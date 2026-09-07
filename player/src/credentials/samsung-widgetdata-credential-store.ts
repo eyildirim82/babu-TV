@@ -92,8 +92,9 @@ function parseDocument(rawData: string, operation: CredentialOperation): Credent
   }
 
   const document: CredentialDocument = Object.create(null) as CredentialDocument;
-  for (const [providerId, value] of Object.entries(parsed as Record<string, unknown>)) {
-    document[providerId] = parseCredential(value, operation);
+  const record = parsed as Record<string, unknown>;
+  for (const providerId of Object.keys(record)) {
+    document[providerId] = parseCredential(record[providerId], operation);
   }
   return document;
 }
