@@ -1,0 +1,48 @@
+name: m1c-package-probe
+
+on:
+  push:
+    branches:
+      - refactor/m1c-playback-boundary
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production player
+        run: npm run build
+
+      - name: Package Tizen WGT
+        run: npm run tizen
+
+      - name: Verify WGT and repository cleanliness
+        shell: bash
+        run: |
+          WGT="$(find beta -maxdepth 1 -type f -name '*.wgt' -print -quit)"
+          test -n "$WGT"
+          echo "WGT=$WGT"
+          ls -lh "$WGT"
+          git diff --exit-code
+          unexpected="$(git status --porcelain --untracked-files=all | grep -v '^?? tizen/nul$' || true)"
+          if [ -n "$unexpected" ]; then
+            echo "Unexpected packaging side effects:"
+            echo "$unexpected"
+            exit 1
+          fi
