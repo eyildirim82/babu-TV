@@ -133,7 +133,7 @@ const CHANGELOG = [
   {
     version: '1.6.0',
     sections: [
-      { type: 'added', items: ['Boot splash with logo animation, typewriter tagline, and spinner', 'App version displayed on splash screen', 'What’s New modal shown once after each update', 'Auto-refresh playlist on app launch — toggle in Settings → Playback'] },
+      { type: 'added', items: ['Boot splash with logo animation, typewriter tagline, and spinner', 'App version displayed on splash screen', 'What\u2019s New modal shown once after each update', 'Auto-refresh playlist on app launch — toggle in Settings → Playback'] },
       { type: 'fixed', items: ['Fetch Active intermittent error during stream playback', 'Relay fallback now shows meaningful error messages', 'Fetch Active button disables during loading'] },
     ],
   },
