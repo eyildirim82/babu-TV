@@ -47,10 +47,10 @@ void test('provider repository strips credential-shaped extra fields at its pers
   const stored = await repository.getProvider('provider-a');
 
   assert.deepEqual(stored, provider('provider-a'));
-  assert.equal(Object.hasOwn(stored ?? {}, 'serverUrl'), false);
-  assert.equal(Object.hasOwn(stored ?? {}, 'playlistUrl'), false);
-  assert.equal(Object.hasOwn(stored ?? {}, 'username'), false);
-  assert.equal(Object.hasOwn(stored ?? {}, 'password'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(stored ?? {}, 'serverUrl'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(stored ?? {}, 'playlistUrl'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(stored ?? {}, 'username'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(stored ?? {}, 'password'), false);
 });
 
 void test('provider repository keeps exactly one active provider and supports switching', async () => {
