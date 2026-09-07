@@ -8,22 +8,46 @@ export class UnknownProviderError extends Error {
   }
 }
 
+function copyProvider(provider: ProviderRecord): ProviderRecord {
+  return {
+    id: provider.id,
+    kind: provider.kind,
+    name: provider.name,
+    createdAtMs: provider.createdAtMs,
+    lastSuccessfulSyncAtMs: provider.lastSuccessfulSyncAtMs,
+  };
+}
+
 export class MemoryProviderRepository implements ProviderRepository {
+  private readonly providers = new Map<ProviderId, ProviderRecord>();
+  private activeProviderId: ProviderId | null = null;
+
   async listProviders(): Promise<readonly ProviderRecord[]> {
-    return [];
+    return Array.from(this.providers.values(), copyProvider);
   }
 
-  async getProvider(_providerId: ProviderId): Promise<ProviderRecord | null> {
-    return null;
+  async getProvider(providerId: ProviderId): Promise<ProviderRecord | null> {
+    const provider = this.providers.get(providerId);
+    return provider ? copyProvider(provider) : null;
   }
 
-  async saveProvider(_provider: ProviderRecord): Promise<void> {}
+  async saveProvider(provider: ProviderRecord): Promise<void> {
+    this.providers.set(provider.id, copyProvider(provider));
+  }
 
-  async removeProvider(_providerId: ProviderId): Promise<void> {}
+  async removeProvider(providerId: ProviderId): Promise<void> {
+    this.providers.delete(providerId);
+    if (this.activeProviderId === providerId) this.activeProviderId = null;
+  }
 
   async getActiveProviderId(): Promise<ProviderId | null> {
-    return null;
+    return this.activeProviderId;
   }
 
-  async setActiveProviderId(_providerId: ProviderId | null): Promise<void> {}
+  async setActiveProviderId(providerId: ProviderId | null): Promise<void> {
+    if (providerId !== null && !this.providers.has(providerId)) {
+      throw new UnknownProviderError(providerId);
+    }
+    this.activeProviderId = providerId;
+  }
 }
