@@ -53,7 +53,9 @@ export function sanitizeLogValue(value: unknown): unknown {
 
   const sanitized: Record<string, unknown> = {};
   for (const key of Object.keys(value)) {
-    sanitized[key] = sanitizeLogValue((value as Record<string, unknown>)[key]);
+    sanitized[key] = SENSITIVE_QUERY_KEYS.has(key.toLowerCase())
+      ? REDACTED
+      : sanitizeLogValue((value as Record<string, unknown>)[key]);
   }
   return sanitized;
 }
