@@ -1,155 +1,53 @@
-# AGENTS.md — EN TV Player
+# AGENTS.md — BabuşTV
 
-> **Check this file at the start of every conversation.** Update it whenever new conventions or files are introduced.
+> Read this file, the active spec, and the active implementation plan before changing code.
 
-## 1. Project Overview
+## Product
 
-**EN TV Player** is a standalone Samsung Tizen TV IPTV player that solves DRM-protected channel playback issues on Tizen OS.
+BabuşTV is a Tizen-first, open-source, privacy-first Live TV client. It inherits a proven Tizen/Shaka/AVPlay baseline from EN TV Player and deliberately evolves into an independent product.
 
-**Key value:** Plays DRM channels that other players can't on Tizen TVs.
+## Source of Truth
 
-**Key principle:** Simple, privacy-focused, no server required.
+- Product/architecture design: `docs/superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md`
+- Upstream baseline: `docs/UPSTREAM_BASELINE.md`
+- Repository workflow: `docs/REPO_RULES.md`
+- Implementation plans: `docs/superpowers/plans/`
 
-## 2. Available Skills
+## Hard Rules
 
-| Skill | Purpose in this project |
-|---|---|
-| `senior-frontend` | Player SPA implementation, remote input, playback engine |
-| `frontend-design` | Visual system, CSS, theming |
-| `ui-ux-pro-max` | 10-foot UX rules, interaction design, TV conventions |
-| `code-reviewer` | Pre-merge verification: security, code quality, spec-compliance |
-| `gitnexus` | Git operations per `docs/REPO_RULES.md` |
+- Never develop directly on `main`.
+- Never merge or deploy without explicit user approval.
+- Before each new task, fresh-check `main`, active branch/PR, exact-head CI, and relevant upstream state.
+- Do not blindly trust prior SHA, CI, PR, or upstream-version information.
+- Bugs follow: root cause -> RED -> minimum fix -> GREEN -> review -> full verification.
+- Preserve working playback behavior unless the active task explicitly changes it.
+- Once platform boundaries exist, Tizen API calls stay inside platform adapters.
+- Once playback boundaries exist, AVPlay calls stay inside playback adapters.
+- Never commit or log IPTV credentials, credential-bearing URLs, provider dumps, tokens, signing keys, certificates, or real playlists/EPG exports.
+- Sanitize URLs before logging.
+- Do not introduce React or another UI framework without a new approved ADR.
+- Keep changes bounded; no big-bang rewrites.
+- Never auto-merge upstream; inspect, establish relevance, port deliberately, and verify.
 
-## 3. Project Structure
+## M0 Baseline
 
-```
-en-tvplayer/
-├── AGENTS.md            ← this file
-├── player/              Shaka SPA (TV app)
-│   ├── src/
-│   │   ├── main.js      App entry point
-│   │   ├── player.js    Shaka Player wrapper
-│   │   ├── avplay.js    Native AVPlay fallback (undecodable streams)
-│   │   ├── ui.js        Channel list + sidebar
-│   │   ├── settings.js  Settings page
-│   │   ├── remote.js    Remote control handler
-│   │   ├── update.js    Update checker + opt-in ping
-│   │   ├── config.js    localStorage settings
-│   │   └── utils.js     Shared utilities
-│   ├── public/          Static assets
-│   └── vite.config.js   Vite configuration
-├── tizen/               WGT build tools
-├── releases/            Pre-built WGT releases
-├── docs/                Project documentation
-└── README.md
-```
+Until M1 establishes new boundaries, the inherited layout remains authoritative:
 
-## 4. Workflow Rules
+- `player/src/player.js` — Shaka playback orchestration
+- `player/src/avplay.js` — Samsung AVPlay fallback
+- `player/src/remote.js` — remote normalization
+- `player/src/utils.js` — playlist parsing and stream URL processing
+- `player/src/config.js` — inherited config/settings
+- `tizen/` — package/install tooling
 
-**Hard rules**
-- Every code file ≤ 300 LOC — split before it grows past the limit.
-- Write code only to spec. Minimum, not maximum. One simple solution.
-- No dead code, no speculative abstractions, no unused imports/variables.
+## Verification
 
-**Commit Convention**
-- Format: `<type>(<scope>): <description>`
-- Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `style`, `perf`
-- Example: `feat(player): preserve playlist channel numbers`
-- One logical change per commit.
-
-**Branch Strategy**
-- `main` — always deployable
-- `feature/<name>` — new functionality
-- `fix/<name>` — bug fixes
-
-## 5. Remote Control (Currently Supported)
-
-| Key | Action |
-|-----|--------|
-| ↑ / ↓ | Navigate channel list |
-| ← / → | Open/close sidebar |
-| Enter | Select channel |
-| Back | Close menu |
-| Volume ↑/↓ | Adjust volume |
-
-**Note:** Other remote buttons (color keys, channel up/down, etc.) are not yet supported.
-
-## 6. Key Features
-
-- **Solves DRM issue** — Plays ClearKey and PlayReady channels on Tizen
-- No server required — fetches M3U8 playlists directly
-- M3U/M3U8 support
-- Per-channel proxy toggle
-- Virtualized channel list (5,000+ channels)
-
-## 7. Installation Methods
-
-1. **Apps2Samsung** (recommended) — network install
-2. **Tizen Studio CLI** — `tizen install -n EN-IPTV_Player.wgt -s <TV_IP>`
-
-## 8. Release Process — MANDATORY STEPS
-
-**⚠️ ALL steps must be completed. Skipping any step breaks the community package.**
-
-### Step 1: Update Version
-- Update `package.json` → `"version": "X.Y.Z"`
-- Update `player/package.json` → `"version": "X.Y.Z"`
-- Update `version.json` → `"version": "X.Y.Z"` (drives the in-app update checker via jsDelivr)
-- Refresh `docs/STATS.md` download counts (see file for the `gh api` command)
-
-### Step 1b: Certificate backup (do once, verify each release)
-- `tizen/author-key.pem` is gitignored and irreplaceable — back it up encrypted off-machine.
-- Future WGTs MUST be signed with the same key or the TV treats them as a new app (settings lost).
-
-### Step 2: Build
-```bash
-npm run build && npm run tizen
-```
-
-### Step 3: Copy WGT
-- Copy built WGT to `releases/EN-IPTV_Player.wgt`
-
-### Step 4: Commit & Tag
-```bash
-git add -A
-git commit -m "release: vX.Y.Z"
-git tag -a vX.Y.Z -m "Release vX.Y.Z"
-git push && git push origin vX.Y.Z
-```
-
-### Step 5: Create GitHub Release
-- Use `gh release create` or GitHub UI
-- Upload `releases/EN-IPTV_Player.wgt` (direct .wgt, NOT zip)
-- Write release notes
-
-### Step 6: ⚠️ UPDATE COMMUNITY JSON (MANDATORY)
-- Edit `packages/Nur-allhi__en-tvplayer.json` in tizen-community-packages repo
-- Ensure `output_name` matches your release asset filename
-- Commit and push
-- Verify PR builds successfully
-
-**Without Step 6, the community bundle will have an OLD version of your app!**
-
-## 9. Community Packages Maintenance
-
-- **Repository:** `Apps2Samsung/tizen-community-packages`
-- **Your file:** `packages/Nur-allhi__en-tvplayer.json`
-- **Always update when:** releasing new version, changing asset filename, or fixing release issues
-
-### How to Update
+Run the baseline checks on a fresh dependency install:
 
 ```bash
-# Clone the community repo
-git clone https://github.com/Nur-allhi/tizen-community-packages.git
-
-# Edit your JSON file
-# packages/Nur-allhi__en-tvplayer.json
-
-# Commit and push
-git add .
-git commit -m "update: EN TV Player to vX.Y.Z"
-git push
-
-# Create PR
-gh pr create --repo Apps2Samsung/tizen-community-packages
+npm ci
+npm test
+npm run build
 ```
+
+Run WGT packaging only in an environment where generated signing material remains uncommitted and secret-safe.
