@@ -19,8 +19,10 @@ function installPlatform({ available = true, prepareSucceeds = true, emitFirstFr
     setDisplayRect(x, y, width, height) { calls.push(['rect', x, y, width, height]); },
     prepareAsync(onSuccess, onFailure) {
       calls.push(['prepare']);
-      if (prepareSucceeds) onSuccess();
-      else onFailure();
+      queueMicrotask(() => {
+        if (prepareSucceeds) onSuccess();
+        else onFailure();
+      });
     },
     play() {
       calls.push(['play']);
