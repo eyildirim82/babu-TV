@@ -1,6 +1,7 @@
 import type {
   Category,
   Channel,
+  ChannelId,
   ProviderId,
   ProviderKind,
 } from '../domain/models.js';
@@ -46,25 +47,61 @@ export class FakeProviderError extends Error {
   }
 }
 
+function toFailureError(failure: FakeProviderFailure): FakeProviderError {
+  if (typeof failure === 'number') {
+    return new FakeProviderError(`HTTP_${failure}` as FakeProviderErrorCode, failure);
+  }
+  if (failure === 'timeout') {
+    return new FakeProviderError('TIMEOUT', null);
+  }
+  return new FakeProviderError('MALFORMED_RESPONSE', null);
+}
+
 export class FakeProvider implements ProviderAdapter {
   readonly kind: ProviderKind;
+  private readonly categories: readonly FakeCategoryInput[];
+  private readonly channels: readonly FakeChannelInput[];
+  private readonly failure: FakeProviderFailure | null;
 
-  constructor(_options: FakeProviderOptions) {
-    this.kind = _options.kind;
+  constructor(options: FakeProviderOptions) {
+    this.kind = options.kind;
+    this.categories = options.categories;
+    this.channels = options.channels;
+    this.failure = options.failure ?? null;
   }
 
-  async listCategories(_providerId: ProviderId): Promise<readonly Category[]> {
-    return [];
+  private assertAvailable(): void {
+    if (this.failure !== null) throw toFailureError(this.failure);
   }
 
-  async listChannels(_providerId: ProviderId): Promise<readonly Channel[]> {
-    return [];
+  async listCategories(providerId: ProviderId): Promise<readonly Category[]> {
+    this.assertAvailable();
+    return this.categories.map((category) => ({
+      providerId,
+      id: category.id,
+      name: category.name,
+    }));
+  }
+
+  async listChannels(providerId: ProviderId): Promise<readonly Channel[]> {
+    this.assertAvailable();
+    return this.channels.map((channel) => ({
+      providerId,
+      id: channel.id,
+      name: channel.name,
+      categoryId: channel.categoryId,
+      logoUrl: channel.logoUrl,
+      number: channel.number,
+    }));
   }
 
   async resolveStream(
-    _providerId: ProviderId,
-    _channelId: string,
+    providerId: ProviderId,
+    channelId: ChannelId,
   ): Promise<StreamRequest> {
-    return { url: 'https://example.invalid/not-implemented.m3u8' };
+    this.assertAvailable();
+    return {
+      url: `https://example.com/live/${encodeURIComponent(providerId)}/${encodeURIComponent(channelId)}.m3u8`,
+    };
   }
 }
