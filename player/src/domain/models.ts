@@ -9,6 +9,14 @@ export interface ProviderSummary {
   name: string;
 }
 
+export interface ProviderRecord {
+  id: ProviderId;
+  kind: ProviderKind;
+  name: string;
+  createdAtMs: number;
+  lastSuccessfulSyncAtMs: number | null;
+}
+
 export interface Category {
   providerId: ProviderId;
   id: CategoryId;
