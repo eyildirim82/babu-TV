@@ -10,6 +10,13 @@ void test('redacts credentials and tokens from URLs', () => {
   );
 });
 
+void test('redacts Xtream credentials embedded in stream paths', () => {
+  assert.equal(
+    sanitizeUrlForLog('https://example.com/live/alice/secret/42.ts'),
+    'https://example.com/live/[REDACTED]/[REDACTED]/42.ts',
+  );
+});
+
 void test('returns non URLs without throwing', () => {
   assert.equal(sanitizeUrlForLog('not-a-url'), 'not-a-url');
 });
