@@ -6,12 +6,17 @@
   "scripts": {
     "dev": "vite --port 5173 --host",
     "build": "vite build",
-    "preview": "vite preview --port 4173 --host"
+    "preview": "vite preview --port 4173 --host",
+    "test:ts": "tsx --test test-ts/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "shaka-player": "^5.2.0"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
     "vite": "^6.3.5"
   }
 }
