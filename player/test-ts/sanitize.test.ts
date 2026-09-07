@@ -27,3 +27,18 @@ void test('sanitizes URL strings inside arrays and plain objects', () => {
     { url: 'https://example.com/live?key=%5BREDACTED%5D', values: ['plain'] },
   );
 });
+
+void test('redacts credential fields in structured log values', () => {
+  assert.deepEqual(
+    sanitizeLogValue({
+      username: 'alice',
+      password: 'secret',
+      nested: { token: 'abc', quality: 'hd' },
+    }),
+    {
+      username: '[REDACTED]',
+      password: '[REDACTED]',
+      nested: { token: '[REDACTED]', quality: 'hd' },
+    },
+  );
+});
