@@ -1,5 +1,6 @@
 import { getSettings, saveSettings, getProxyOverrides, getActivePlaylist, APP_VERSION } from './config.js';
-import * as player from './player.js';
+import * as legacyPlayer from './player.js';
+import { createPlaybackService } from './playback/playback-service.ts';
 import * as ui from './ui.js';
 import * as remote from './remote.js';
 import * as settings from './settings.js';
@@ -8,6 +9,7 @@ import { processStreamUrl, parseM3u, fetchPlaylist as fetchFromPlaylistUrl } fro
 import { createPlatform, LEGACY_OPTIONAL_TIZEN_KEYS } from './platform/create-platform.ts';
 
 const platform = createPlatform(window);
+const player = createPlaybackService(legacyPlayer);
 
 let currentIndex = 0;
 let channels;

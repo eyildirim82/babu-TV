@@ -1,6 +1,9 @@
 import shaka from 'shaka-player';
 import config, { getSettings } from './config.js';
-import * as avplay from './avplay.js';
+import * as legacyAvplay from './avplay.js';
+import { createAvplayAdapter } from './playback/avplay-adapter.ts';
+
+const avplay = createAvplayAdapter(legacyAvplay);
 
 function logEvent(level, message) {
   try {
@@ -1030,6 +1033,11 @@ export function togglePlay() {
 
 export function isNativeAvailable() {
   return avplay.isAvailable();
+}
+
+export function getPlaybackEngine() {
+  if (useAvplay) return 'avplay';
+  return player ? 'shaka' : null;
 }
 
 export function getPlayer() {
