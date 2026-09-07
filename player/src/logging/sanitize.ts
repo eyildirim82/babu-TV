@@ -13,6 +13,18 @@ const SENSITIVE_QUERY_KEYS = new Set([
   'key',
 ]);
 
+const XTREAM_CREDENTIAL_PATHS = new Set(['live', 'movie', 'series']);
+
+function redactXtreamPathCredentials(url: URL): void {
+  const segments = url.pathname.split('/');
+  const markerIndex = segments.findIndex((segment) => XTREAM_CREDENTIAL_PATHS.has(segment.toLowerCase()));
+  if (markerIndex < 0 || segments.length <= markerIndex + 2) return;
+
+  segments[markerIndex + 1] = REDACTED;
+  segments[markerIndex + 2] = REDACTED;
+  url.pathname = segments.join('/');
+}
+
 export function sanitizeUrlForLog(value: string): string {
   let url: URL;
   try {
@@ -23,6 +35,7 @@ export function sanitizeUrlForLog(value: string): string {
 
   url.username = '';
   url.password = '';
+  redactXtreamPathCredentials(url);
 
   for (const key of Array.from(url.searchParams.keys())) {
     if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
