@@ -1,110 +1,73 @@
-# REPO RULES — EN TV Player
+# BabuşTV Repository Rules
 
-> **Version:** 1.1 · **Date:** 2026-08-28
+## Branches
 
----
+- `main` — always buildable; no development commits after the one-time upstream bootstrap
+- `docs/*` — documentation/spec/plan work
+- `feature/*` — user-visible functionality
+- `fix/*` — bug fixes
+- `refactor/*` — behavior-preserving structural work
+- `spike/*` — bounded technical investigations
 
-## 1. Branch Strategy
+## Pull Requests
 
-| Branch | Purpose | Rules |
-|---|---|---|
-| `main` | Always deployable | No direct commits. Only merges from feature/fix branches. |
-| `feature/<name>` | New functionality | e.g. `feature/favorites` |
-| `fix/<name>` | Bug fixes | e.g. `fix/remote-keys` |
+- Every development branch reaches `main` through a pull request.
+- Keep each PR bounded to one behavior or one architectural step.
+- The exact PR head must pass required verification before completion or merge claims.
+- Merge only after explicit user approval.
+- Prefer squash merge for BabuşTV-owned development unless preserving imported history is the explicit task.
 
----
+## Commits
 
-## 2. Commits (Conventional Commits)
+Use Conventional Commit style where practical:
 
-- Format: `<type>(<scope>): <description>`
-- Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `style`, `perf`
-- Example: `feat(player): preserve playlist channel numbers`
-- One logical change per commit. Bodies explain *why*.
-- **File limit:** no file over 300 LOC.
+- `feat(scope): ...`
+- `fix(scope): ...`
+- `test(scope): ...`
+- `refactor(scope): ...`
+- `docs(scope): ...`
+- `chore(scope): ...`
 
----
+Keep one logical change per commit.
 
-## 3. Merge Rules
+## Test Discipline
 
-1. Feature/fix branches → PR into `main`
-2. Squash-merge; delete branch after merge
-3. Every merge carries a one-line summary
-4. README + CHANGELOG must be updated in the same PR
+For behavior changes and bugs:
 
----
+1. reproduce or characterize the existing behavior
+2. establish RED
+3. implement the minimum change
+4. reach GREEN
+5. run relevant regression tests
+6. run full task verification
+7. review the diff against the active spec/plan
 
-## 4. README.md
+Do not guess at fixes before root cause is established.
 
-- Reflects current setup in the same PR as any change
-- Stale README = PR not done
+## Secrets and Provider Data
 
----
+Never commit:
 
-## 5. CHANGELOG.md
+- Xtream usernames/passwords or provider tokens
+- secret M3U URLs or credential-bearing stream URLs
+- real provider channel/EPG dumps
+- private playlist snapshots
+- Tizen signing private keys/certificates
+- pairing plaintext or decrypted provider payloads
 
-- "Keep a Changelog" format
-- Updated on every merge to `main`
+Use synthetic fixtures only. Sanitize URLs and request metadata before logging.
 
----
+## Upstream
 
-## 6. Versioning
+`Nur-allhi/en-tvplayer` remains the upstream reference. Do not automatically merge upstream.
 
-- Semver tags: `vX.Y.Z`
-- Current: `v1.1.0`
-- WGT releases attach to GitHub Release — **never committed to repo**
+Prioritize review of upstream:
 
----
+1. security fixes
+2. playback fixes
+3. Tizen compatibility fixes
+4. packaging/install fixes
 
-## 7. Housekeeping
+For relevant changes, inspect the exact diff, establish relevance or reproduce where practical, port deliberately, and verify against BabuşTV tests.
 
-- `.gitignore` covers: `node_modules/`, `*.pem`, `*.p12`, `*.wgt` (except `releases/`), `logs/`
-- No secrets in git ever
-- `main` must build on fresh clone
-
----
-
-## ⚠️ 8. Community Packages Update — MANDATORY
-
-**Every release MUST update the community JSON file.**
-
-### Rule
-When you release a new version, you MUST:
-1. Update `packages/Nur-allhi__en-tvplayer.json` in `tizen-community-packages` repo
-2. Ensure `output_name` matches your release asset filename
-3. Open a PR to `Apps2Samsung/tizen-community-packages`
-
-### Why
-- Users discover your app through the community bundle
-- Old versions in the bundle = bad user experience
-- Maintainers may remove apps that are rarely updated
-
-### Checklist for Every Release
-
-- [ ] Version updated in `package.json` and `player/package.json`
-- [ ] `version.json` updated (in-app update checker)
-- [ ] `docs/STATS.md` download counts refreshed
-- [ ] Author key (`tizen/author-key.pem`) backed up off-machine
-- [ ] WGT built successfully
-- [ ] GitHub release created with direct .wgt file
-- [ ] Community JSON file updated (if asset filename changed)
-- [ ] PR opened to `Apps2Samsung/tizen-community-packages`
-- [ ] PR merged successfully
-
-### What to Update in JSON
-
-```json
-{
-  "name": "EN TV Player",
-  "description": "...",
-  "repo": "Nur-allhi/en-tvplayer",
-  "source": "release",
-  "branch": "main",
-  "output_name": "EN-IPTV_Player.wgt"  ← Must match release asset
-}
-```
-
-### When to Update
-
-- **Always:** On every new release
-- **If changed:** Asset filename, repo name, branch
-- **Never:** Remove the JSON file (app stays in community)
+The pinned starting point is documented in `docs/UPSTREAM_BASELINE.md`.
