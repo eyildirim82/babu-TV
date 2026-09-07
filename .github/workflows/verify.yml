@@ -31,6 +31,9 @@ jobs:
       - name: Run characterization tests
         run: npm test
 
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Build production player
         run: npm run build
 

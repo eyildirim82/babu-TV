@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "npm run dev -w player",
     "build": "npm run build -w player",
-    "test": "node --test player/test/*.test.js",
+    "test": "node --test player/test/*.test.js && npm run test:ts -w player",
+    "typecheck": "npm run typecheck -w player",
     "tizen": "cd tizen && node package.mjs"
   },
   "workspaces": [
