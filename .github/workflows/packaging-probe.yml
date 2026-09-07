@@ -1,0 +1,40 @@
+name: packaging probe
+
+on:
+  push:
+    branches:
+      - docs/m0-baseline-bootstrap
+    paths:
+      - .github/workflows/packaging-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build player
+        run: npm run build
+
+      - name: Package inherited Tizen app
+        run: npm run tizen
+
+      - name: Verify signing material remains ignored
+        run: |
+          git check-ignore -v tizen/author-key.pem
+          git check-ignore -v tizen/author-cert.pem
+          git status --short
