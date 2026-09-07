@@ -8,17 +8,27 @@ import {
   makeLargeChannelFixture,
 } from './fixtures/provider-fixtures.js';
 
-void test('fake provider returns provider-scoped catalog and synthetic stream URLs', async () => {
-  const provider = new FakeProvider({
+void test('fake provider binds provider identity once and returns provider-scoped catalog', async () => {
+  const provider = new FakeProvider('provider-a', {
     kind: 'xtream',
     categories: BASIC_CATEGORIES,
     channels: BASIC_CHANNELS,
   });
 
-  const categories = await provider.listCategories('provider-a');
-  const channels = await provider.listChannels('provider-a');
-  const stream = await provider.resolveStream('provider-a', '42');
+  const profile = await provider.getProfile();
+  const categories = await provider.listCategories();
+  const channels = await provider.listChannels();
+  const stream = await provider.resolveStream('42');
 
+  assert.equal(provider.providerId, 'provider-a');
+  assert.equal(provider.kind, 'xtream');
+  assert.deepEqual(profile, {
+    providerId: 'provider-a',
+    kind: 'xtream',
+    accountName: 'Synthetic Account',
+    expiresAtMs: null,
+    maxConnections: 1,
+  });
   assert.deepEqual(categories[0], { providerId: 'provider-a', id: 'news', name: 'News' });
   assert.equal(channels[0]?.providerId, 'provider-a');
   assert.equal(channels[0]?.id, '42');
@@ -29,7 +39,7 @@ void test('fake provider returns provider-scoped catalog and synthetic stream UR
 
 for (const status of [401, 403, 404, 500] as const) {
   void test(`fake provider exposes deterministic HTTP ${status} failure`, async () => {
-    const provider = new FakeProvider({
+    const provider = new FakeProvider('provider-a', {
       kind: 'xtream',
       categories: BASIC_CATEGORIES,
       channels: BASIC_CHANNELS,
@@ -37,7 +47,7 @@ for (const status of [401, 403, 404, 500] as const) {
     });
 
     await assert.rejects(
-      provider.listChannels('provider-a'),
+      provider.listChannels(),
       (error: unknown) => error instanceof FakeProviderError
         && error.code === `HTTP_${status}`
         && error.status === status,
@@ -46,7 +56,7 @@ for (const status of [401, 403, 404, 500] as const) {
 }
 
 void test('fake provider exposes deterministic timeout failure without sleeping', async () => {
-  const provider = new FakeProvider({
+  const provider = new FakeProvider('provider-a', {
     kind: 'xtream',
     categories: BASIC_CATEGORIES,
     channels: BASIC_CHANNELS,
@@ -54,7 +64,7 @@ void test('fake provider exposes deterministic timeout failure without sleeping'
   });
 
   await assert.rejects(
-    provider.listChannels('provider-a'),
+    provider.listChannels(),
     (error: unknown) => error instanceof FakeProviderError
       && error.code === 'TIMEOUT'
       && error.status === null,
@@ -62,7 +72,7 @@ void test('fake provider exposes deterministic timeout failure without sleeping'
 });
 
 void test('fake provider exposes deterministic malformed-response failure', async () => {
-  const provider = new FakeProvider({
+  const provider = new FakeProvider('provider-a', {
     kind: 'm3u',
     categories: BASIC_CATEGORIES,
     channels: BASIC_CHANNELS,
@@ -70,22 +80,27 @@ void test('fake provider exposes deterministic malformed-response failure', asyn
   });
 
   await assert.rejects(
-    provider.listCategories('provider-a'),
+    provider.listCategories(),
     (error: unknown) => error instanceof FakeProviderError
       && error.code === 'MALFORMED_RESPONSE'
       && error.status === null,
   );
 });
 
-void test('fake provider can return duplicate external IDs across providers without collapsing identity', async () => {
-  const provider = new FakeProvider({
+void test('two fake adapters keep identical external channel IDs provider-scoped', async () => {
+  const providerA = new FakeProvider('provider-a', {
+    kind: 'xtream',
+    categories: BASIC_CATEGORIES,
+    channels: BASIC_CHANNELS,
+  });
+  const providerB = new FakeProvider('provider-b', {
     kind: 'xtream',
     categories: BASIC_CATEGORIES,
     channels: BASIC_CHANNELS,
   });
 
-  const a = await provider.listChannels('provider-a');
-  const b = await provider.listChannels('provider-b');
+  const a = await providerA.listChannels();
+  const b = await providerB.listChannels();
 
   assert.equal(a[0]?.id, '42');
   assert.equal(b[0]?.id, '42');
@@ -94,13 +109,13 @@ void test('fake provider can return duplicate external IDs across providers with
 });
 
 void test('fake provider supports deterministic large channel lists', async () => {
-  const provider = new FakeProvider({
+  const provider = new FakeProvider('provider-large', {
     kind: 'xtream',
     categories: [{ id: 'bulk', name: 'Bulk' }],
     channels: makeLargeChannelFixture(1000),
   });
 
-  const channels = await provider.listChannels('provider-large');
+  const channels = await provider.listChannels();
 
   assert.equal(channels.length, 1000);
   assert.equal(channels[0]?.id, 'channel-1');
