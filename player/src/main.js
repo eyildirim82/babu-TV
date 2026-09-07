@@ -5,6 +5,9 @@ import * as remote from './remote.js';
 import * as settings from './settings.js';
 import { checkForUpdate, sendUsagePing, consentAsked, hasConsented, setConsented } from './update.js';
 import { processStreamUrl, parseM3u, fetchPlaylist as fetchFromPlaylistUrl } from './utils.js';
+import { createPlatform, LEGACY_OPTIONAL_TIZEN_KEYS } from './platform/create-platform.ts';
+
+const platform = createPlatform(window);
 
 let currentIndex = 0;
 let channels;
@@ -243,7 +246,7 @@ async function init() {
   
 
 
-  registerTizenKeys();
+  platform.registerOptionalKeys(LEGACY_OPTIONAL_TIZEN_KEYS);
 
   document.addEventListener('tizenhwkey', (e) => {
     if (e.keyName === 'back') {
@@ -660,19 +663,6 @@ async function refreshChannelsInBackground() {
   }
 }
 
-function registerTizenKeys() {
-  if (!window.tizen || !window.tizen.tvinputdevice) return;
-  const keys = [
-    'ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue',
-    'MediaPlayPause', 'MediaPlay', 'MediaPause', 'MediaStop',
-    'MediaFastForward', 'MediaRewind', 'MediaTrackNext', 'MediaTrackPrevious',
-    'ChannelUp', 'ChannelDown',
-  ];
-  for (const key of keys) {
-    try { window.tizen.tvinputdevice.registerKey(key); } catch (e) { console.warn('Failed to register Tizen key:', key); }
-  }
-}
-
 function handleRemoteAction(action, value) {
   if (action === 'back') {
     const now = Date.now();
@@ -878,11 +868,7 @@ function handleRemoteAction(action, value) {
     case 'back':
       ui.showConfirmDialog('Exit the app?', (confirmed) => {
         if (confirmed) {
-          if (window.tizen && window.tizen.application) {
-            try { window.tizen.application.getCurrentApplication().exit(); } catch {}
-          } else {
-            window.close();
-          }
+          platform.exitApp();
         }
       });
       break;
