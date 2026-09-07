@@ -6,7 +6,7 @@ import type {
   ProviderKind,
 } from '../domain/models.js';
 import type { StreamRequest } from '../playback/contracts.js';
-import type { ProviderAdapter } from './contracts.js';
+import type { ProviderAdapter, ProviderProfile } from './contracts.js';
 
 export type FakeProviderFailure = 401 | 403 | 404 | 500 | 'timeout' | 'malformed';
 export type FakeProviderErrorCode =
@@ -58,12 +58,14 @@ function toFailureError(failure: FakeProviderFailure): FakeProviderError {
 }
 
 export class FakeProvider implements ProviderAdapter {
+  readonly providerId: ProviderId;
   readonly kind: ProviderKind;
   private readonly categories: readonly FakeCategoryInput[];
   private readonly channels: readonly FakeChannelInput[];
   private readonly failure: FakeProviderFailure | null;
 
-  constructor(options: FakeProviderOptions) {
+  constructor(providerId: ProviderId, options: FakeProviderOptions) {
+    this.providerId = providerId;
     this.kind = options.kind;
     this.categories = options.categories;
     this.channels = options.channels;
@@ -74,19 +76,30 @@ export class FakeProvider implements ProviderAdapter {
     if (this.failure !== null) throw toFailureError(this.failure);
   }
 
-  async listCategories(providerId: ProviderId): Promise<readonly Category[]> {
+  async getProfile(): Promise<ProviderProfile> {
+    this.assertAvailable();
+    return {
+      providerId: this.providerId,
+      kind: this.kind,
+      accountName: 'Synthetic Account',
+      expiresAtMs: null,
+      maxConnections: 1,
+    };
+  }
+
+  async listCategories(): Promise<readonly Category[]> {
     this.assertAvailable();
     return this.categories.map((category) => ({
-      providerId,
+      providerId: this.providerId,
       id: category.id,
       name: category.name,
     }));
   }
 
-  async listChannels(providerId: ProviderId): Promise<readonly Channel[]> {
+  async listChannels(): Promise<readonly Channel[]> {
     this.assertAvailable();
     return this.channels.map((channel) => ({
-      providerId,
+      providerId: this.providerId,
       id: channel.id,
       name: channel.name,
       categoryId: channel.categoryId,
@@ -95,13 +108,10 @@ export class FakeProvider implements ProviderAdapter {
     }));
   }
 
-  async resolveStream(
-    providerId: ProviderId,
-    channelId: ChannelId,
-  ): Promise<StreamRequest> {
+  async resolveStream(channelId: ChannelId): Promise<StreamRequest> {
     this.assertAvailable();
     return {
-      url: `https://example.com/live/${encodeURIComponent(providerId)}/${encodeURIComponent(channelId)}.m3u8`,
+      url: `https://example.com/live/${encodeURIComponent(this.providerId)}/${encodeURIComponent(channelId)}.m3u8`,
     };
   }
 }
