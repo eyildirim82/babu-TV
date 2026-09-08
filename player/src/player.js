@@ -508,6 +508,7 @@ async function runChannelLoadWithPolicy(channel, policy) {
     return loadViaAvplay(channel, myToken);
   }
 
+  let loadWatchdogTimedOut = false;
   try {
     // Always destroy and recreate the player on every channel switch.
     // On Tizen, Shaka's unload/load can hang forever when stuck on a failed
@@ -559,6 +560,7 @@ async function runChannelLoadWithPolicy(channel, policy) {
       }
       const idleFor = Date.now() - lastShakaActivity;
       if (idleFor >= 15000 || Date.now() - loadStart > 60000) {
+        loadWatchdogTimedOut = true;
         clearInterval(loadingTimeout);
         loadingTimeout = null;
         logEvent('WARN', 'Load stalled (idle ' + Math.round(idleFor / 1000) + 's, lastREQ=' + lastShakaReq + ', lastRESP=' + lastShakaResp + ')');
@@ -611,6 +613,10 @@ async function runChannelLoadWithPolicy(channel, policy) {
     initialLoadPending = false;
     showLoading(false);
     videoErrorCount = 0;
+
+    if (policy === M3_SHAKA_ATTEMPT_POLICY && loadWatchdogTimedOut) {
+      return { ok: false, failure: { m3Code: 'TIMEOUT' } };
+    }
 
     if (error && error.code === 7000) return false;
 
