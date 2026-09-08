@@ -2,8 +2,23 @@ import shaka from 'shaka-player';
 import config, { getSettings } from './config.js';
 import * as legacyAvplay from './avplay.js';
 import { createAvplayAdapter } from './playback/avplay-adapter.ts';
+import { classifyShakaFailure } from './playback/shaka-error-classifier.ts';
 
 const avplay = createAvplayAdapter(legacyAvplay);
+
+const LEGACY_PLAYBACK_POLICY = Object.freeze({
+  allowNativeFallback: true,
+  allowAutomaticRecovery: true,
+  allowAutoAdvance: true,
+});
+
+const M3_SHAKA_ATTEMPT_POLICY = Object.freeze({
+  allowNativeFallback: false,
+  allowAutomaticRecovery: false,
+  allowAutoAdvance: false,
+});
+
+let activePlaybackPolicy = LEGACY_PLAYBACK_POLICY;
 
 function logEvent(level, message) {
   try {
@@ -406,9 +421,25 @@ async function probeChannelFormat(channel) {
 }
 
 export async function loadChannel(channel) {
-  if (!channel) return false;
+  return loadChannelWithPolicy(channel, LEGACY_PLAYBACK_POLICY);
+}
+
+export async function playShakaAttempt(channel) {
+  const attempt = { error: null };
+  const ok = await loadChannelWithPolicy(channel, M3_SHAKA_ATTEMPT_POLICY, attempt);
+  return { ok, error: ok ? null : attempt.error };
+}
+
+async function loadChannelWithPolicy(channel, policy, attempt = null) {
+  activePlaybackPolicy = policy;
+
+  if (!channel) {
+    if (attempt) attempt.error = 'UNKNOWN';
+    return false;
+  }
 
   if (channel.drm && !isEmeSupported()) {
+    if (attempt) attempt.error = 'ENGINE_FAILURE';
     logEvent('ERROR', 'DRM not available — EME (Encrypted Media Extensions) is not supported in this browser/context');
     showError('This channel is protected and cannot play here. Try a different channel.');
     return false;
@@ -435,8 +466,9 @@ export async function loadChannel(channel) {
     url += sep + '_t=' + Date.now();
   }
 
-  // Channels already known to need native playback skip Shaka entirely.
-  if (avplayPreferredUrls.has(channel.url) && avplay.isAvailable()) {
+  // Channels already known to need native playback skip Shaka entirely only
+  // on the legacy path. M3 always starts each engine attempt with Shaka.
+  if (policy.allowNativeFallback && avplayPreferredUrls.has(channel.url) && avplay.isAvailable()) {
     return loadViaAvplay(channel, myToken);
   }
 
@@ -450,7 +482,10 @@ export async function loadChannel(channel) {
 
     if (el) {
       const ok = await initPlayer(el);
-      if (!ok) return false;
+      if (!ok) {
+        if (attempt) attempt.error = 'ENGINE_FAILURE';
+        return false;
+      }
     }
     if (videoElement) videoElement.classList.remove('hidden');
     currentChannel = channel;
@@ -526,13 +561,14 @@ export async function loadChannel(channel) {
     reconnectAttempts = 0;
     consecutiveErrors = 0;
     videoErrorCount = 0;
-    startStallWatchdog();
-    startBlackWatchdog();
+    if (policy.allowAutomaticRecovery) startStallWatchdog();
+    if (policy.allowNativeFallback) startBlackWatchdog();
     logEvent('INFO', 'Loaded: ' + (channel.name || channel.url.slice(0, 60)));
     return true;
   } catch (error) {
     clearTimeout(loadingTimeout);
     loadingTimeout = null;
+    if (attempt) attempt.error = classifyShakaFailure(error);
     if (myToken !== loadToken) return false;
 
     initialLoadPending = false;
@@ -542,7 +578,8 @@ export async function loadChannel(channel) {
     if (error && error.code === 7000) return false;
 
     // After a timeout, the player was destroyed above. Recreate it so the
-    // next channel switch works.
+    // next channel switch works. M3 reports the normalized failure directly
+    // instead of scheduling hidden retries.
     if (error && (error.message === 'Load timed out' || error.name === 'DestroyedError')) {
       logEvent('WARN', 'Load abandoned — recreating player for next attempt');
       const el = videoElement;
@@ -550,9 +587,9 @@ export async function loadChannel(channel) {
       if (el && myToken === loadToken) {
         await initPlayer(el);
       }
-      if (reconnectAttempts < 3) {
+      if (policy.allowAutomaticRecovery && reconnectAttempts < 3) {
         scheduleReconnect();
-      } else {
+      } else if (policy.allowAutomaticRecovery) {
         showError('Could not load this channel after several tries. It may be turned off or not available on your TV.');
         logEvent('ERROR', 'Reconnect limit reached — ' + (channel.name || channel.url.slice(0, 60)));
       }
@@ -560,9 +597,9 @@ export async function loadChannel(channel) {
     }
 
     // Shaka could not guess the stream format from the URL (error 4000).
-    // Many IPTV servers hide the channel type behind tokenized links with no
-    // file extension. Probe the first bytes and retry with the right hint.
-    if (error && error.code === 4000 && currentChannel && !sniffTriedUrls.has(currentChannel.url)) {
+    // Keep the inherited one-time probe only on the legacy recovery path;
+    // M3 returns control to the external session coordinator instead.
+    if (policy.allowAutomaticRecovery && error && error.code === 4000 && currentChannel && !sniffTriedUrls.has(currentChannel.url)) {
       sniffTriedUrls.add(currentChannel.url);
       const crashedChannel = currentChannel;
       const tokenAtCatch = loadToken;
@@ -583,6 +620,10 @@ export async function loadChannel(channel) {
 
     if (isRecoverable(error)) {
       logEvent('WARN', 'Load failed (recoverable ' + error.code + ')');
+      if (!policy.allowAutomaticRecovery) {
+        showError(getErrorMessage(error));
+        return false;
+      }
       if (reconnectAttempts < 3) {
         scheduleReconnect();
       } else {
@@ -592,9 +633,9 @@ export async function loadChannel(channel) {
     }
 
     // BUG-017: tokenized servers reject loads with 403/401 when the token
-    // went stale between playlist fetch and segment fetch. Every loadChannel()
-    // refetches the master playlist (fresh token), so retry twice first.
-    if (error && error.code === 1001 && currentChannel && reconnectAttempts < 2) {
+    // went stale between playlist fetch and segment fetch. Every legacy
+    // loadChannel() refetches the master playlist (fresh token), so retry twice.
+    if (policy.allowAutomaticRecovery && error && error.code === 1001 && currentChannel && reconnectAttempts < 2) {
       const status = error.data && error.data[1];
       if (status === 403 || status === 401) {
         logEvent('WARN', 'Access denied at load (' + status + ') — retrying with fresh token');
@@ -603,11 +644,11 @@ export async function loadChannel(channel) {
       }
     }
 
-    if (currentChannel && currentChannel.useProxy === false && proxySuggestionCallback) {
+    if (policy.allowAutomaticRecovery && currentChannel && currentChannel.useProxy === false && proxySuggestionCallback) {
       proxySuggestionCallback(currentChannel);
     }
 
-    if (isNativeLoadCrash(error) && currentChannel && !pdtFallbackUrls.has(currentChannel.url)) {
+    if (policy.allowAutomaticRecovery && isNativeLoadCrash(error) && currentChannel && !pdtFallbackUrls.has(currentChannel.url)) {
       // Retry once with HLS program-date-time sync disabled (BUG-013): some
       // HLS streams crash inside Shaka's PDT handling, which v1.7.0 enabled.
       pdtFallbackUrls.add(currentChannel.url);
@@ -674,16 +715,17 @@ function handlePlayerError(error) {
 
   console.error('Shaka error:', error);
 
+  const policy = activePlaybackPolicy;
+
   // Suppress errors while auto-advance is pending
-  if (advancePending) return;
+  if (policy.allowAutoAdvance && advancePending) return;
 
   consecutiveErrors++;
 
-  // Native crash inside Shaka during playback — retry once with HLS PDT sync
-  // disabled (BUG-013), unless we are still inside load() (its catch handles
-  // that path).
+  // Native crash inside Shaka during playback — legacy retries once with HLS
+  // PDT sync disabled. M3 leaves recovery to the external coordinator.
   if (isNativeLoadCrash(error) && !loadingTimeout) {
-    if (currentChannel && !pdtFallbackUrls.has(currentChannel.url)) {
+    if (policy.allowAutomaticRecovery && currentChannel && !pdtFallbackUrls.has(currentChannel.url)) {
       pdtFallbackUrls.add(currentChannel.url);
       logEvent('WARN', 'Native crash during playback — reloading without PDT sync: ' +
           (currentChannel.name || currentChannel.url.slice(0, 80)));
@@ -700,11 +742,9 @@ function handlePlayerError(error) {
   }
 
   // 401/403 (BAD_HTTP_STATUS, code 1001, status in data[1]) on a segment:
-  // retry up to 3 times with a 4s cool-down (BUG-021: hammering a
-  // rate-limiting relay gets the IP banned; back off instead). BUG-021
-  // follow-up: tokenized relays also answer 401 mid-playback when the token
-  // dies — same fresh-token recovery, not a terminal login error.
-  if (error.code === 1001 && currentChannel) {
+  // legacy retries up to 3 times with a 4s cool-down. M3 never starts this
+  // hidden retry loop.
+  if (policy.allowAutomaticRecovery && error.code === 1001 && currentChannel) {
     const status = error.data && error.data[1];
     if (status === 403 || status === 401) {
       lastResortAttempts++;
@@ -722,6 +762,11 @@ function handlePlayerError(error) {
   }
 
   if (isRecoverable(error)) {
+    if (!policy.allowAutomaticRecovery) {
+      logEvent('ERROR', 'M3 Shaka attempt failed — external recovery required');
+      showError(getErrorMessage(error));
+      return;
+    }
     // After 3 consecutive errors, force a hard reload (cache-bust + fresh edge)
     if (consecutiveErrors >= 3) {
       consecutiveErrors = 0;
@@ -736,8 +781,8 @@ function handlePlayerError(error) {
   logEvent('ERROR', 'Unrecoverable error ' + error.code + ' (' + (currentChannel && currentChannel.name ? currentChannel.name : 'unknown') + ') — ' + getErrorMessage(error));
   showError(getErrorMessage(error));
 
-  // Auto-advance to next channel after 3 failed 401/403 retries
-  if (error.code === 1001 && channelAdvanceCallback) {
+  // Auto-advance to next channel after 3 failed 401/403 retries, legacy only.
+  if (policy.allowAutoAdvance && error.code === 1001 && channelAdvanceCallback) {
     const status = error.data && error.data[1];
     if ((status === 403 || status === 401) && lastResortAttempts > 3) {
       advancePending = true;
@@ -779,6 +824,7 @@ function isRecoverable(error) {
 }
 
 function scheduleReconnect() {
+  if (!activePlaybackPolicy.allowAutomaticRecovery) return;
   if (reconnectPending || !currentChannel) return;
   reconnectPending = true;
   reconnectAttempts++;
@@ -821,6 +867,7 @@ function showReloadingMessage() {
 
 function startStallWatchdog() {
   stopStallWatchdog();
+  if (!activePlaybackPolicy.allowAutomaticRecovery) return;
   lastStallTime = videoElement ? videoElement.currentTime : 0;
   lastStallCheck = Date.now();
   stallWatchdogTimer = setInterval(() => {
@@ -859,6 +906,7 @@ function stopStallWatchdog() {
 // frame counter is only a fallback (a stuck decoder can still count frames).
 function startBlackWatchdog() {
   stopBlackWatchdog();
+  if (!activePlaybackPolicy.allowNativeFallback) return;
   const tokenAtStart = loadToken;
   blackWatchTimer = setTimeout(() => {
     blackWatchTimer = null;
@@ -892,6 +940,7 @@ function startBlackWatchdog() {
 }
 
 function onBlackScreen() {
+  if (!activePlaybackPolicy.allowNativeFallback) return;
   if (!currentChannel || avplayFailedUrls.has(currentChannel.url)) return;
   if (!avplay.isAvailable()) {
     logEvent('ERROR', 'Undecodable stream, no native fallback: ' + currentChannel.url.slice(0, 100));
@@ -959,6 +1008,7 @@ async function loadViaAvplay(channel, myToken) {
 }
 
 async function switchToAvplay() {
+  if (!activePlaybackPolicy.allowNativeFallback) return;
   const channel = currentChannel;
   const tokenAtSwitch = loadToken;
   if (!channel || !avplay.isAvailable()) return;
