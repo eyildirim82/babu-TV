@@ -41,6 +41,17 @@ test('player.js leaves M3 failure normalization to the TypeScript adapter', asyn
   assert.match(source, /return \{ ok: false, failure: error \};/);
 });
 
+test('M3 load watchdog keeps timeout classification ahead of Shaka load interruption', async () => {
+  const source = await readFile(playerUrl, 'utf8');
+
+  assert.match(source, /let loadWatchdogTimedOut = false;/);
+  assert.match(source, /loadWatchdogTimedOut = true;[\s\S]*if \(player\) player\.destroy\(\)\.catch/);
+  assert.match(
+    source,
+    /catch \(error\) \{[\s\S]*if \(policy === M3_SHAKA_ATTEMPT_POLICY && loadWatchdogTimedOut\) \{\s*return \{ ok: false, failure: \{ m3Code: 'TIMEOUT' \} \};\s*\}[\s\S]*if \(error && error\.code === 7000\) return false;/,
+  );
+});
+
 test('transient StreamRequest playback redacts resolved URLs and raw Shaka errors from logs', async () => {
   const source = await readFile(playerUrl, 'utf8');
 
