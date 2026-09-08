@@ -19,6 +19,19 @@ export const LEGACY_OPTIONAL_TIZEN_KEYS = [
   'ChannelDown',
 ] as const;
 
+export const M3_NUMERIC_TIZEN_KEYS = [
+  '0',
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+] as const;
+
 export function createPlatform(windowLike: PlatformWindowLike): Platform {
   if (windowLike.tizen) {
     return new TizenPlatform(windowLike);
