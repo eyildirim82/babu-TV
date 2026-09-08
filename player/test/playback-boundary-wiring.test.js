@@ -51,3 +51,13 @@ test('transient StreamRequest playback redacts resolved URLs and raw Shaka error
   assert.match(source, /if \(isSensitiveStream\(currentChannel\)\) \{\s*console\.error\('Shaka error code:', error && error\.code \? error\.code : 'native'\);/);
   assert.match(source, /function channelForLog\(channel, maxLength\)[\s\S]*if \(isSensitiveStream\(channel\)\) return '\[redacted stream\]';/);
 });
+
+test('M3 Shaka request filter forwards arbitrary transient stream headers', async () => {
+  const source = await readFile(playerUrl, 'utf8');
+
+  assert.doesNotMatch(source, /if \(\['user-agent', 'referer', 'origin'\]\.includes\(lower\)\)/);
+  assert.match(
+    source,
+    /const canon = lower === 'user-agent'[\s\S]*lower === 'referer'[\s\S]*lower === 'origin'[\s\S]*: k;\s*request\.headers\[canon\] = v;/,
+  );
+});
