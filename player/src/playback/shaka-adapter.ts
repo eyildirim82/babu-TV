@@ -4,6 +4,7 @@ import type {
   PlaybackResult,
   StreamRequest,
 } from './contracts.js';
+import { classifyShakaFailure } from './shaka-error-classifier.js';
 
 export type ActivePlaybackEngine = 'shaka' | 'avplay' | null;
 
@@ -66,13 +67,16 @@ export class ShakaAdapter implements PlaybackEnginePort {
 
   async open(request: StreamRequest): Promise<PlaybackResult> {
     const result = await this.legacy.playShakaAttempt(requestToLegacyChannel(request));
-    return result.ok
-      ? { ok: true, engine: 'shaka', error: null }
-      : { ok: false, engine: null, error: result.error ?? 'UNKNOWN' };
+    if (result.ok) return { ok: true, engine: 'shaka', error: null };
+    return {
+      ok: false,
+      engine: null,
+      error: classifyShakaFailure(result.failure),
+    };
   }
 
   isAvailable(): boolean {
-    return this.legacy.getPlayer() !== null;
+    return true;
   }
 
   async play(request: StreamRequest): Promise<PlaybackResult> {
