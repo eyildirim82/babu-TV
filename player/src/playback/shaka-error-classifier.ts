@@ -1,6 +1,22 @@
 import type { PlaybackErrorCode } from './contracts.js';
 
+interface M3FailureSentinel {
+  m3Code?: unknown;
+}
+
 export function classifyShakaFailure(error: unknown): PlaybackErrorCode {
+  const sentinel = error as M3FailureSentinel | null;
+  if (
+    sentinel?.m3Code === 'AUTH'
+    || sentinel?.m3Code === 'NETWORK'
+    || sentinel?.m3Code === 'TIMEOUT'
+    || sentinel?.m3Code === 'STREAM_NOT_FOUND'
+    || sentinel?.m3Code === 'UNSUPPORTED_CODEC'
+    || sentinel?.m3Code === 'ENGINE_FAILURE'
+  ) {
+    return sentinel.m3Code;
+  }
+
   if (error instanceof TypeError) return 'ENGINE_FAILURE';
 
   const value = error as { code?: unknown; data?: unknown[] } | null;
