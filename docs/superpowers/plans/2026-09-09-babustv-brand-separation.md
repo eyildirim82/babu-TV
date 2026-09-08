@@ -4,7 +4,7 @@
 
 **Goal:** Remove active ENTV/EN-IPTV product identity from BabuşTV, establish a BabuşTV-owned visual system and packaging identity, and preserve the already-working provider/playback/focus/recovery behavior.
 
-**Architecture:** Keep Provider / Domain / Playback / Focus / Recovery boundaries unchanged and replace identity/presentation around them. Canonical product identity is defined once and consumed by both Tizen packaging paths; UI styling moves toward isolated BabuşTV token/theme/primitives files before shell and Live TV presentation are rebuilt on top. The work is delivered as independently reviewable B0A–B0G slices with strict file ownership so the first wave can run in parallel without merge-conflict churn.
+**Architecture:** Keep Provider / Domain / Playback / Focus / Recovery boundaries unchanged and replace identity/presentation around them. Canonical product identity is defined once and consumed by both Tizen packaging paths; UI styling moves into isolated BabuşTV token/theme/primitives files before shell and Live TV presentation are rebuilt on top. The work is delivered as independently reviewable B0A–B0G slices with strict file ownership so the first wave can run in parallel without merge-conflict churn.
 
 **Tech Stack:** Vite 6, vanilla JavaScript/TypeScript, DOM/CSS, Node test runner, `tsx --test`, Samsung Tizen Web app packaging, Tizen CLI, SDB/TV Emulator.
 
@@ -13,10 +13,12 @@
 ## Global Constraints
 
 - Product name is `BabuşTV`.
-- TV-facing display form is `BABUŞ TV`, using an ASCII-safe equivalent only where a platform restriction makes that necessary.
+- Preferred TV-facing display form is `BABUŞ TV`. Use `BABUS TV` only if Tizen tooling/runtime rejects the UTF-8 form and that failure is reproduced and recorded.
 - Canonical npm workspace names are `@babustv/player` and `@babustv/tizen`.
 - Canonical Tizen application identity is `BabusTVApp.BabusTV` with package `BabusTVApp` and widget id `https://babus.tv/babustvapp`.
+- Canonical browser/dev base path is `/babustv/`; `/enplayer/` is legacy identity and must disappear from active code/docs.
 - Canonical WGT artifact names are `babustv_stable_v<version>_<commit>.wgt` on `main` and `babustv_beta_v<version>_<commit>.wgt` elsewhere.
+- Root `package.json` is the canonical application-version source. `player/package.json` must have the same version.
 - Tizen compatibility floor stays `required_version="5.0"`.
 - Primary UI language is Turkish.
 - Primary visual direction is premium/restrained/TV-first, dark charcoal surfaces with violet accent.
@@ -38,17 +40,17 @@ The first wave may run as **four parallel branches** after this docs branch is m
 
 | Slice | Branch | Exclusive ownership in first wave |
 | --- | --- | --- |
-| B0A | `refactor/b0a-product-identity` | package metadata, Tizen identity/packaging, legacy-brand scanner |
+| B0A | `refactor/b0a-product-identity` | package metadata, Vite base identity, Tizen identity/packaging, identity scanner, active build docs |
 | B0B | `feature/b0b-design-system` | new `player/src/ui/*.css` design-system files and their tests |
 | B0C | `feature/b0c-brand-assets` | brand/icon asset files and asset packaging checks |
-| B0F | `feature/b0f-settings-copy-cleanup` | user-facing copy in settings/dialog/action code; no layout/CSS redesign |
+| B0F | `feature/b0f-settings-copy-cleanup` | runtime-generated user-facing copy in settings/dialog/action code; no layout/CSS redesign |
 
 During that wave:
 
-- B0A must not edit `player/index.html` or presentation CSS except if a test proves a package metadata requirement cannot be met otherwise.
-- B0B must not edit `player/index.html`, `player/src/main.js`, `player/src/settings.js`, or Tizen packaging files.
+- B0A must not edit `player/index.html` or presentation CSS.
+- B0B must not edit `player/index.html`, `player/src/main.js`, `player/src/settings.js`, package metadata, or Tizen packaging files.
 - B0C must not edit application logic or presentation layout; it owns asset files and asset-specific packaging checks only.
-- B0F must not edit layout CSS, Tizen packaging, npm package names, or design tokens.
+- B0F must not edit `player/index.html`, layout CSS, Tizen packaging, npm package names, or design tokens.
 - `package-lock.json` is owned by B0A in wave 1.
 
 After B0A/B0B/B0C/B0F are merged and post-merge `main` is GREEN:
@@ -67,23 +69,25 @@ B0D and B0E are intentionally sequential because both depend on the final shell/
 - Read: `docs/superpowers/specs/2026-09-09-babustv-brand-separation-design.md`
 - Read: `docs/superpowers/plans/2026-09-09-babustv-brand-separation.md`
 - Read: `package.json`
+- Read: `player/vite.config.js`
 - Read: `tizen/config.xml`
 - Read: `tizen/package.mjs`
 
 **Interfaces:**
 - Consumes: current post-docs-merge `main` head.
-- Produces: a recorded GREEN base SHA used by all first-wave branches.
+- Produces: one recorded GREEN base SHA used by all first-wave branches.
 
-- [ ] **Step 1: Refresh main and verify no unrelated open implementation PR must land first**
+- [ ] **Step 1: Refresh main and record the exact base**
 
 ```bash
 git checkout main
 git pull --ff-only origin main
 git status --short
-git rev-parse HEAD
+BASE_SHA="$(git rev-parse HEAD)"
+printf '%s\n' "$BASE_SHA"
 ```
 
-Expected: clean worktree. Record the exact SHA in each branch PR body.
+Expected: clean worktree. Copy the printed SHA into each first-wave PR body.
 
 - [ ] **Step 2: Run the baseline automated suite**
 
@@ -97,22 +101,23 @@ npm run tizen:build
 
 Expected: all commands PASS. `tizen:build` must stage a Tizen 5.0+ app with relative asset URLs.
 
-- [ ] **Step 3: Verify current packaging split before changing it**
+- [ ] **Step 3: Characterize the current identity split**
 
 ```bash
 grep -n "BabusTVApp.BabusTV\|BabusTVApp" tizen/config.xml
 grep -n "IPTVPlayer\|EN-IPTV" tizen/package.mjs
+grep -n "enplayer" player/vite.config.js tizen/package.mjs SETUP.md
 ```
 
-Expected: official `config.xml` already reports the canonical BabuşTV identity while the inherited custom packager still exposes legacy identity. This is the characterized RED condition B0A will remove.
+Expected: official `config.xml` already reports the canonical BabuşTV identity; the inherited custom packager and browser base still expose legacy identity.
 
-- [ ] **Step 4: Create first-wave branches only from the same GREEN base SHA**
+- [ ] **Step 4: Create first-wave branches from the exact same SHA**
 
 ```bash
-git branch refactor/b0a-product-identity <GREEN_SHA>
-git branch feature/b0b-design-system <GREEN_SHA>
-git branch feature/b0c-brand-assets <GREEN_SHA>
-git branch feature/b0f-settings-copy-cleanup <GREEN_SHA>
+git branch refactor/b0a-product-identity "$BASE_SHA"
+git branch feature/b0b-design-system "$BASE_SHA"
+git branch feature/b0c-brand-assets "$BASE_SHA"
+git branch feature/b0f-settings-copy-cleanup "$BASE_SHA"
 ```
 
 Do not base first-wave branches on each other.
@@ -130,22 +135,24 @@ Do not base first-wave branches on each other.
 - Modify: `package.json`
 - Modify: `package-lock.json`
 - Modify: `player/package.json`
+- Modify: `player/vite.config.js`
 - Modify: `tizen/package.json`
 - Modify: `tizen/package.mjs`
-- Modify: `tizen/stage.mjs`
 - Modify: `tizen/wgt.mjs`
-- Verify only unless a failing identity test requires correction: `tizen/config.xml`
+- Modify if needed to reach the preferred display form: `tizen/config.xml`
 - Modify: `README.md`
 - Modify: `tizen/README.md`
+- Modify: `SETUP.md`
 
 **Interfaces:**
-- Consumes: current `tizen/config.xml` canonical identity.
+- Consumes: current `tizen/config.xml` canonical app/package identity.
 - Produces:
-  - `PRODUCT_IDENTITY` exported by `tizen/product-identity.mjs`.
-  - root `npm run brand:check`.
+  - `PRODUCT_IDENTITY` and `artifactName()` from `tizen/product-identity.mjs`.
+  - root `npm run brand:check` covering identity/build surfaces.
   - both package pipelines generating the same Tizen identity and canonical artifact naming.
+  - browser/dev base `/babustv/`.
 
-Use this exact identity module shape:
+Use this exact identity module:
 
 ```js
 export const PRODUCT_IDENTITY = Object.freeze({
@@ -156,6 +163,7 @@ export const PRODUCT_IDENTITY = Object.freeze({
   applicationId: 'BabusTVApp.BabusTV',
   authorName: 'BABUS',
   authorUrl: 'https://babus.tv',
+  browserBase: '/babustv/',
 });
 
 export function artifactName({ version, commit, channel }) {
@@ -168,15 +176,18 @@ export function artifactName({ version, commit, channel }) {
 
 - [ ] **Step 1: Write identity tests first**
 
-Add `player/test/brand-identity.test.js` with tests that load root/player/tizen package JSON plus `tizen/config.xml` and assert:
+Create `player/test/brand-identity.test.js`. Assert:
 
 ```js
 assert.equal(rootPackage.name, 'babustv');
+assert.equal(rootPackage.author, 'BabuşTV');
 assert.equal(playerPackage.name, '@babustv/player');
 assert.equal(tizenPackage.name, '@babustv/tizen');
+assert.equal(rootPackage.version, playerPackage.version);
 assert.match(configXml, /id="BabusTVApp\.BabusTV"/);
 assert.match(configXml, /package="BabusTVApp"/);
 assert.match(configXml, /<name>BABUŞ TV<\/name>/);
+assert.match(viteConfig, /base:\s*['"]\/babustv\/['"]/);
 ```
 
 Also import `artifactName()` and assert:
@@ -192,15 +203,15 @@ assert.equal(
 );
 ```
 
-- [ ] **Step 2: Run the focused test and confirm RED**
+- [ ] **Step 2: Run focused identity tests and confirm RED**
 
 ```bash
 node --test player/test/brand-identity.test.js
 ```
 
-Expected: FAIL because package names and `tizen/product-identity.mjs` are not yet canonical.
+Expected: FAIL because package names, Vite base, and identity module are not yet canonical.
 
-- [ ] **Step 3: Add the canonical identity module and update package metadata**
+- [ ] **Step 3: Add canonical package metadata**
 
 Set:
 
@@ -208,62 +219,78 @@ Set:
 // package.json
 "name": "babustv",
 "description": "BabuşTV — Samsung Tizen TV player",
+"author": "BabuşTV"
 ```
 
 ```json
 // player/package.json
 "name": "@babustv/player",
-"description": "BabuşTV player SPA",
+"description": "BabuşTV player SPA"
 ```
 
 ```json
 // tizen/package.json
 "name": "@babustv/tizen",
-"description": "BabuşTV Tizen WGT build tools",
+"description": "BabuşTV Tizen WGT build tools"
 ```
 
-Run `npm install --package-lock-only` after package metadata changes so the lockfile workspace names are regenerated instead of hand-edited.
+Keep root/player versions equal. Run:
 
-- [ ] **Step 4: Make the inherited custom packager consume canonical identity**
-
-Remove local `IPTVPlayer`/EN-IPTV constants from `tizen/package.mjs`. Import `PRODUCT_IDENTITY` and `artifactName`.
-
-The generated `<tizen:application>` must be:
-
-```xml
-<tizen:application id="BabusTVApp.BabusTV" package="BabusTVApp" required_version="5.0"/>
+```bash
+npm install --package-lock-only
 ```
 
-The generated author/name must be:
+Do not hand-edit lockfile workspace package names.
 
-```xml
-<author href="https://babus.tv">BABUS</author>
-<name>BABUŞ TV</name>
+- [ ] **Step 4: Replace the browser/dev identity path**
+
+In `player/vite.config.js` set:
+
+```js
+base: '/babustv/',
 ```
 
-The custom packager must preserve the existing WidgetData privilege if it generates its own `config.xml`:
+Update active docs to use:
 
-```xml
-<tizen:privilege name="http://developer.samsung.com/privilege/widgetdata"/>
+```text
+http://localhost:5173/babustv/
 ```
 
-Do not generate a second identity template that drifts from `tizen/config.xml`; where practical, read the canonical config and only replace its version.
+- [ ] **Step 5: Make the custom packager consume the canonical manifest**
 
-- [ ] **Step 5: Normalize official CLI artifact naming**
+Remove its locally generated ENTV manifest. Read `tizen/config.xml`, replace only the widget `version` attribute with the root package version, and write that manifest into the temporary package.
 
-In `tizen/wgt.mjs`, after `tizen package` succeeds, rename the single produced `.wgt` to `artifactName(...)` using root version, short git commit, and branch-derived channel.
+Remove the `/enplayer/` rewrite and replace it with `/babustv/` only for the legacy custom packaging path:
 
-Branch mapping is exact:
+```js
+html = html.replace(/\/babustv\//g, '/');
+```
+
+When a development certificate must be generated, use an ASCII-safe subject owned by BabuşTV:
+
+```text
+/CN=BabusTVApp/O=BabusTV/OU=Development
+```
+
+Do not remove `widgetdata`, `internet`, or `tv.inputdevice` privileges from the canonical manifest.
+
+- [ ] **Step 6: Normalize custom WGT naming**
+
+Read the version from root `package.json`; derive the channel as:
 
 ```js
 const channel = branch === 'main' ? 'stable' : 'beta';
 ```
 
-The final output remains under `tizen/build/` for the official CLI pipeline.
+Use `artifactName({ version, commit: commitHash, channel })` for the custom packager output.
 
-- [ ] **Step 6: Add a repo-active legacy-brand scanner**
+- [ ] **Step 7: Normalize official CLI WGT naming**
 
-Create `tools/check-legacy-brand.mjs`. Build prohibited markers from fragments so the scanner source does not fail itself:
+In `tizen/wgt.mjs`, after the CLI produces exactly one `.wgt`, obtain root version, short git SHA, and branch name, then rename the package to `artifactName(...)`. Keep the final file under `tizen/build/`.
+
+- [ ] **Step 8: Add the first-stage legacy-brand scanner**
+
+Create `tools/check-legacy-brand.mjs`. Construct markers so the scanner source does not match itself:
 
 ```js
 const prohibited = [
@@ -272,28 +299,27 @@ const prohibited = [
   ['IPTV', 'Player'].join(''),
   ['@en', 'iptv'].join('-'),
   ['en', 'tvplayer'].join('-'),
+  ['en', 'player'].join(''),
 ];
 ```
 
-Scan these active surfaces recursively:
+For B0A, scan only identity/build surfaces that B0A owns:
 
 ```text
 package.json
 package-lock.json
 README.md
-player/index.html
+SETUP.md
 player/package.json
-player/src/
-player/public/
+player/vite.config.js
 tizen/package.json
 tizen/config.xml
 tizen/package.mjs
-tizen/stage.mjs
 tizen/wgt.mjs
 tizen/README.md
 ```
 
-Ignore generated/binary paths such as `node_modules`, `player/dist`, `tizen/build`, `.git`, `.wgt`, `.png`, `.jpg`, `.webp`. Do not scan historical specs/license provenance as product surfaces.
+Do **not** scan `player/index.html` or `player/src/` yet; those are deliberately owned by B0D/B0F/B0E. B0G expands the same scanner after those slices are merged.
 
 Add root script:
 
@@ -303,19 +329,15 @@ Add root script:
 
 The checker exits non-zero and prints `path:line: marker` for every finding.
 
-- [ ] **Step 7: Run the scanner while legacy active surfaces still exist and confirm RED**
+- [ ] **Step 9: Confirm scanner RED, then clean owned surfaces**
 
 ```bash
 npm run brand:check
 ```
 
-Expected: FAIL until README/Tizen README/package metadata/custom packager legacy product references are cleaned.
+Expected before cleanup: FAIL on active build/docs identity. Update README/Tizen README/SETUP/package metadata/custom packager until the same command passes. Preserve LICENSE and historical milestone/spec provenance outside the scanner scope.
 
-- [ ] **Step 8: Clean active technical/docs identity without deleting legal provenance**
-
-Update active README/package instructions to BabuşTV artifact names and commands. Preserve LICENSE/copyright provenance. Do not rewrite historical milestone specs merely to make the scanner quiet; they are outside the active scan set.
-
-- [ ] **Step 9: Verify identity and packaging GREEN**
+- [ ] **Step 10: Verify identity and packaging GREEN**
 
 ```bash
 node --test player/test/brand-identity.test.js
@@ -326,17 +348,17 @@ npm run build
 npm run tizen:build
 ```
 
-If Tizen CLI/profile exists in the environment:
+If the Tizen CLI/profile is installed in the execution environment:
 
 ```bash
 npm run tizen:package
 ```
 
-Expected: generated official WGT name starts `babustv_beta_` on the feature branch and staged `config.xml` contains `BabusTVApp.BabusTV`.
+Expected on the feature branch: artifact name starts `babustv_beta_`; staged `config.xml` contains `BabusTVApp.BabusTV` and Tizen 5.0 requirement.
 
-- [ ] **Step 10: Explicit storage/upgrade gate before PR Ready**
+- [ ] **Step 11: Apply the explicit upgrade/storage gate before Ready**
 
-Document in the PR body one of these exact outcomes:
+Record exactly one outcome in the PR body:
 
 ```text
 Upgrade target: pre-release/dev only; no supported IPTVPlayer-installed user population. Canonical BabusTVApp identity may proceed.
@@ -348,16 +370,18 @@ or
 Upgrade target includes supported IPTVPlayer installations. STOP: cross-identity storage migration requires a separate approved design before Ready/merge.
 ```
 
-Do not invent a migration inside B0A.
+Do not invent cross-app migration in B0A.
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
-git add package.json package-lock.json player/package.json tizen/package.json \
-  tizen/product-identity.mjs tizen/package.mjs tizen/stage.mjs tizen/wgt.mjs \
-  tools/check-legacy-brand.mjs player/test/brand-identity.test.js README.md tizen/README.md
+git add package.json package-lock.json player/package.json player/vite.config.js \
+  tizen/package.json tizen/product-identity.mjs tizen/package.mjs tizen/wgt.mjs tizen/config.xml \
+  tools/check-legacy-brand.mjs player/test/brand-identity.test.js README.md tizen/README.md SETUP.md
 git commit -m "refactor(b0): own BabuşTV product identity"
 ```
+
+If `tizen/config.xml` did not change, omit it from `git add`.
 
 ---
 
@@ -375,7 +399,7 @@ git commit -m "refactor(b0): own BabuşTV product identity"
 - Consumes: no B0A/B0C/B0F implementation files.
 - Produces: stable CSS custom-property and primitive-class contract consumed by B0D/B0E.
 
-Use these baseline tokens unless the approved spec has a stricter value for the same semantic token:
+Use these exact B0 tokens:
 
 ```css
 :root {
@@ -402,11 +426,11 @@ Use these baseline tokens unless the approved spec has a stricter value for the 
 
 - [ ] **Step 1: Write design-contract tests first**
 
-`player/test/babustv-design-system.test.js` must read the three CSS files and assert the semantic token names above, `.babu-focus-ring`, `.babu-surface`, `.babu-pill`, and `prefers-reduced-motion` support exist. It must also assert the inherited accent literal is absent from the new files by constructing the old value dynamically:
+`player/test/babustv-design-system.test.js` must read the three CSS files and assert the semantic token names above, `.babu-focus-ring`, `.babu-surface`, `.babu-surface-raised`, `.babu-pill`, and `prefers-reduced-motion` exist. It must also assert the inherited accent literal is absent from the new files:
 
 ```js
 const inheritedAccent = ['#ED', '421F'].join('');
-assert.equal(css.includes(inheritedAccent), false);
+assert.equal(css.toUpperCase().includes(inheritedAccent), false);
 ```
 
 - [ ] **Step 2: Run focused test and confirm RED**
@@ -419,15 +443,15 @@ Expected: FAIL because the design-system files do not exist.
 
 - [ ] **Step 3: Implement `tokens.css`**
 
-Define only semantic variables: color, spacing, radii, typography scale, focus ring, and motion durations. Do not style legacy IDs/classes here.
+Define semantic color, spacing, radii, typography, focus, and motion tokens only. Do not style legacy IDs/classes in this file.
 
 - [ ] **Step 4: Implement `theme.css`**
 
-Apply base `html, body` background/text/font behavior using tokens. Keep playback surface capable of true black independently of shell surfaces.
+Apply base `html, body` background/text/font behavior using tokens. Keep the video/playback surface capable of true black independently of shell surfaces.
 
 - [ ] **Step 5: Implement `primitives.css`**
 
-Provide reusable primitives:
+Provide:
 
 ```css
 .babu-surface { ... }
@@ -437,9 +461,9 @@ Provide reusable primitives:
 .babu-muted { ... }
 ```
 
-Focus must remain visible at TV viewing distance; use outline/box-shadow rather than hover-only state. Keep transitions within the 120–220ms token range and disable nonessential motion under `prefers-reduced-motion: reduce`.
+Focus must remain visible at TV viewing distance using outline/box-shadow, not hover-only state. Keep transitions within 120–220ms and disable nonessential motion under `prefers-reduced-motion: reduce`.
 
-- [ ] **Step 6: Verify GREEN without integrating into the shell yet**
+- [ ] **Step 6: Verify GREEN without shell integration**
 
 ```bash
 node --test player/test/babustv-design-system.test.js
@@ -451,7 +475,8 @@ npm run build
 - [ ] **Step 7: Commit**
 
 ```bash
-git add player/src/ui player/test/babustv-design-system.test.js
+git add player/src/ui/tokens.css player/src/ui/theme.css player/src/ui/primitives.css \
+  player/test/babustv-design-system.test.js
 git commit -m "feat(b0): add BabuşTV design system"
 ```
 
@@ -475,7 +500,7 @@ git commit -m "feat(b0): add BabuşTV design system"
 
 - [ ] **Step 1: Define asset acceptance tests first**
 
-`player/test/babustv-assets.test.js` must assert:
+`player/test/babustv-assets.test.js` must assert these files exist and are non-empty:
 
 ```text
 player/public/brand/babustv-mark.svg
@@ -485,9 +510,15 @@ player/public/favicon.png
 tizen/icons/icon_128.png
 ```
 
-exist, are non-empty, and the SVG source does not contain inherited TV/play branding terms.
+For SVG source assert:
 
-For PNG files, assert the PNG signature bytes `89 50 4E 47 0D 0A 1A 0A`.
+```text
+contains BabuşTV-owned mark metadata/title
+contains no television-outline or play-triangle legacy mark
+contains no EN/ENTV/EN-IPTV product text
+```
+
+For PNG files, assert the PNG signature bytes are `89 50 4E 47 0D 0A 1A 0A`.
 
 - [ ] **Step 2: Run focused test and confirm RED**
 
@@ -497,19 +528,26 @@ node --test player/test/babustv-assets.test.js
 
 Expected: FAIL because the BabuşTV asset set is incomplete.
 
-- [ ] **Step 3: Produce the approved asset family**
+- [ ] **Step 3: Produce one coherent asset family**
 
-The family must share one mark: a minimal calico-cat-derived symbol plus BabuşTV wordmark, readable on dark charcoal at TV distance. The cat mark must not contain a television outline, play triangle, inherited red/orange palette, or the letters `EN`/`IPTV`.
+Use the approved calico direction: minimal cat-derived symbol, charcoal/violet system, restrained black/cream/warm-ginger patches. The mark must not contain a television outline, play triangle, inherited red/orange primary palette, or EN/IPTV lettering. The 128×128 Tizen icon uses the mark without wordmark and must remain legible at launcher size.
 
-Use the approved charcoal/violet system plus restrained calico patches (black/cream/warm ginger). Keep the small Tizen icon legible without wordmark at 128×128.
+Use an image-generation/design tool for raster artwork when available; do not substitute unrelated stock imagery. Commit only final exported assets, not source prompts or font files.
 
 - [ ] **Step 4: Verify Tizen staging picks up the new icon**
 
 ```bash
 npm run tizen:build
+cmp tizen/icons/icon_128.png tizen/build/icon.png
 ```
 
-Then verify `tizen/build/icon.png` byte-for-byte matches `tizen/icons/icon_128.png`.
+On Windows PowerShell, use a byte/hash comparison instead of `cmp`:
+
+```powershell
+(Get-FileHash tizen/icons/icon_128.png).Hash -eq (Get-FileHash tizen/build/icon.png).Hash
+```
+
+Expected: `true`/matching files.
 
 - [ ] **Step 5: Verify GREEN**
 
@@ -529,22 +567,23 @@ git commit -m "feat(b0): add BabuşTV brand assets"
 
 ---
 
-### Task 4: B0F — Turkish-first copy and settings/action cleanup
+### Task 4: B0F — Turkish-first runtime copy cleanup
 
 **Branch:** `feature/b0f-settings-copy-cleanup`
 
 **Files:**
 - Create: `player/src/ui/copy.js`
+- Create: `player/src/ui/copy.d.ts`
 - Create: `player/test/babustv-copy.test.js`
 - Modify: `player/src/settings.js`
-- Modify: `player/src/player.js` only for user-visible strings owned by legacy UI; do not change playback logic
-- Modify: `player/src/main.js` only for user-visible strings, not startup orchestration
-- Do not modify in this slice: `player/index.html`, `player/src/styles.css`, `player/src/m3-live-tv.css`
+- Modify: `player/src/player.js` only for user-visible strings; do not change playback logic
+- Modify: `player/src/main.js` only for user-visible strings; do not change startup orchestration
+- Do not modify: `player/index.html`, `player/src/styles.css`, `player/src/m3-live-tv.css`
 
 **Interfaces:**
-- Produces: `UI_COPY` object consumed by B0D/B0E where practical.
+- Produces: `UI_COPY` runtime object and matching declaration so JavaScript and TypeScript presentation code can consume the same labels.
 
-Use an explicit flat copy contract so strings are searchable and stable:
+Use this exact JavaScript object:
 
 ```js
 export const UI_COPY = Object.freeze({
@@ -559,15 +598,40 @@ export const UI_COPY = Object.freeze({
   noChannel: 'Kanal seçilmedi',
   buffering: 'Arabelleğe alınıyor',
   streamOpening: 'Yayın açılıyor…',
+  recovering: 'Yayın yeniden deneniyor…',
+  streamFailed: 'Yayın açılamadı',
   cancel: 'İptal',
   confirm: 'Onayla',
   close: 'Kapat',
 });
 ```
 
+Use this exact declaration shape in `copy.d.ts`:
+
+```ts
+export declare const UI_COPY: Readonly<{
+  loading: string;
+  preparing: string;
+  channels: string;
+  settings: string;
+  quality: string;
+  actions: string;
+  reloadStream: string;
+  refreshChannels: string;
+  noChannel: string;
+  buffering: string;
+  streamOpening: string;
+  recovering: string;
+  streamFailed: string;
+  cancel: string;
+  confirm: string;
+  close: string;
+}>;
+```
+
 - [ ] **Step 1: Write copy tests first**
 
-Assert the keys above exist and no value contains inherited product names. Add characterization assertions around any existing settings/action labels being replaced.
+Assert every key above exists, values equal the approved Turkish copy, and no value contains legacy product names. Add characterization assertions for runtime-generated settings/action labels being replaced.
 
 - [ ] **Step 2: Run focused test and confirm RED**
 
@@ -575,13 +639,13 @@ Assert the keys above exist and no value contains inherited product names. Add c
 node --test player/test/babustv-copy.test.js
 ```
 
-- [ ] **Step 3: Add `UI_COPY` and replace runtime-generated user-visible English strings**
+- [ ] **Step 3: Replace runtime-generated user-visible copy only**
 
-Do not refactor control flow. Replace only copy at its existing decision points. Preserve technical log/error codes that are not user-facing.
+Import `UI_COPY` into existing JavaScript presentation paths. Replace labels/messages without changing control flow, storage, provider behavior, remote behavior, playback decisions, retry policy, or timers.
 
-- [ ] **Step 4: Leave static `player/index.html` copy for B0D**
+- [ ] **Step 4: Preserve the static-shell boundary**
 
-This is an explicit conflict-avoidance boundary. Record remaining static English shell strings in the PR body; do not edit them in B0F.
+Do not edit `player/index.html`. Record remaining static English shell labels in the PR body under `Deferred to B0D`; that is intentional file ownership, not unfinished B0F work.
 
 - [ ] **Step 5: Verify GREEN**
 
@@ -595,8 +659,9 @@ npm run build
 - [ ] **Step 6: Commit**
 
 ```bash
-git add player/src/ui/copy.js player/test/babustv-copy.test.js player/src/settings.js player/src/player.js player/src/main.js
-git commit -m "feat(b0): localize BabuşTV product copy"
+git add player/src/ui/copy.js player/src/ui/copy.d.ts player/test/babustv-copy.test.js \
+  player/src/settings.js player/src/player.js player/src/main.js
+git commit -m "feat(b0): localize BabuşTV runtime copy"
 ```
 
 ---
@@ -606,9 +671,9 @@ git commit -m "feat(b0): localize BabuşTV product copy"
 After B0A/B0B/B0C/B0F each pass review:
 
 - [ ] Merge one PR at a time using squash merge.
-- [ ] Rebase/refresh each remaining first-wave branch on the new `main` only if required for mergeability; do not absorb another branch's scope.
-- [ ] After every merge run/observe `main` verification before merging the next.
-- [ ] After all four are merged, run:
+- [ ] Rebase/refresh each remaining first-wave branch on the new `main` only when needed for mergeability; do not absorb another slice's scope.
+- [ ] Require post-merge `main` GREEN before merging the next first-wave PR.
+- [ ] After all four merge, run/require:
 
 ```bash
 npm ci
@@ -637,20 +702,34 @@ Only then create B0D from fresh GREEN `main`.
 - Create: `player/test/babustv-shell.test.js`
 
 **Interfaces:**
-- Consumes: design tokens/primitives, brand asset paths, `UI_COPY`.
-- Produces: final shell DOM contract that B0E styles/renders without redefining boot/sidebar/right-panel structure.
+- Consumes: B0B tokens/primitives, B0C asset paths, B0F `UI_COPY`.
+- Produces: final shell DOM contract that B0E consumes without redefining boot/sidebar/right-panel structure.
 
 - [ ] **Step 1: Write shell presentation tests first**
 
-The test must read `player/index.html` and assert:
+Assert `player/index.html` contains:
 
 ```html
 <title>BabuşTV</title>
 ```
 
-It must assert the page references BabuşTV brand assets and new CSS files, and that static shell text no longer contains `IPTV`, `EN IPTV`, `Loading...`, `Menu`, `Quality`, `Actions`, `Settings`, `What's New`, `Got it`, `Cancel`, or `Confirm` as user-facing static labels.
+Assert it references BabuşTV brand assets and design-system stylesheets. Assert static user-facing shell no longer contains these inherited labels:
 
-The test must also assert the old inline TV/play SVG is absent.
+```text
+IPTV
+EN IPTV
+Loading...
+Menu
+Quality
+Actions
+Settings
+What's New
+Got it
+Cancel
+Confirm
+```
+
+Assert the old inline television/play SVG is absent.
 
 - [ ] **Step 2: Run focused test and confirm RED**
 
@@ -660,11 +739,9 @@ node --test player/test/babustv-shell.test.js
 
 - [ ] **Step 3: Rebuild boot branding**
 
-Replace the inherited EN IPTV boot mark with `babustv-boot.svg`, BabuşTV text, version, and Turkish status. Keep boot visually simple; no heavy blur, bounce, or full-screen mascot animation.
+Replace inherited boot art with `/brand/babustv-boot.svg`, BabuşTV product text, version, and Turkish status. No heavy blur, bounce, long intro, or persistent mascot overlay.
 
-- [ ] **Step 4: Integrate design-system stylesheets**
-
-Load in deterministic order:
+- [ ] **Step 4: Integrate design-system stylesheets in this order**
 
 ```html
 <link rel="stylesheet" href="/src/ui/tokens.css">
@@ -675,22 +752,20 @@ Load in deterministic order:
 <link rel="stylesheet" href="/src/m3-live-tv.css">
 ```
 
-Do not delete legacy CSS rules in bulk in this slice. Override/migrate the shell surface intentionally and remove only rules proven unused by the new shell.
+Do not bulk-delete inherited CSS. Migrate shell surfaces intentionally and remove only rules proven unused by tests/browser smoke.
 
-- [ ] **Step 5: Rebrand left/right shell surfaces**
+- [ ] **Step 5: Rebrand shell surfaces**
 
-Static shell must use BabuşTV wordmark/mark, charcoal surfaces, violet focus, Turkish labels, and remote-visible focus states. Maintain existing IDs needed by runtime wiring unless tests and dependent code are updated in the same commit.
+Use BabuşTV wordmark/mark, charcoal surfaces, violet focus, and Turkish static labels. Preserve runtime IDs used by existing controller/player wiring unless the same change updates every consumer and test.
 
-- [ ] **Step 6: Preserve M3 runtime contract**
-
-Run existing wiring/controller/view tests without modifying their state/playback expectations:
+- [ ] **Step 6: Preserve M3 runtime behavior**
 
 ```bash
 node --test player/test/m3-live-tv-wiring.test.js
-npm run test:ts -w player -- --test-name-pattern="Live TV|DomLiveTvView"
+npm run test:ts -w player
 ```
 
-If the second command is not accepted by the current `tsx --test` version, run `npm run test:ts -w player` in full; do not change the test runner merely for filtering.
+Do not change M3 state/playback expectations to make a visual test pass.
 
 - [ ] **Step 7: Verify shell GREEN**
 
@@ -703,21 +778,21 @@ npm run build
 npm run tizen:build
 ```
 
-- [ ] **Step 8: Manual browser smoke**
+- [ ] **Step 8: Manual browser smoke at 1920×1080**
 
 ```bash
 npm run dev -w player
 ```
 
-Check at 1920×1080 viewport:
+Open `/babustv/` and verify:
 
 ```text
 BabuşTV boot branding
 charcoal/violet shell
 visible remote-style focus
-no ENTV logo/play mark
+no inherited TV/play mark
 no layout overflow
-video surface remains unobstructed when shell closes
+video surface unobstructed when shell closes
 ```
 
 - [ ] **Step 9: Commit**
@@ -743,22 +818,20 @@ git commit -m "feat(b0): rebrand BabuşTV shell"
 - Create: `player/test/babustv-live-tv-presentation.test.js`
 
 **Interfaces:**
-- Consumes: existing `LiveTvState`, `LiveTvViewModel`, B0D shell DOM, B0B tokens/primitives, B0F `UI_COPY` where TypeScript/JS boundary permits without coupling core state to copy.
+- Consumes: existing `LiveTvState`, `LiveTvViewModel`, B0D shell DOM, B0B tokens/primitives, and typed `UI_COPY` from `../ui/copy.js`.
 - Produces: BabuşTV-specific Live TV presentation while preserving M3 interaction behavior.
 
-- [ ] **Step 1: Characterize M3 behavior that must not change**
-
-Before modifying presentation, run:
+- [ ] **Step 1: Characterize M3 behavior before edits**
 
 ```bash
 npm run test:ts -w player
 ```
 
-Record current pass count in the PR body. Do not rewrite `live-tv-state`, `channel-intent-coordinator`, or `player-session-coordinator` tests to accommodate a visual change.
+Record current pass count in the PR body. Do not rewrite `live-tv-state`, `channel-intent-coordinator`, or `player-session-coordinator` behavior/tests for a visual change.
 
 - [ ] **Step 2: Write presentation RED tests**
 
-Extend `dom-live-tv-view.test.ts` to require distinct classes/data state for:
+Extend `dom-live-tv-view.test.ts` to require distinct presentation state for:
 
 ```text
 focused channel
@@ -769,36 +842,34 @@ playback status
 numeric zap overlay
 ```
 
-The test must preserve the invariant that rendering classes never calls playback or mutates intent/state.
+The test must keep rendering downstream-only: no playback invocation, intent creation, retry scheduling, or state mutation.
 
-Add `babustv-live-tv-presentation.test.js` to assert `ui/live-tv.css` uses BabuşTV semantic tokens and does not contain the inherited red/orange accent literal.
+Add `babustv-live-tv-presentation.test.js` to assert `ui/live-tv.css` uses BabuşTV semantic tokens and contains no inherited red/orange accent literal.
 
-- [ ] **Step 3: Run focused tests and confirm RED**
+- [ ] **Step 3: Run focused/full presentation tests and confirm RED**
 
 ```bash
 npm run test:ts -w player
 node --test player/test/babustv-live-tv-presentation.test.js
 ```
 
-Expected: only the new presentation expectations fail.
+Expected: only new presentation requirements fail.
 
 - [ ] **Step 4: Implement the TV-native overlay presentation**
 
-Keep the existing behavior model but present category/channel information as one coherent BabuşTV overlay. Focus must be visually stronger than passive selection; playing state must be distinguishable without relying on color alone.
+Keep the current behavior model but visually compose categories and channels as one BabuşTV overlay. Focus must be stronger than passive selection; playing state must be distinguishable without color alone. Do not add EPG, Favorite, Search, program detail, new timers, or playback decisions.
 
-Do not add EPG data, Favorite action, Search, program detail, new timers, or playback decisions.
+- [ ] **Step 5: Use the shared Turkish playback status copy**
 
-- [ ] **Step 5: Turkish status surfaces**
-
-Use these exact core statuses:
+Map presentation only:
 
 ```text
-RESOLVING/PREPARING -> Yayın açılıyor…
-RECOVERING -> Yayın yeniden deneniyor…
-FAILED -> Yayın açılamadı
+RESOLVING/PREPARING -> UI_COPY.streamOpening
+RECOVERING -> UI_COPY.recovering
+FAILED -> UI_COPY.streamFailed
 ```
 
-A failed target remains highlighted according to M3 behavior; presentation must not force focus back to the playing channel.
+A failed target remains highlighted according to M3 state. Presentation must not move focus back to the playing channel.
 
 - [ ] **Step 6: Verify full M3 regression safety**
 
@@ -809,21 +880,21 @@ npm run build
 npm run brand:check
 ```
 
-Pay special attention to:
+Review these invariants explicitly:
 
 ```text
 highlight != playback
 category navigation does not play
-CH+/CH- no-wrap behavior
+CH+/CH- no-wrap
 rapid zap last-intent-wins
-failed target rollback semantics
+failed-target rollback semantics
 Back layer ownership
 numeric zap capability gating
 ```
 
-- [ ] **Step 7: Manual 1920×1080 browser smoke**
+- [ ] **Step 7: Manual browser smoke at 1920×1080**
 
-Check categories, channels, focused/playing distinction, long channel names, numeric overlay, failure status, and overlay-close state. Do not judge real TV performance from desktop animation smoothness.
+Check categories, channels, focused/playing distinction, long channel names, numeric overlay, failure status, and overlay-close state. Do not treat desktop animation performance as real-TV performance evidence.
 
 - [ ] **Step 8: Commit**
 
@@ -839,33 +910,59 @@ git commit -m "feat(b0): reset BabuşTV Live TV presentation"
 
 **Branch:** `feature/b0g-brand-hardening`
 
-**Dependencies:** B0A–B0F/B0E all merged and post-merge `main` GREEN.
+**Dependencies:** all B0 implementation slices merged and post-merge `main` GREEN.
 
 **Files:**
-- Modify: `tools/check-legacy-brand.mjs` only for reproduced scanner gaps
+- Modify: `tools/check-legacy-brand.mjs`
 - Create: `docs/verification/b0-brand-separation.md`
-- Modify tests only for reproduced gaps; do not perform speculative refactors
+- Modify tests/code only after a reproduced final-gate failure
 
 **Interfaces:**
 - Consumes: completed B0 product/presentation.
-- Produces: final active-brand audit and emulator/runtime evidence.
+- Produces: final full-active-surface legacy-brand gate and runtime evidence.
 
-- [ ] **Step 1: Run the active legacy-brand gate**
+- [ ] **Step 1: Expand the legacy-brand scanner to all active product surfaces**
+
+Keep the B0A identity/build list and add:
+
+```text
+player/index.html
+player/src/
+player/public/
+```
+
+Ignore generated/binary directories/files:
+
+```text
+.git/
+node_modules/
+player/dist/
+tizen/build/
+*.wgt
+*.png
+*.jpg
+*.jpeg
+*.webp
+```
+
+The final scanner still excludes LICENSE and historical specs/baselines from product-surface failure; those are reviewed separately as provenance.
+
+- [ ] **Step 2: Run final active legacy-brand gate**
 
 ```bash
 npm run brand:check
 ```
 
-Expected: PASS with zero findings in active product/build surfaces.
+Expected: zero findings.
 
-Also run a broad manual audit for review only:
+Also run a broad human-review audit:
 
 ```bash
-rg -ni "EN[- ]?IPTV|IPTVPlayer|@en-iptv|en-tvplayer" . \
+rg -ni "EN[- ]?IPTV|IPTVPlayer|@en-iptv|en-tvplayer|enplayer" . \
   -g '!node_modules/**' -g '!player/dist/**' -g '!tizen/build/**' -g '!.git/**'
 ```
 
-Classify every remaining hit as one of:
+Classify every remaining hit as exactly one of:
 
 ```text
 LEGAL_ATTRIBUTION
@@ -873,9 +970,9 @@ HISTORICAL_SPEC_OR_BASELINE
 BUG_ACTIVE_PRODUCT_SURFACE
 ```
 
-Any `BUG_ACTIVE_PRODUCT_SURFACE` is a B0G failure and needs root-cause -> RED -> minimum fix -> GREEN.
+Every `BUG_ACTIVE_PRODUCT_SURFACE` requires root cause -> failing test/check -> minimum fix -> GREEN before B0G can complete.
 
-- [ ] **Step 2: Run the complete automated matrix**
+- [ ] **Step 3: Run the complete automated matrix**
 
 ```bash
 npm ci
@@ -892,22 +989,22 @@ If Tizen CLI/profile is available:
 npm run tizen:package
 ```
 
-Expected package identity: `BabusTVApp.BabusTV`.
 Expected feature-branch artifact prefix: `babustv_beta_`.
+Expected staged identity: `BabusTVApp.BabusTV`.
 
-- [ ] **Step 3: Validate staged package contents**
+- [ ] **Step 4: Validate staged package contents**
 
 Verify:
 
 ```text
-tizen/build/config.xml -> BabuşTV canonical identity
+tizen/build/config.xml -> canonical BabuşTV identity and required_version 5.0
 tizen/build/icon.png -> BabuşTV icon
 staged index -> BabuşTV title/assets
-no absolute asset paths
-no active ENTV product strings
+staged index -> no absolute asset paths
+active staged text -> no ENTV/EN-IPTV legacy product identity
 ```
 
-- [ ] **Step 4: Emulator smoke when the Windows hypervisor path is available**
+- [ ] **Step 5: Emulator smoke when available**
 
 ```bash
 em-cli launch -n tv-emu
@@ -920,33 +1017,33 @@ Record PASS/FAIL/NOT-AVAILABLE for:
 ```text
 app installs and launches
 launcher/app identity is BabuşTV
-boot screen is BabuşTV
+boot is BabuşTV
 shell is charcoal/violet
 remote focus is visible
-SELECT/Back navigation still works
+SELECT/Back still work
 Live TV overlay opens without implicit playback
 no ENTV/EN-IPTV user-visible text or mark
 ```
 
-Do not claim real-TV acceptance from emulator evidence.
+Do not claim physical-TV release acceptance from emulator evidence.
 
-- [ ] **Step 5: Write final verification document**
+- [ ] **Step 6: Write final verification evidence**
 
-`docs/verification/b0-brand-separation.md` must contain:
+Create `docs/verification/b0-brand-separation.md` with:
 
 ```text
 exact tested commit SHA
-automated command matrix and result
-legacy-brand broad audit classification
+automated command matrix/results
+legacy-brand broad-audit classifications
 WGT identity/artifact result
 browser smoke result
-emulator smoke result or NOT-AVAILABLE reason
-known hardware-only gates deferred to M3G/M8
+emulator result or NOT-AVAILABLE reason
+hardware-only gates deferred to M3G/M8
 ```
 
 Do not include credentials, provider URLs, or private stream data.
 
-- [ ] **Step 6: Final diff review against the spec**
+- [ ] **Step 7: Final diff review against scope**
 
 Verify B0 did not introduce:
 
@@ -954,19 +1051,19 @@ Verify B0 did not introduce:
 provider protocol changes
 playback policy changes
 new AVPlay calls in presentation code
-new credential fallback/storage behavior
+credential fallback/storage behavior
 EPG/search/favorites behavior
-heavy dependencies/frameworks
+heavy UI/framework dependencies
 ```
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add docs/verification/b0-brand-separation.md tools/check-legacy-brand.mjs player/test player/test-ts
+git add tools/check-legacy-brand.mjs docs/verification/b0-brand-separation.md
 git commit -m "test(b0): harden BabuşTV brand separation"
 ```
 
-Only include scanner/test files in the commit if they actually changed because of a reproduced B0G gap.
+If a reproduced final-gate bug required code/test changes, add only those specific files to the same or a focused corrective commit.
 
 ---
 
@@ -976,21 +1073,21 @@ Only include scanner/test files in the commit if they actually changed because o
                   ┌─ B0A identity ───────┐
                   ├─ B0B design system ──┤
 GREEN main ───────┼─ B0C assets ─────────┼──> GREEN main ──> B0D shell ──> B0E Live TV ──> B0G hardening
-                  └─ B0F copy ───────────┘
+                  └─ B0F runtime copy ────┘
 ```
 
-The first four are parallel only because their file ownership is intentionally disjoint. B0D/B0E are sequential because the value of another parallel branch is lower than the merge/review risk once the same presentation DOM becomes shared state.
+The first four are parallel only because their file ownership is deliberately disjoint. B0D/B0E are sequential because another parallel presentation branch would create more merge/review risk than elapsed-time benefit.
 
 ## Recommended Worker Count
 
-For B0 itself, use **4 parallel workers in wave 1**. This is the practical concurrency ceiling before merge-conflict and review overhead start outweighing elapsed-time gains.
+For B0 itself, use **4 parallel workers in wave 1**.
 
-- 2 workers under-use the genuinely independent identity/design/assets/copy surfaces.
+- 2 workers under-use independent identity/design/assets/copy surfaces.
 - 3 workers is safe but leaves one independent slice idle.
-- 4 workers maps exactly to B0A/B0B/B0C/B0F.
-- 5+ B0 workers would require splitting cohesive slices or letting two workers touch shared presentation files; do not do that.
+- 4 workers maps exactly to B0A/B0B/B0C/B0F and is the practical concurrency ceiling.
+- 5+ B0 workers would require splitting cohesive slices or allowing shared presentation-file ownership; do not do that.
 
-An optional **fifth non-B0 lane** can run M3G emulator/runtime verification independently if review bandwidth allows, but it should not be counted as a B0 implementation branch and must not modify B0 presentation speculatively.
+An optional **fifth non-B0 lane** may run M3G emulator/runtime verification if review bandwidth permits. It is not a B0 branch and must not modify B0 presentation speculatively.
 
 ## Final B0 Acceptance
 
@@ -999,12 +1096,13 @@ B0 is complete only when all are true:
 ```text
 User-visible name/logo/icon/boot = BabuşTV
 Active npm/Tizen/WGT identity = BabuşTV
+Browser/dev base = /babustv/
 Legacy custom and official Tizen package paths agree
-Active product surfaces pass legacy-brand scanner
+Final active product surfaces pass legacy-brand scanner
 Charcoal/violet design system is the presentation base
 Calico brand mark is present but non-intrusive during playback
 Shell/settings/status copy is Turkish-first
-Live TV focus/playing/failed states are visually distinct
+Live TV focused/playing/failed states are visually distinct
 M3 playback/provider/focus/recovery regression suite remains GREEN
 Tizen 5.0+ package contract remains intact
 Emulator result is recorded honestly as PASS/FAIL/NOT-AVAILABLE
