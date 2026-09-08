@@ -20,6 +20,9 @@ export interface StreamRequest {
   userAgent?: string;
   referer?: string;
   headers?: Readonly<Record<string, string>>;
+  drm?: { keyId: string; key: string };
+  useProxy?: boolean;
+  proxyUrl?: string;
 }
 
 export interface PlaybackResult {
