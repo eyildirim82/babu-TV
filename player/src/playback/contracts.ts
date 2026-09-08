@@ -4,6 +4,7 @@ export type PlaybackState =
   | 'PREPARING'
   | 'PLAYING'
   | 'BUFFERING'
+  | 'RECOVERING'
   | 'FAILED';
 
 export type PlaybackErrorCode =
@@ -25,9 +26,23 @@ export interface StreamRequest {
   proxyUrl?: string;
 }
 
+export type PlaybackEngineName = 'shaka' | 'avplay';
+
 export interface PlaybackResult {
   ok: boolean;
-  engine: 'shaka' | 'avplay' | null;
+  engine: PlaybackEngineName | null;
+  error: PlaybackErrorCode | null;
+}
+
+export interface PlaybackEnginePort {
+  readonly name: PlaybackEngineName;
+  isAvailable(): boolean;
+  open(request: StreamRequest): Promise<PlaybackResult>;
+  stop(): Promise<void> | void;
+}
+
+export interface LegacyShakaAttemptResult {
+  ok: boolean;
   error: PlaybackErrorCode | null;
 }
 
