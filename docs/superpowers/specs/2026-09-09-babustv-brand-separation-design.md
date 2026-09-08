@@ -22,7 +22,8 @@ B0 deliberately avoids rewriting provider, playback, domain, focus, or recovery 
 The approved identity is:
 
 - Product name: **BabuşTV**
-- TV-facing display form: **BABUŞ TV** or an ASCII-safe equivalent where platform restrictions require it
+- TV-facing display form: **BABUŞ TV** where supported
+- ASCII-safe platform form: **BabusTV**
 - Visual personality: premium, restrained, modern, TV-first
 - Primary motif: calico cat identity used selectively rather than as a constant mascot
 - Base theme: dark charcoal surfaces
@@ -120,17 +121,17 @@ Existing architectural rules remain mandatory:
 
 ## 6. Canonical naming rules
 
-B0 establishes a single canonical product identity.
+B0 establishes one canonical product identity.
 
 ### User-facing name
 
-Use `BabuşTV` where Unicode is supported and safe.
+Use `BabuşTV` in normal product copy.
 
-For platform fields with practical ASCII or package-name constraints, use a documented canonical ASCII-safe form such as `BabusTV` or `BabusTVApp`. The exact package string may follow Tizen constraints, but all active packaging paths must use the same identity source rather than defining their own unrelated constants.
+Use `BABUŞ TV` for the TV application display name where the target field safely supports Unicode. Use `BabusTV` only where an ASCII-safe identifier is required.
 
 ### npm package namespace
 
-Target package names:
+Canonical package names are:
 
 - `@babustv/player`
 - `@babustv/tizen`
@@ -139,22 +140,30 @@ The root lockfile must be regenerated so no active workspace linkage depends on 
 
 ### WGT artifact naming
 
-Artifacts must use BabuşTV-owned naming, for example:
+Canonical artifact names are:
 
 ```text
-babustv_stable_<version>_<commit>.wgt
-babustv_beta_<version>_<commit>.wgt
+babustv_stable_v<version>_<commit>.wgt
+babustv_beta_v<version>_<commit>.wgt
 ```
 
-The exact separator/casing convention must be consistent across scripts, docs, and CI.
+`<commit>` is the existing short-commit convention used by the packaging pipeline. Scripts, docs, and CI must all use this same format.
 
 ### Tizen identity
 
-All supported Tizen packaging paths must consume one canonical application/package identity definition.
+The desired canonical Tizen identity is:
+
+```text
+package:        BabusTVApp
+application id: BabusTVApp.BabusTV
+display name:   BABUŞ TV
+```
+
+All supported Tizen packaging paths must consume one canonical identity definition rather than defining their own unrelated constants.
 
 The legacy custom packaging path must not continue generating `IPTVPlayer` while the CLI path generates `BabusTVApp.BabusTV`.
 
-Any Tizen application/package identity change that could alter persisted storage origin must first pass the storage-continuity decision described in Section 13.
+However, changing an already-installed application's package/application identity can affect persisted data. Therefore `BabusTVApp.BabusTV` is the target identity, but B0A must first execute the storage-continuity decision in Section 13. If evidence shows that switching an existing installation to this identity would irrecoverably lose user-owned state or credentials and no safe migration is available, B0A must stop and return that product decision for explicit approval rather than silently choosing data loss.
 
 ## 7. Legacy-brand gate
 
@@ -384,22 +393,22 @@ Tizen application/package identity changes may affect persisted application stor
 
 B0 must not change identity purely for branding and silently discard user state.
 
-Before finalizing a Tizen identity migration, implementation must determine the effect on at least:
+Before finalizing the target `BabusTVApp.BabusTV` identity, implementation must determine the effect on at least:
 
 - IndexedDB provider/category/channel/app state
 - local legacy settings still intentionally supported during migration
 - secure WidgetData credential access
 - application update/install behavior
 
-The preferred outcome is a single BabuşTV identity with continuity preserved.
+The preferred outcome is `BabusTVApp.BabusTV` with continuity preserved.
 
-If continuity cannot be preserved automatically, the implementation plan must choose one of these explicitly:
+If continuity cannot be preserved automatically, B0A must stop before destructive identity migration and present evidence. The allowed follow-up decisions are:
 
 1. preserve the existing installed identity internally while changing all user-visible identity, or
-2. perform a documented migration path with evidence, or
-3. treat identity change as a breaking reinstall only if explicitly approved as a product decision.
+2. implement a documented migration path with evidence, or
+3. treat identity change as a breaking reinstall only after explicit product approval.
 
-Option 3 is not the default.
+Option 3 is never implicit.
 
 No implementation branch may assume storage continuity without a test or platform-specific evidence.
 
@@ -427,7 +436,7 @@ Branch:
 
 `docs/b0-babustv-brand-separation`
 
-Owns this design and the implementation plan only.
+Owns this design and, after design review, the implementation plan only.
 
 ### B0A — Product identity
 
@@ -648,9 +657,9 @@ B0 is complete when all of the following are true:
 
 - the application is visibly and technically branded as BabuşTV
 - the inherited ENTV visual language is no longer recognizable as the active UI system
-- active WGT artifacts use BabuşTV naming
+- active WGT artifacts use `babustv_{stable|beta}_v<version>_<commit>.wgt`
 - supported Tizen packaging paths use one canonical BabuşTV identity source
-- active npm workspaces no longer use `@en-iptv/*`
+- active npm workspaces are `@babustv/player` and `@babustv/tizen`
 - no user-facing `EN IPTV`, `EN-IPTV`, `IPTVPlayer`, or equivalent inherited product branding remains
 - legacy-brand regression scanning is automated
 - only documented legal/provenance/history exceptions remain
@@ -660,7 +669,7 @@ B0 is complete when all of the following are true:
 - primary consumer copy is Turkish-first
 - playback/provider/recovery behavior remains GREEN
 - remote focus remains clear and deterministic
-- storage/credential continuity is preserved or an explicitly approved migration decision is documented
+- storage/credential continuity is preserved, or any deviation from the target Tizen identity has explicit product approval based on evidence
 - production build and Tizen packaging pass
 - emulator smoke passes for supported scenarios
 
