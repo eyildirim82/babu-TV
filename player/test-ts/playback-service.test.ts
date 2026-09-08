@@ -46,6 +46,7 @@ void test('playback service preserves legacy channel objects while routing throu
       Origin: 'https://example.test',
       Referer: 'https://example.test/',
     },
+    redactStreamUrl: true,
   });
   assert.deepEqual(result, { ok: true, engine: 'avplay', error: null });
 
@@ -99,6 +100,7 @@ void test('Shaka adapter M3 open uses the explicit Shaka-only attempt instead of
           Origin: 'https://example.test',
           Referer: 'https://example.test/',
         },
+        redactStreamUrl: true,
       });
       return { ok: false, error: 'UNSUPPORTED_CODEC' as const };
     },
