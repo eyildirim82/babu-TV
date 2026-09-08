@@ -1,3 +1,5 @@
+import type { PlaybackEnginePort, PlaybackResult, StreamRequest } from './contracts.js';
+
 export type NativeBufferingCallback = (buffering: boolean, percent?: number) => void;
 export type NativeErrorCallback = (type: unknown) => void;
 
@@ -17,11 +19,28 @@ export interface LegacyAvplayPort {
   stop(): void;
 }
 
-export class AvplayAdapter {
+export class AvplayAdapter implements PlaybackEnginePort {
+  readonly name = 'avplay' as const;
+
   constructor(private readonly legacy: LegacyAvplayPort) {}
 
   isAvailable(): boolean {
     return this.legacy.isAvailable();
+  }
+
+  async open(request: StreamRequest): Promise<PlaybackResult> {
+    if (!this.isAvailable()) {
+      return { ok: false, engine: null, error: 'ENGINE_FAILURE' };
+    }
+
+    const ok = await this.play(request.url, {
+      userAgent: request.userAgent ?? null,
+      referer: request.referer ?? null,
+    });
+
+    return ok
+      ? { ok: true, engine: 'avplay', error: null }
+      : { ok: false, engine: null, error: 'ENGINE_FAILURE' };
   }
 
   onBuffering(callback: NativeBufferingCallback): void {
