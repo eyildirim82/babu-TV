@@ -21,3 +21,54 @@ test('legacy player routes native calls through AvplayAdapter and exposes active
   assert.doesNotMatch(source, /import \* as avplay from '\.\/avplay\.js';/);
   assert.match(source, /export function getPlaybackEngine\(\)/);
 });
+
+test('M3 Shaka attempt uses a no-fallback policy while legacy load keeps inherited recovery enabled', async () => {
+  const source = await readFile(playerUrl, 'utf8');
+
+  assert.match(source, /const LEGACY_PLAYBACK_POLICY = Object\.freeze\(\{[\s\S]*allowNativeFallback: true,[\s\S]*allowAutomaticRecovery: true,[\s\S]*allowAutoAdvance: true,[\s\S]*\}\);/);
+  assert.match(source, /const M3_SHAKA_ATTEMPT_POLICY = Object\.freeze\(\{[\s\S]*allowNativeFallback: false,[\s\S]*allowAutomaticRecovery: false,[\s\S]*allowAutoAdvance: false,[\s\S]*\}\);/);
+  assert.match(source, /export async function loadChannel\(channel\) \{\s*const result = await loadChannelWithPolicy\(channel, LEGACY_PLAYBACK_POLICY\);\s*return result\.ok;\s*\}/);
+  assert.match(source, /export async function playShakaAttempt\(channel\) \{\s*return loadChannelWithPolicy\(channel, M3_SHAKA_ATTEMPT_POLICY\);\s*\}/);
+  assert.match(source, /policy\.allowNativeFallback && avplayPreferredUrls\.has\(channel\.url\)/);
+});
+
+test('player.js leaves M3 failure normalization to the TypeScript adapter', async () => {
+  const source = await readFile(playerUrl, 'utf8');
+
+  assert.doesNotMatch(source, /classifyShakaFailure/);
+  assert.match(source, /failure: \{ m3Code: 'TIMEOUT' \}/);
+  assert.match(source, /failure: \{ m3Code: 'ENGINE_FAILURE' \}/);
+  assert.match(source, /return \{ ok: false, failure: error \};/);
+});
+
+test('M3 load watchdog keeps timeout classification ahead of Shaka load interruption', async () => {
+  const source = await readFile(playerUrl, 'utf8');
+
+  assert.match(source, /let loadWatchdogTimedOut = false;/);
+  assert.match(source, /loadWatchdogTimedOut = true;[\s\S]*if \(player\) player\.destroy\(\)\.catch/);
+  assert.match(
+    source,
+    /catch \(error\) \{[\s\S]*if \(policy === M3_SHAKA_ATTEMPT_POLICY && loadWatchdogTimedOut\) \{\s*return \{ ok: false, failure: \{ m3Code: 'TIMEOUT' \} \};\s*\}[\s\S]*if \(error && error\.code === 7000\) return false;/,
+  );
+});
+
+test('transient StreamRequest playback redacts resolved URLs and raw Shaka errors from logs', async () => {
+  const source = await readFile(playerUrl, 'utf8');
+
+  assert.match(source, /function isSensitiveStream\(channel\)[\s\S]*redactStreamUrl === true/);
+  assert.match(source, /function streamUrlForLog\(channel, url, maxLength\)[\s\S]*\[redacted stream URL\]/);
+  assert.match(source, /lastShakaReq = 't' \+ type \+ ' ' \+ streamUrlForLog\(currentChannel, requestUri, 55\)/);
+  assert.match(source, /lastShakaResp = 't' \+ type \+ ' ' \+ streamUrlForLog\(currentChannel, responseUri, 40\)/);
+  assert.match(source, /if \(isSensitiveStream\(currentChannel\)\) \{\s*console\.error\('Shaka error code:', error && error\.code \? error\.code : 'native'\);/);
+  assert.match(source, /function channelForLog\(channel, maxLength\)[\s\S]*if \(isSensitiveStream\(channel\)\) return '\[redacted stream\]';/);
+});
+
+test('M3 Shaka request filter forwards arbitrary transient stream headers', async () => {
+  const source = await readFile(playerUrl, 'utf8');
+
+  assert.doesNotMatch(source, /if \(\['user-agent', 'referer', 'origin'\]\.includes\(lower\)\)/);
+  assert.match(
+    source,
+    /const canon = lower === 'user-agent'[\s\S]*lower === 'referer'[\s\S]*lower === 'origin'[\s\S]*: k;\s*request\.headers\[canon\] = v;/,
+  );
+});

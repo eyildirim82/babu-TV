@@ -5,12 +5,46 @@ import { createAvplayAdapter } from './playback/avplay-adapter.ts';
 
 const avplay = createAvplayAdapter(legacyAvplay);
 
+const LEGACY_PLAYBACK_POLICY = Object.freeze({
+  allowNativeFallback: true,
+  allowAutomaticRecovery: true,
+  allowAutoAdvance: true,
+});
+
+const M3_SHAKA_ATTEMPT_POLICY = Object.freeze({
+  allowNativeFallback: false,
+  allowAutomaticRecovery: false,
+  allowAutoAdvance: false,
+});
+
+let activePlaybackPolicy = LEGACY_PLAYBACK_POLICY;
+
+function isSensitiveStream(channel) {
+  return Boolean(channel && channel.redactStreamUrl === true);
+}
+
+function streamUrlForLog(channel, url, maxLength) {
+  if (isSensitiveStream(channel)) return '[redacted stream URL]';
+  if (typeof url !== 'string' || !url) return '?';
+  return url.slice(-maxLength);
+}
+
+function channelForLog(channel, maxLength) {
+  if (isSensitiveStream(channel)) return '[redacted stream]';
+  if (channel && channel.name) return channel.name;
+  if (channel && typeof channel.url === 'string') return channel.url.slice(0, maxLength);
+  return '?';
+}
+
 function logEvent(level, message) {
+  const safeMessage = isSensitiveStream(currentChannel)
+    ? 'Sensitive stream playback event'
+    : message;
   try {
     fetch('/log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ level, message }),
+      body: JSON.stringify({ level, message: safeMessage }),
     }).catch(() => {});
   } catch (e) {}
 }
@@ -104,16 +138,19 @@ export async function initPlayer(videoEl) {
 
   const networkingEngine = player.getNetworkingEngine();
   if (networkingEngine) {
-    // Track Shaka request activity for the load watchdog below.
+    // Track Shaka request activity for the load watchdog below. Transient
+    // provider StreamRequest URLs are redacted before entering diagnostics.
     networkingEngine.registerRequestFilter((type, request) => {
       try {
-        lastShakaReq = 't' + type + ' ' + (request.uris && request.uris[0] ? request.uris[0].slice(-55) : '?');
+        const requestUri = request.uris && request.uris[0] ? request.uris[0] : null;
+        lastShakaReq = 't' + type + ' ' + streamUrlForLog(currentChannel, requestUri, 55);
         lastShakaActivity = Date.now();
       } catch {}
     });
     networkingEngine.registerResponseFilter((type, response) => {
       try {
-        lastShakaResp = 't' + type + ' ' + (response.uri ? response.uri.slice(-40) : '?');
+        const responseUri = response.uri || null;
+        lastShakaResp = 't' + type + ' ' + streamUrlForLog(currentChannel, responseUri, 40);
         lastShakaActivity = Date.now();
       } catch {}
     });
@@ -126,10 +163,8 @@ export async function initPlayer(videoEl) {
         if (currentChannel.customHeaders) {
           for (const [k, v] of Object.entries(currentChannel.customHeaders)) {
             const lower = k.toLowerCase();
-            if (['user-agent', 'referer', 'origin'].includes(lower)) {
-              const canon = lower === 'user-agent' ? 'User-Agent' : lower === 'referer' ? 'Referer' : 'Origin';
-              request.headers[canon] = v;
-            }
+            const canon = lower === 'user-agent' ? 'User-Agent' : lower === 'referer' ? 'Referer' : lower === 'origin' ? 'Origin' : k;
+            request.headers[canon] = v;
           }
         }
       }
@@ -196,7 +231,10 @@ export async function initPlayer(videoEl) {
   videoEl.addEventListener('stalled', onVideoStalled);
   videoEl.addEventListener('waiting', onVideoWaiting);
 
-  await player.attach(videoEl).catch((e) => console.error('Player attach failed:', e));
+  await player.attach(videoEl).catch((e) => {
+    if (isSensitiveStream(currentChannel)) console.error('Player attach failed');
+    else console.error('Player attach failed:', e);
+  });
   return true;
 }
 
@@ -233,10 +271,11 @@ function onVideoError() {
     4: 'Video source not supported on this device — try a different quality or proxy',
   };
   const msg = mediaErrorMessages[err.code] || ('Video error (code ' + err.code + ')');
-  logEvent('ERROR', 'Video element error: ' + msg + ' (code=' + err.code + ', mediaErr=' + (err.message || '') + ')');
+  const mediaErrorDetail = isSensitiveStream(currentChannel) ? '[redacted]' : (err.message || '');
+  logEvent('ERROR', 'Video element error: ' + msg + ' (code=' + err.code + ', mediaErr=' + mediaErrorDetail + ')');
   if (videoErrorCount >= 2 && currentChannel) {
     // 2+ native errors in a row — this stream format is likely unsupported
-    logEvent('ERROR', 'Channel appears unsupported on this device: ' + (currentChannel.name || currentChannel.url.slice(0, 60)));
+    logEvent('ERROR', 'Channel appears unsupported on this device: ' + channelForLog(currentChannel, 60));
     showError('This channel could not play. Try turning on Proxy in the menu, or pick a different channel.');
     videoErrorCount = 0;
   }
@@ -400,17 +439,45 @@ async function probeChannelFormat(channel) {
     }
     return null;
   } catch (e) {
-    logEvent('WARN', 'Format probe failed: ' + (e && e.message ? e.message : e));
+    const detail = isSensitiveStream(channel) ? '[redacted]' : (e && e.message ? e.message : e);
+    logEvent('WARN', 'Format probe failed: ' + detail);
     return null;
   }
 }
 
 export async function loadChannel(channel) {
-  if (!channel) return false;
+  const result = await loadChannelWithPolicy(channel, LEGACY_PLAYBACK_POLICY);
+  return result.ok;
+}
+
+export async function playShakaAttempt(channel) {
+  return loadChannelWithPolicy(channel, M3_SHAKA_ATTEMPT_POLICY);
+}
+
+async function loadChannelWithPolicy(channel, policy) {
+  const result = await runChannelLoadWithPolicy(channel, policy);
+  if (result && typeof result === 'object' && typeof result.ok === 'boolean') {
+    return result;
+  }
+  return { ok: result === true, failure: null };
+}
+
+async function runChannelLoadWithPolicy(channel, policy) {
+  activePlaybackPolicy = policy;
+
+  if (!channel) {
+    if (policy === M3_SHAKA_ATTEMPT_POLICY) {
+      return { ok: false, failure: { m3Code: 'ENGINE_FAILURE' } };
+    }
+    return false;
+  }
 
   if (channel.drm && !isEmeSupported()) {
     logEvent('ERROR', 'DRM not available — EME (Encrypted Media Extensions) is not supported in this browser/context');
     showError('This channel is protected and cannot play here. Try a different channel.');
+    if (policy === M3_SHAKA_ATTEMPT_POLICY) {
+      return { ok: false, failure: { m3Code: 'ENGINE_FAILURE' } };
+    }
     return false;
   }
 
@@ -435,11 +502,13 @@ export async function loadChannel(channel) {
     url += sep + '_t=' + Date.now();
   }
 
-  // Channels already known to need native playback skip Shaka entirely.
-  if (avplayPreferredUrls.has(channel.url) && avplay.isAvailable()) {
+  // Channels already known to need native playback skip Shaka entirely only
+  // on the legacy path. M3 always starts each engine attempt with Shaka.
+  if (policy.allowNativeFallback && avplayPreferredUrls.has(channel.url) && avplay.isAvailable()) {
     return loadViaAvplay(channel, myToken);
   }
 
+  let loadWatchdogTimedOut = false;
   try {
     // Always destroy and recreate the player on every channel switch.
     // On Tizen, Shaka's unload/load can hang forever when stuck on a failed
@@ -450,7 +519,12 @@ export async function loadChannel(channel) {
 
     if (el) {
       const ok = await initPlayer(el);
-      if (!ok) return false;
+      if (!ok) {
+        if (policy === M3_SHAKA_ATTEMPT_POLICY) {
+          return { ok: false, failure: { m3Code: 'UNSUPPORTED_CODEC' } };
+        }
+        return false;
+      }
     }
     if (videoElement) videoElement.classList.remove('hidden');
     currentChannel = channel;
@@ -486,6 +560,7 @@ export async function loadChannel(channel) {
       }
       const idleFor = Date.now() - lastShakaActivity;
       if (idleFor >= 15000 || Date.now() - loadStart > 60000) {
+        loadWatchdogTimedOut = true;
         clearInterval(loadingTimeout);
         loadingTimeout = null;
         logEvent('WARN', 'Load stalled (idle ' + Math.round(idleFor / 1000) + 's, lastREQ=' + lastShakaReq + ', lastRESP=' + lastShakaResp + ')');
@@ -509,7 +584,7 @@ export async function loadChannel(channel) {
     // buster (BUG-017) while the probe is stored under the original URL.
     const mimeType = sniffedMimeUrls.get(channel.url) || detectMimeType(url);
     if (mimeType) {
-      logEvent('INFO', 'Detected MIME type: ' + mimeType + ' for ' + url.slice(0, 80));
+      logEvent('INFO', 'Detected MIME type: ' + mimeType + ' for ' + streamUrlForLog(channel, url, 80));
       await player.load(url, undefined, mimeType);
     } else {
       await player.load(url);
@@ -526,9 +601,9 @@ export async function loadChannel(channel) {
     reconnectAttempts = 0;
     consecutiveErrors = 0;
     videoErrorCount = 0;
-    startStallWatchdog();
-    startBlackWatchdog();
-    logEvent('INFO', 'Loaded: ' + (channel.name || channel.url.slice(0, 60)));
+    if (policy.allowAutomaticRecovery) startStallWatchdog();
+    if (policy.allowNativeFallback) startBlackWatchdog();
+    logEvent('INFO', 'Loaded: ' + channelForLog(channel, 60));
     return true;
   } catch (error) {
     clearTimeout(loadingTimeout);
@@ -539,30 +614,42 @@ export async function loadChannel(channel) {
     showLoading(false);
     videoErrorCount = 0;
 
+    if (policy === M3_SHAKA_ATTEMPT_POLICY && loadWatchdogTimedOut) {
+      return { ok: false, failure: { m3Code: 'TIMEOUT' } };
+    }
+
     if (error && error.code === 7000) return false;
 
     // After a timeout, the player was destroyed above. Recreate it so the
-    // next channel switch works.
+    // next channel switch works. M3 returns a safe timeout sentinel and leaves
+    // retries to the external session coordinator.
     if (error && (error.message === 'Load timed out' || error.name === 'DestroyedError')) {
+      if (policy === M3_SHAKA_ATTEMPT_POLICY) {
+        return { ok: false, failure: { m3Code: 'TIMEOUT' } };
+      }
       logEvent('WARN', 'Load abandoned — recreating player for next attempt');
       const el = videoElement;
       await destroyPlayer(el);
       if (el && myToken === loadToken) {
         await initPlayer(el);
       }
-      if (reconnectAttempts < 3) {
+      if (policy.allowAutomaticRecovery && reconnectAttempts < 3) {
         scheduleReconnect();
-      } else {
+      } else if (policy.allowAutomaticRecovery) {
         showError('Could not load this channel after several tries. It may be turned off or not available on your TV.');
-        logEvent('ERROR', 'Reconnect limit reached — ' + (channel.name || channel.url.slice(0, 60)));
+        logEvent('ERROR', 'Reconnect limit reached — ' + channelForLog(channel, 60));
       }
       return false;
     }
 
+    if (policy === M3_SHAKA_ATTEMPT_POLICY) {
+      return { ok: false, failure: error };
+    }
+
     // Shaka could not guess the stream format from the URL (error 4000).
-    // Many IPTV servers hide the channel type behind tokenized links with no
-    // file extension. Probe the first bytes and retry with the right hint.
-    if (error && error.code === 4000 && currentChannel && !sniffTriedUrls.has(currentChannel.url)) {
+    // Keep the inherited one-time probe only on the legacy recovery path;
+    // M3 returns control to the external session coordinator instead.
+    if (policy.allowAutomaticRecovery && error && error.code === 4000 && currentChannel && !sniffTriedUrls.has(currentChannel.url)) {
       sniffTriedUrls.add(currentChannel.url);
       const crashedChannel = currentChannel;
       const tokenAtCatch = loadToken;
@@ -570,12 +657,12 @@ export async function loadChannel(channel) {
       probeChannelFormat(crashedChannel).then((mime) => {
         if (tokenAtCatch !== loadToken) return; // user switched channels meanwhile
         if (!mime) {
-          logEvent('WARN', 'Could not identify channel format: ' + crashedChannel.url.slice(0, 100));
+          logEvent('WARN', 'Could not identify channel format: ' + streamUrlForLog(crashedChannel, crashedChannel.url, 100));
           showError('This channel could not be identified. Try enabling Proxy in the menu, or try a different channel.');
           return;
         }
         sniffedMimeUrls.set(crashedChannel.url, mime);
-        logEvent('INFO', 'Identified channel format: ' + mime + ' for ' + crashedChannel.url.slice(0, 80) + ' — retrying');
+        logEvent('INFO', 'Identified channel format: ' + mime + ' for ' + streamUrlForLog(crashedChannel, crashedChannel.url, 80) + ' — retrying');
         loadChannel(crashedChannel);
       });
       return false;
@@ -583,6 +670,10 @@ export async function loadChannel(channel) {
 
     if (isRecoverable(error)) {
       logEvent('WARN', 'Load failed (recoverable ' + error.code + ')');
+      if (!policy.allowAutomaticRecovery) {
+        showError(getErrorMessage(error));
+        return false;
+      }
       if (reconnectAttempts < 3) {
         scheduleReconnect();
       } else {
@@ -592,9 +683,9 @@ export async function loadChannel(channel) {
     }
 
     // BUG-017: tokenized servers reject loads with 403/401 when the token
-    // went stale between playlist fetch and segment fetch. Every loadChannel()
-    // refetches the master playlist (fresh token), so retry twice first.
-    if (error && error.code === 1001 && currentChannel && reconnectAttempts < 2) {
+    // went stale between playlist fetch and segment fetch. Every legacy
+    // loadChannel() refetches the master playlist (fresh token), so retry twice.
+    if (policy.allowAutomaticRecovery && error && error.code === 1001 && currentChannel && reconnectAttempts < 2) {
       const status = error.data && error.data[1];
       if (status === 403 || status === 401) {
         logEvent('WARN', 'Access denied at load (' + status + ') — retrying with fresh token');
@@ -603,33 +694,36 @@ export async function loadChannel(channel) {
       }
     }
 
-    if (currentChannel && currentChannel.useProxy === false && proxySuggestionCallback) {
+    if (policy.allowAutomaticRecovery && currentChannel && currentChannel.useProxy === false && proxySuggestionCallback) {
       proxySuggestionCallback(currentChannel);
     }
 
-    if (isNativeLoadCrash(error) && currentChannel && !pdtFallbackUrls.has(currentChannel.url)) {
+    if (policy.allowAutomaticRecovery && isNativeLoadCrash(error) && currentChannel && !pdtFallbackUrls.has(currentChannel.url)) {
       // Retry once with HLS program-date-time sync disabled (BUG-013): some
       // HLS streams crash inside Shaka's PDT handling, which v1.7.0 enabled.
       pdtFallbackUrls.add(currentChannel.url);
       const crashedChannel = currentChannel;
       const tokenAtCatch = loadToken;
-      logEvent('WARN', 'Native crash loading channel — retrying without PDT sync: ' +
-          (crashedChannel.name || crashedChannel.url.slice(0, 80)));
+      logEvent('WARN', 'Native crash loading channel — retrying without PDT sync: ' + channelForLog(crashedChannel, 80));
       showCustomMessage('Retrying with compatibility mode...');
       setTimeout(() => { if (tokenAtCatch === loadToken) loadChannel(crashedChannel); }, 1200);
       return false;
     }
 
     if (isNativeLoadCrash(error)) {
-      logEvent('ERROR', 'Channel failed to load (native crash): ' +
-          (currentChannel ? currentChannel.name + ' | ' + currentChannel.url.slice(0, 100) : '?') +
-          ' — ' + (error.message || ''));
-      if (typeof console !== 'undefined') console.error('Channel load crashed inside Shaka:', error, error.stack);
+      const detail = isSensitiveStream(currentChannel) ? '[redacted native error]' : (error.message || '');
+      logEvent('ERROR', 'Channel failed to load (native crash): ' + channelForLog(currentChannel, 100) + ' — ' + detail);
+      if (typeof console !== 'undefined' && !isSensitiveStream(currentChannel)) {
+        console.error('Channel load crashed inside Shaka:', error, error.stack);
+      }
       showError('This channel could not start — it uses a stream format this player could not handle. Try another channel or enable Proxy.');
       return false;
     }
 
-    logEvent('ERROR', 'Failed to load — ' + getErrorMessage(error));
+    const failureMessage = isSensitiveStream(currentChannel)
+      ? 'Sensitive stream failed with error ' + (error && error.code ? error.code : 'unknown')
+      : getErrorMessage(error);
+    logEvent('ERROR', 'Failed to load — ' + failureMessage);
     showError(getErrorMessage(error));
     return false;
   }
@@ -672,39 +766,42 @@ function handlePlayerError(error) {
   // Ignore interruptions from switching channels
   if (error.code === 7000) return;
 
-  console.error('Shaka error:', error);
+  if (isSensitiveStream(currentChannel)) {
+    console.error('Shaka error code:', error && error.code ? error.code : 'native');
+  } else {
+    console.error('Shaka error:', error);
+  }
+
+  const policy = activePlaybackPolicy;
 
   // Suppress errors while auto-advance is pending
-  if (advancePending) return;
+  if (policy.allowAutoAdvance && advancePending) return;
 
   consecutiveErrors++;
 
-  // Native crash inside Shaka during playback — retry once with HLS PDT sync
-  // disabled (BUG-013), unless we are still inside load() (its catch handles
-  // that path).
+  // Native crash inside Shaka during playback — legacy retries once with HLS
+  // PDT sync disabled. M3 leaves recovery to the external coordinator.
   if (isNativeLoadCrash(error) && !loadingTimeout) {
-    if (currentChannel && !pdtFallbackUrls.has(currentChannel.url)) {
+    if (policy.allowAutomaticRecovery && currentChannel && !pdtFallbackUrls.has(currentChannel.url)) {
       pdtFallbackUrls.add(currentChannel.url);
-      logEvent('WARN', 'Native crash during playback — reloading without PDT sync: ' +
-          (currentChannel.name || currentChannel.url.slice(0, 80)));
+      logEvent('WARN', 'Native crash during playback — reloading without PDT sync: ' + channelForLog(currentChannel, 80));
       showReloadingMessage();
       loadChannel(currentChannel);
       return;
     }
-    logEvent('ERROR', 'Playback crashed (native): ' +
-        (currentChannel ? currentChannel.name + ' | ' + currentChannel.url.slice(0, 100) : '?') +
-        ' — ' + (error.message || ''));
-    if (typeof console !== 'undefined') console.error('Shaka runtime crash:', error, error.stack);
+    const detail = isSensitiveStream(currentChannel) ? '[redacted native error]' : (error.message || '');
+    logEvent('ERROR', 'Playback crashed (native): ' + channelForLog(currentChannel, 100) + ' — ' + detail);
+    if (typeof console !== 'undefined' && !isSensitiveStream(currentChannel)) {
+      console.error('Shaka runtime crash:', error, error.stack);
+    }
     showError('This channel stopped unexpectedly — it uses a stream format this player could not handle. Try another channel or enable Proxy.');
     return;
   }
 
   // 401/403 (BAD_HTTP_STATUS, code 1001, status in data[1]) on a segment:
-  // retry up to 3 times with a 4s cool-down (BUG-021: hammering a
-  // rate-limiting relay gets the IP banned; back off instead). BUG-021
-  // follow-up: tokenized relays also answer 401 mid-playback when the token
-  // dies — same fresh-token recovery, not a terminal login error.
-  if (error.code === 1001 && currentChannel) {
+  // legacy retries up to 3 times with a 4s cool-down. M3 never starts this
+  // hidden retry loop.
+  if (policy.allowAutomaticRecovery && error.code === 1001 && currentChannel) {
     const status = error.data && error.data[1];
     if (status === 403 || status === 401) {
       lastResortAttempts++;
@@ -722,6 +819,11 @@ function handlePlayerError(error) {
   }
 
   if (isRecoverable(error)) {
+    if (!policy.allowAutomaticRecovery) {
+      logEvent('ERROR', 'M3 Shaka attempt failed — external recovery required');
+      showError(getErrorMessage(error));
+      return;
+    }
     // After 3 consecutive errors, force a hard reload (cache-bust + fresh edge)
     if (consecutiveErrors >= 3) {
       consecutiveErrors = 0;
@@ -733,11 +835,14 @@ function handlePlayerError(error) {
     return;
   }
 
-  logEvent('ERROR', 'Unrecoverable error ' + error.code + ' (' + (currentChannel && currentChannel.name ? currentChannel.name : 'unknown') + ') — ' + getErrorMessage(error));
+  const errorMessage = isSensitiveStream(currentChannel)
+    ? 'Sensitive stream error ' + (error && error.code ? error.code : 'unknown')
+    : getErrorMessage(error);
+  logEvent('ERROR', 'Unrecoverable error ' + error.code + ' (' + channelForLog(currentChannel, 60) + ') — ' + errorMessage);
   showError(getErrorMessage(error));
 
-  // Auto-advance to next channel after 3 failed 401/403 retries
-  if (error.code === 1001 && channelAdvanceCallback) {
+  // Auto-advance to next channel after 3 failed 401/403 retries, legacy only.
+  if (policy.allowAutoAdvance && error.code === 1001 && channelAdvanceCallback) {
     const status = error.data && error.data[1];
     if ((status === 403 || status === 401) && lastResortAttempts > 3) {
       advancePending = true;
@@ -779,6 +884,7 @@ function isRecoverable(error) {
 }
 
 function scheduleReconnect() {
+  if (!activePlaybackPolicy.allowAutomaticRecovery) return;
   if (reconnectPending || !currentChannel) return;
   reconnectPending = true;
   reconnectAttempts++;
@@ -821,6 +927,7 @@ function showReloadingMessage() {
 
 function startStallWatchdog() {
   stopStallWatchdog();
+  if (!activePlaybackPolicy.allowAutomaticRecovery) return;
   lastStallTime = videoElement ? videoElement.currentTime : 0;
   lastStallCheck = Date.now();
   stallWatchdogTimer = setInterval(() => {
@@ -859,6 +966,7 @@ function stopStallWatchdog() {
 // frame counter is only a fallback (a stuck decoder can still count frames).
 function startBlackWatchdog() {
   stopBlackWatchdog();
+  if (!activePlaybackPolicy.allowNativeFallback) return;
   const tokenAtStart = loadToken;
   blackWatchTimer = setTimeout(() => {
     blackWatchTimer = null;
@@ -892,9 +1000,10 @@ function startBlackWatchdog() {
 }
 
 function onBlackScreen() {
+  if (!activePlaybackPolicy.allowNativeFallback) return;
   if (!currentChannel || avplayFailedUrls.has(currentChannel.url)) return;
   if (!avplay.isAvailable()) {
-    logEvent('ERROR', 'Undecodable stream, no native fallback: ' + currentChannel.url.slice(0, 100));
+    logEvent('ERROR', 'Undecodable stream, no native fallback: ' + streamUrlForLog(currentChannel, currentChannel.url, 100));
     showError('This channel uses a format the TV browser cannot display. Try a native player app for this channel.');
     return;
   }
@@ -929,7 +1038,8 @@ async function loadViaAvplay(channel, myToken) {
     if (myToken !== loadToken) return;
     avplayFailedUrls.add(channel.url);
     avplayPreferredUrls.delete(channel.url);
-    logEvent('ERROR', 'Native playback failed (' + type + '): ' + (channel.name || channel.url.slice(0, 60)));
+    const nativeType = isSensitiveStream(channel) ? '[redacted]' : type;
+    logEvent('ERROR', 'Native playback failed (' + nativeType + '): ' + channelForLog(channel, 60));
     showError('This channel could not play on your TV. Try another channel.');
   });
   let referer = null;
@@ -954,18 +1064,18 @@ async function loadViaAvplay(channel, myToken) {
   hideError();
   reconnectAttempts = 0;
   consecutiveErrors = 0;
-  logEvent('INFO', 'Playing natively: ' + (channel.name || channel.url.slice(0, 60)));
+  logEvent('INFO', 'Playing natively: ' + channelForLog(channel, 60));
   return true;
 }
 
 async function switchToAvplay() {
+  if (!activePlaybackPolicy.allowNativeFallback) return;
   const channel = currentChannel;
   const tokenAtSwitch = loadToken;
   if (!channel || !avplay.isAvailable()) return;
   stopBlackWatchdog();
   stopStallWatchdog();
-  logEvent('WARN', 'No frames rendered — switching to native playback: ' +
-      (channel.name || channel.url.slice(0, 80)));
+  logEvent('WARN', 'No frames rendered — switching to native playback: ' + channelForLog(channel, 80));
   showCustomMessage('Switching to native playback...');
   if (player) {
     try { await player.destroy(); } catch {}

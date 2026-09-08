@@ -75,3 +75,21 @@ test('native play resolves true on first playback frame and active stop closes t
   assert.equal(calls.some(([name]) => name === 'stop'), true);
   assert.equal(calls.some(([name]) => name === 'close'), true);
 });
+
+test('native play applies only the supported user-agent and referer stream properties', async () => {
+  const { calls } = installPlatform({ emitFirstFrame: true });
+  const avplay = await freshModule();
+
+  assert.equal(await avplay.play('https://example.test/live.m3u8', {
+    userAgent: 'BabusTV-Test',
+    referer: 'https://ref.example.test/',
+  }), true);
+
+  assert.deepEqual(
+    calls.filter(([name]) => name === 'property'),
+    [
+      ['property', 'USER_AGENT', 'BabusTV-Test'],
+      ['property', 'REFERRER', 'https://ref.example.test/'],
+    ],
+  );
+});

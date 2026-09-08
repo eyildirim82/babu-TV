@@ -1,4 +1,10 @@
-import type { PlaybackResult, StreamRequest } from './contracts.js';
+import type {
+  LegacyShakaAttemptResult,
+  PlaybackEnginePort,
+  PlaybackResult,
+  StreamRequest,
+} from './contracts.js';
+import { classifyShakaFailure } from './shaka-error-classifier.js';
 
 export type ActivePlaybackEngine = 'shaka' | 'avplay' | null;
 
@@ -10,6 +16,7 @@ export type ProxySuggestionCallback = (channel: unknown) => void;
 export interface LegacyPlayerPort {
   initPlayer(videoEl: unknown): boolean | Promise<boolean>;
   loadChannel(channel: unknown): Promise<boolean>;
+  playShakaAttempt(channel: unknown): Promise<LegacyShakaAttemptResult>;
   stop(): void;
   togglePlay(): void;
   reloadChannel(): void;
@@ -33,19 +40,44 @@ function requestToLegacyChannel(request: StreamRequest): Record<string, unknown>
   const customHeaders: Record<string, string> = { ...(request.headers ?? {}) };
   if (request.referer) customHeaders.Referer = request.referer;
 
-  const channel: Record<string, unknown> = { url: request.url };
+  const channel: Record<string, unknown> = {
+    url: request.url,
+    // StreamRequest URLs are transient provider material and may contain
+    // credentials/tokens. The inherited player can consume the URL, but its
+    // diagnostic logging must treat it as sensitive.
+    redactStreamUrl: true,
+  };
   if (request.userAgent) channel.userAgent = request.userAgent;
   if (Object.keys(customHeaders).length > 0) channel.customHeaders = customHeaders;
+  if (request.drm) channel.drm = request.drm;
+  if (request.useProxy !== undefined) channel.useProxy = request.useProxy;
+  if (request.proxyUrl) channel.proxyUrl = request.proxyUrl;
   return channel;
 }
 
 /**
  * Transitional adapter around the inherited player orchestrator.
- * The inherited module still owns its proven Shaka -> AVPlay fallback in M1C;
- * later milestones can split engine coordination without changing callers.
+ * Legacy callers keep the inherited Shaka -> AVPlay/recovery path through
+ * `play()`/`loadChannel()`, while M3 uses the explicit Shaka-only `open()` seam.
  */
-export class ShakaAdapter {
+export class ShakaAdapter implements PlaybackEnginePort {
+  readonly name = 'shaka' as const;
+
   constructor(private readonly legacy: LegacyPlayerPort) {}
+
+  async open(request: StreamRequest): Promise<PlaybackResult> {
+    const result = await this.legacy.playShakaAttempt(requestToLegacyChannel(request));
+    if (result.ok) return { ok: true, engine: 'shaka', error: null };
+    return {
+      ok: false,
+      engine: null,
+      error: classifyShakaFailure(result.failure),
+    };
+  }
+
+  isAvailable(): boolean {
+    return true;
+  }
 
   async play(request: StreamRequest): Promise<PlaybackResult> {
     const ok = await this.legacy.loadChannel(requestToLegacyChannel(request));
