@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BrowserPlatform } from '../src/platform/browser-platform.js';
-import { createPlatform, LEGACY_OPTIONAL_TIZEN_KEYS } from '../src/platform/create-platform.js';
+import {
+  createPlatform,
+  LEGACY_OPTIONAL_TIZEN_KEYS,
+  M3_NUMERIC_TIZEN_KEYS,
+} from '../src/platform/create-platform.js';
 
 const EXPECTED_LEGACY_KEYS = [
   'ColorF0Red',
@@ -20,8 +24,16 @@ const EXPECTED_LEGACY_KEYS = [
   'ChannelDown',
 ] as const;
 
+const EXPECTED_M3_NUMERIC_KEYS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
+
 void test('preserves the inherited optional Tizen key registration list', () => {
   assert.deepEqual(LEGACY_OPTIONAL_TIZEN_KEYS, EXPECTED_LEGACY_KEYS);
+});
+
+void test('keeps M3 numeric Tizen keys separate from the inherited registration list', () => {
+  const numericKeys = new Set<string>(EXPECTED_M3_NUMERIC_KEYS);
+  assert.deepEqual(M3_NUMERIC_TIZEN_KEYS, EXPECTED_M3_NUMERIC_KEYS);
+  assert.equal(LEGACY_OPTIONAL_TIZEN_KEYS.some((key) => numericKeys.has(key)), false);
 });
 
 void test('browser platform is safe and reports no Tizen-only capabilities', () => {
@@ -79,6 +91,9 @@ void test('Tizen platform registers optional keys, detects supported keys, and e
 
   platform.registerOptionalKeys(LEGACY_OPTIONAL_TIZEN_KEYS);
   assert.deepEqual(registered, EXPECTED_LEGACY_KEYS);
+
+  platform.registerOptionalKeys(M3_NUMERIC_TIZEN_KEYS);
+  assert.deepEqual(registered, [...EXPECTED_LEGACY_KEYS, ...EXPECTED_M3_NUMERIC_KEYS]);
 
   platform.exitApp();
   assert.equal(exitCalls, 1);

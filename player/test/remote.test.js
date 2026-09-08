@@ -89,3 +89,35 @@ test('buffers numeric input and emits a channel number after 500ms', async () =>
 
   assert.deepEqual(actions, [['number', 124]]);
 });
+
+test('digit mode emits each digit immediately without legacy buffering', async () => {
+  const fake = installFakeDocument();
+  const actions = [];
+  init((...args) => actions.push(args), { numericMode: 'digits' });
+
+  fake.press({ key: '1', keyCode: 49 });
+  fake.press({ key: '2', keyCode: 50 });
+
+  assert.deepEqual(actions, [['digit', 1], ['digit', 2]]);
+
+  await new Promise((resolve) => setTimeout(resolve, 550));
+  assert.deepEqual(actions, [['digit', 1], ['digit', 2]]);
+});
+
+test('destroy clears pending legacy numeric state before a later init', async () => {
+  const fake = installFakeDocument();
+  const firstActions = [];
+  init((...args) => firstActions.push(args));
+  fake.press({ key: '1', keyCode: 49 });
+
+  destroy();
+
+  const secondActions = [];
+  init((...args) => secondActions.push(args));
+  fake.press({ key: '2', keyCode: 50 });
+
+  await new Promise((resolve) => setTimeout(resolve, 550));
+
+  assert.deepEqual(firstActions, []);
+  assert.deepEqual(secondActions, [['number', 2]]);
+});

@@ -1,9 +1,20 @@
 let onKeyAction = null;
 let numberBuffer = '';
 let numberTimeout = null;
+let numericMode = 'buffered';
 
-export function init(callback) {
+function resetNumberInput() {
+  if (numberTimeout !== null) {
+    clearTimeout(numberTimeout);
+    numberTimeout = null;
+  }
+  numberBuffer = '';
+}
+
+export function init(callback, options = {}) {
+  resetNumberInput();
   onKeyAction = callback;
+  numericMode = options.numericMode === 'digits' ? 'digits' : 'buffered';
 
   document.addEventListener('keydown', handleKeyDown, true);
 }
@@ -11,6 +22,8 @@ export function init(callback) {
 export function destroy() {
   document.removeEventListener('keydown', handleKeyDown, true);
   onKeyAction = null;
+  numericMode = 'buffered';
+  resetNumberInput();
 }
 
 function handleKeyDown(e) {
@@ -195,18 +208,26 @@ function handleKeyDown(e) {
 }
 
 function handleNumberInput(num) {
+  if (numericMode === 'digits') {
+    if (onKeyAction) onKeyAction('digit', Number(num));
+    return;
+  }
+
   numberBuffer += num;
 
   // Clear previous timeout
-  if (numberTimeout) {
+  if (numberTimeout !== null) {
     clearTimeout(numberTimeout);
   }
 
   // Wait 500ms for more digits, then jump to channel
   numberTimeout = setTimeout(() => {
-    if (onKeyAction && numberBuffer) {
-      onKeyAction('number', parseInt(numberBuffer, 10));
-    }
+    const value = numberBuffer;
     numberBuffer = '';
+    numberTimeout = null;
+
+    if (onKeyAction && value) {
+      onKeyAction('number', parseInt(value, 10));
+    }
   }, 500);
 }
