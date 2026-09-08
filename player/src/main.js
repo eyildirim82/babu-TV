@@ -1,12 +1,18 @@
 import { getSettings, saveSettings, getProxyOverrides, getActivePlaylist, APP_VERSION } from './config.js';
 import * as legacyPlayer from './player.js';
+import * as legacyAvplay from './avplay.js';
 import { createPlaybackService } from './playback/playback-service.ts';
+import { createBrowserLiveTvRuntime } from './live-tv/create-live-tv-runtime.ts';
 import * as ui from './ui.js';
 import * as remote from './remote.js';
 import * as settings from './settings.js';
 import { checkForUpdate, sendUsagePing, consentAsked, hasConsented, setConsented } from './update.js';
 import { processStreamUrl, parseM3u, fetchPlaylist as fetchFromPlaylistUrl } from './utils.js';
-import { createPlatform, LEGACY_OPTIONAL_TIZEN_KEYS } from './platform/create-platform.ts';
+import {
+  createPlatform,
+  LEGACY_OPTIONAL_TIZEN_KEYS,
+  M3_NUMERIC_TIZEN_KEYS,
+} from './platform/create-platform.ts';
 
 const platform = createPlatform(window);
 const player = createPlaybackService(legacyPlayer);
@@ -18,7 +24,72 @@ let bufferingInterval = null;
 let bufferingActive = false;
 let cleanupListeners = [];
 let pendingPreview = null;
+let m3Controller = null;
 
+const actionMap = {
+  up: 'UP',
+  down: 'DOWN',
+  left: 'LEFT',
+  right: 'RIGHT',
+  select: 'SELECT',
+  back: 'BACK',
+  channelUp: 'CHANNEL_UP',
+  channelDown: 'CHANNEL_DOWN',
+};
+
+function handleM3RemoteAction(action, value) {
+  if (!m3Controller) return;
+
+  switch (action) {
+    case 'digit':
+      if (Number.isInteger(value) && value >= 0 && value <= 9) {
+        void m3Controller.handleInput({ type: 'DIGIT', digit: value });
+      }
+      return;
+    default: {
+      const logicalAction = actionMap[action];
+      if (logicalAction) {
+        void m3Controller.handleInput({ type: 'ACTION', action: logicalAction });
+      }
+    }
+  }
+}
+
+async function tryStartM3LiveTv() {
+  let runtime;
+  try {
+    runtime = await createBrowserLiveTvRuntime({
+      indexedDb: window.indexedDB || null,
+      widgetData: window.webapis && window.webapis.widgetdata
+        ? window.webapis.widgetdata
+        : null,
+      fetchImpl: window.fetch.bind(window),
+      platform,
+      document,
+      legacyPlayer,
+      legacyAvplay,
+    });
+  } catch {
+    return false;
+  }
+
+  if (runtime.mode !== 'm3') return false;
+
+  m3Controller = runtime.controller;
+  remote.init(handleM3RemoteAction, { numericMode: 'digits' });
+  if (platform.capabilities().numericKeys) {
+    platform.registerOptionalKeys(M3_NUMERIC_TIZEN_KEYS);
+  }
+
+  document.addEventListener('tizenhwkey', (e) => {
+    if (e.keyName === 'back') {
+      e.preventDefault();
+      handleM3RemoteAction('back');
+    }
+  });
+
+  return true;
+}
 
 /* Responsive TV scaling: detect screen size and set CSS variable */
 function applyResponsiveScale() {
@@ -235,12 +306,16 @@ function closeWhatsNew() {
 
 async function init() {
   const videoEl = document.getElementById('video');
-  if (!player.initPlayer(videoEl)) {
+  if (!await player.initPlayer(videoEl)) {
     document.body.innerHTML =
       '<div style="text-align:center;padding:40px;color:#fff;">' +
       '<h2>App cannot start</h2>' +
       '<p>Your device does not support the video playback needed for this app. Please try restarting the app or updating your TV software.</p>' +
       '</div>';
+    return;
+  }
+
+  if (await tryStartM3LiveTv()) {
     return;
   }
 
