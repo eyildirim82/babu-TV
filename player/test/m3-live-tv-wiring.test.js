@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const mainUrl = new URL('../src/main.js', import.meta.url);
 const indexUrl = new URL('../index.html', import.meta.url);
+const stylesUrl = new URL('../src/styles.css', import.meta.url);
 
 void test('main starts M3 before the inherited legacy remote and playlist path', async () => {
   const source = await readFile(mainUrl, 'utf8');
@@ -43,4 +44,12 @@ void test('index exposes dedicated M3 status and numeric nodes', async () => {
 
   assert.match(html, /id="live-tv-status"/);
   assert.match(html, /id="numeric-zap"/);
+});
+
+void test('M3 state-only classes have dedicated presentation styles', async () => {
+  const styles = await readFile(stylesUrl, 'utf8');
+
+  assert.match(styles, /\.channel-item\.playing\s*\{/);
+  assert.match(styles, /\.live-tv-status\s*\{/);
+  assert.match(styles, /\.numeric-zap\s*\{/);
 });
