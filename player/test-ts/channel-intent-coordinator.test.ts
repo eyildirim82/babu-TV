@@ -255,8 +255,7 @@ void test('provider failures map to safe playback errors without reaching the se
       previousChannelId: null,
     }), 'failed');
     assert.equal(session.requests.length, 0);
-    assert.equal(events.at(-1)?.type, 'FAILED');
-    const terminal = events.at(-1);
+    const terminal = events[events.length - 1];
     assert.ok(terminal?.type === 'FAILED');
     assert.equal(terminal.error, item.expected);
     assert.equal(terminal.rollback, 'not-needed');
@@ -280,7 +279,7 @@ void test('current failed session result emits FAILED and returns failed', async
     previousChannelId: 'old',
   }), 'failed');
 
-  const terminal = events.at(-1);
+  const terminal = events[events.length - 1];
   assert.ok(terminal?.type === 'FAILED');
   assert.equal(terminal.error, 'UNSUPPORTED_CODEC');
   assert.equal(terminal.rollback, 'restored');

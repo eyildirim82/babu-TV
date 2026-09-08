@@ -4,7 +4,7 @@ import type {
   ChannelId,
   ProviderId,
 } from '../domain/models.js';
-import type { PlaybackErrorCode } from '../playback/contracts.js';
+import type { PlaybackErrorCode, StreamRequest } from '../playback/contracts.js';
 
 export type LiveTvScope =
   | { kind: 'all' }
@@ -17,6 +17,50 @@ export interface PlaybackIntentState {
   channelId: ChannelId;
   previousChannelId: ChannelId | null;
 }
+
+export interface ChannelStreamResolver {
+  resolve(providerId: ProviderId, channelId: ChannelId): Promise<StreamRequest>;
+}
+
+export interface SessionSwitchRequest {
+  intentId: number;
+  targetChannelId: ChannelId;
+  previousChannelId: ChannelId | null;
+  initialRequest: StreamRequest;
+  reResolveTarget(): Promise<StreamRequest>;
+  resolvePrevious: (() => Promise<StreamRequest>) | null;
+  isCurrent(): boolean;
+  onRecovering(): void;
+}
+
+export type SessionSwitchResult =
+  | { status: 'playing'; engine: 'shaka' | 'avplay' }
+  | {
+      status: 'failed';
+      error: PlaybackErrorCode;
+      rollback: 'not-needed' | 'restored' | 'failed';
+    };
+
+export interface PlayerSessionPort {
+  switchTo(request: SessionSwitchRequest): Promise<SessionSwitchResult>;
+  stop(): Promise<void> | void;
+}
+
+export type ChannelIntentEvent =
+  | { type: 'RESOLVING'; intent: PlaybackIntentState }
+  | { type: 'PREPARING'; intent: PlaybackIntentState }
+  | { type: 'RECOVERING'; intent: PlaybackIntentState }
+  | {
+      type: 'PLAYING';
+      intent: PlaybackIntentState;
+      engine: 'shaka' | 'avplay';
+    }
+  | {
+      type: 'FAILED';
+      intent: PlaybackIntentState;
+      error: PlaybackErrorCode;
+      rollback: 'not-needed' | 'restored' | 'failed';
+    };
 
 export interface LiveTvState {
   providerId: ProviderId;
