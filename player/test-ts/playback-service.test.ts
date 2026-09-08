@@ -10,7 +10,7 @@ void test('playback service preserves legacy channel objects while routing throu
   const legacyPlayer = {
     async initPlayer() { return true; },
     async loadChannel(channel: unknown) { loaded.push(channel); return true; },
-    async playShakaAttempt() { return { ok: false, error: 'UNKNOWN' as const }; },
+    async playShakaAttempt() { return { ok: false, failure: { m3Code: 'ENGINE_FAILURE' } }; },
     stop() { stops += 1; },
     togglePlay() {},
     reloadChannel() {},
@@ -60,7 +60,7 @@ void test('playback service reports a failed legacy load without inventing an en
   const legacyPlayer = {
     async initPlayer() { return true; },
     async loadChannel() { return false; },
-    async playShakaAttempt() { return { ok: false, error: 'UNKNOWN' as const }; },
+    async playShakaAttempt() { return { ok: false, failure: { m3Code: 'ENGINE_FAILURE' } }; },
     stop() {},
     togglePlay() {},
     reloadChannel() {},
@@ -84,12 +84,11 @@ void test('playback service reports a failed legacy load without inventing an en
   );
 });
 
-void test('Shaka adapter M3 open uses the explicit Shaka-only attempt instead of the legacy fallback path', async () => {
+void test('Shaka adapter M3 open owns normalization and never enters the legacy fallback path', async () => {
   let loadChannelCalls = 0;
   let shakaAttemptCalls = 0;
-  let initialized = true;
   const legacyPlayer = {
-    async initPlayer() { initialized = true; return true; },
+    async initPlayer() { return true; },
     async loadChannel() { loadChannelCalls += 1; return true; },
     async playShakaAttempt(channel: unknown) {
       shakaAttemptCalls += 1;
@@ -102,7 +101,7 @@ void test('Shaka adapter M3 open uses the explicit Shaka-only attempt instead of
         },
         redactStreamUrl: true,
       });
-      return { ok: false, error: 'UNSUPPORTED_CODEC' as const };
+      return { ok: false, failure: { m3Code: 'UNSUPPORTED_CODEC' } };
     },
     stop() {},
     togglePlay() {},
@@ -114,7 +113,7 @@ void test('Shaka adapter M3 open uses the explicit Shaka-only attempt instead of
     getActiveHeight() { return null; },
     getActiveBandwidth() { return null; },
     getBufferingPercent() { return 0; },
-    getPlayer() { return initialized ? { kind: 'shaka' } : null; },
+    getPlayer() { return null; },
     getResolutions() { return []; },
     selectResolution() {},
     getPlaybackEngine() { return 'avplay' as const; },
@@ -134,6 +133,33 @@ void test('Shaka adapter M3 open uses the explicit Shaka-only attempt instead of
   );
   assert.equal(loadChannelCalls, 0);
   assert.equal(shakaAttemptCalls, 1);
+});
+
+void test('Shaka adapter normalizes raw inherited Shaka failures in TypeScript', async () => {
+  const legacyPlayer = {
+    async initPlayer() { return true; },
+    async loadChannel() { return false; },
+    async playShakaAttempt() { return { ok: false, failure: { code: 1001, data: [null, 403] } }; },
+    stop() {},
+    togglePlay() {},
+    reloadChannel() {},
+    onBuffering() {},
+    onTrackChange() {},
+    onChannelAdvance() {},
+    onProxySuggestion() {},
+    getActiveHeight() { return null; },
+    getActiveBandwidth() { return null; },
+    getBufferingPercent() { return 0; },
+    getPlayer() { return null; },
+    getResolutions() { return []; },
+    selectResolution() {},
+    getPlaybackEngine() { return null; },
+  };
+
+  assert.deepEqual(
+    await new ShakaAdapter(legacyPlayer).open({ url: 'https://example.test/private' }),
+    { ok: false, engine: null, error: 'AUTH' },
+  );
 });
 
 void test('AVPlay adapter preserves the inherited native API shape', async () => {
