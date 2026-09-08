@@ -2,7 +2,6 @@ import shaka from 'shaka-player';
 import config, { getSettings } from './config.js';
 import * as legacyAvplay from './avplay.js';
 import { createAvplayAdapter } from './playback/avplay-adapter.ts';
-import { classifyShakaFailure } from './playback/shaka-error-classifier.ts';
 
 const avplay = createAvplayAdapter(legacyAvplay);
 
@@ -449,27 +448,38 @@ async function probeChannelFormat(channel) {
 }
 
 export async function loadChannel(channel) {
-  return loadChannelWithPolicy(channel, LEGACY_PLAYBACK_POLICY);
+  const result = await loadChannelWithPolicy(channel, LEGACY_PLAYBACK_POLICY);
+  return result.ok;
 }
 
 export async function playShakaAttempt(channel) {
-  const attempt = { error: null };
-  const ok = await loadChannelWithPolicy(channel, M3_SHAKA_ATTEMPT_POLICY, attempt);
-  return { ok, error: ok ? null : attempt.error };
+  return loadChannelWithPolicy(channel, M3_SHAKA_ATTEMPT_POLICY);
 }
 
-async function loadChannelWithPolicy(channel, policy, attempt = null) {
+async function loadChannelWithPolicy(channel, policy) {
+  const result = await runChannelLoadWithPolicy(channel, policy);
+  if (result && typeof result === 'object' && typeof result.ok === 'boolean') {
+    return result;
+  }
+  return { ok: result === true, failure: null };
+}
+
+async function runChannelLoadWithPolicy(channel, policy) {
   activePlaybackPolicy = policy;
 
   if (!channel) {
-    if (attempt) attempt.error = 'UNKNOWN';
+    if (policy === M3_SHAKA_ATTEMPT_POLICY) {
+      return { ok: false, failure: { m3Code: 'ENGINE_FAILURE' } };
+    }
     return false;
   }
 
   if (channel.drm && !isEmeSupported()) {
-    if (attempt) attempt.error = 'ENGINE_FAILURE';
     logEvent('ERROR', 'DRM not available — EME (Encrypted Media Extensions) is not supported in this browser/context');
     showError('This channel is protected and cannot play here. Try a different channel.');
+    if (policy === M3_SHAKA_ATTEMPT_POLICY) {
+      return { ok: false, failure: { m3Code: 'ENGINE_FAILURE' } };
+    }
     return false;
   }
 
@@ -511,7 +521,9 @@ async function loadChannelWithPolicy(channel, policy, attempt = null) {
     if (el) {
       const ok = await initPlayer(el);
       if (!ok) {
-        if (attempt) attempt.error = 'ENGINE_FAILURE';
+        if (policy === M3_SHAKA_ATTEMPT_POLICY) {
+          return { ok: false, failure: { m3Code: 'UNSUPPORTED_CODEC' } };
+        }
         return false;
       }
     }
@@ -596,7 +608,6 @@ async function loadChannelWithPolicy(channel, policy, attempt = null) {
   } catch (error) {
     clearTimeout(loadingTimeout);
     loadingTimeout = null;
-    if (attempt) attempt.error = classifyShakaFailure(error);
     if (myToken !== loadToken) return false;
 
     initialLoadPending = false;
@@ -606,9 +617,12 @@ async function loadChannelWithPolicy(channel, policy, attempt = null) {
     if (error && error.code === 7000) return false;
 
     // After a timeout, the player was destroyed above. Recreate it so the
-    // next channel switch works. M3 reports the normalized failure directly
-    // instead of scheduling hidden retries.
+    // next channel switch works. M3 returns a safe timeout sentinel and leaves
+    // retries to the external session coordinator.
     if (error && (error.message === 'Load timed out' || error.name === 'DestroyedError')) {
+      if (policy === M3_SHAKA_ATTEMPT_POLICY) {
+        return { ok: false, failure: { m3Code: 'TIMEOUT' } };
+      }
       logEvent('WARN', 'Load abandoned — recreating player for next attempt');
       const el = videoElement;
       await destroyPlayer(el);
@@ -622,6 +636,10 @@ async function loadChannelWithPolicy(channel, policy, attempt = null) {
         logEvent('ERROR', 'Reconnect limit reached — ' + channelForLog(channel, 60));
       }
       return false;
+    }
+
+    if (policy === M3_SHAKA_ATTEMPT_POLICY) {
+      return { ok: false, failure: error };
     }
 
     // Shaka could not guess the stream format from the URL (error 4000).
