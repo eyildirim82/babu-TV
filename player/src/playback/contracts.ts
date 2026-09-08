@@ -43,7 +43,7 @@ export interface PlaybackEnginePort {
 
 export interface LegacyShakaAttemptResult {
   ok: boolean;
-  error: PlaybackErrorCode | null;
+  failure: unknown | null;
 }
 
 export interface PlaybackService {
