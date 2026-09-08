@@ -163,10 +163,8 @@ export async function initPlayer(videoEl) {
         if (currentChannel.customHeaders) {
           for (const [k, v] of Object.entries(currentChannel.customHeaders)) {
             const lower = k.toLowerCase();
-            if (['user-agent', 'referer', 'origin'].includes(lower)) {
-              const canon = lower === 'user-agent' ? 'User-Agent' : lower === 'referer' ? 'Referer' : 'Origin';
-              request.headers[canon] = v;
-            }
+            const canon = lower === 'user-agent' ? 'User-Agent' : lower === 'referer' ? 'Referer' : lower === 'origin' ? 'Origin' : k;
+            request.headers[canon] = v;
           }
         }
       }
