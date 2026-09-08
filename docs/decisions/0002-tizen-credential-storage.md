@@ -24,7 +24,7 @@ Official references checked for this decision:
 4. All provider credentials are stored in one provider-scoped JSON document inside WidgetData. The implementation enforces the documented 20,000-character limit before calling the native write API.
 5. A missing WidgetData document is treated as an empty credential store. When the last provider credential is removed, the native WidgetData document is removed.
 6. Native WidgetData errors are translated into fixed, sanitized application errors. Native error text or serialized credential payloads are never surfaced or logged.
-7. If WidgetData is unavailable, persistent credential saving **fails closed**. There is no plaintext localStorage/IndexedDB fallback.
+7. If WidgetData is unavailable, persistent credential saving **fails closed**. There is no plaintext localStorage/IndexedDB fallback from Provider Core.
 8. We do **not** claim WidgetData is hardware-backed, TEE-backed, or equivalent to a platform keychain beyond Samsung's documented "application secure storage" behavior.
 9. KeyManager is not shipped as BabuşTV's production credential adapter. It may be re-evaluated only as a sideload/research alternative after a separate compatibility and distribution review.
 
@@ -56,9 +56,37 @@ Do not record real provider credentials in the evidence.
 - Remote Test Lab: **pending**
 - Physical TV: **pending**
 
+### M2D checkpoint — 2026-09-08
+
+No Tizen runtime was available in the implementation/CI environment at this checkpoint, so the mandatory WidgetData runtime probe remains **not yet satisfied**. No pass result has been inferred from unit tests, browser behavior, packaging, or Samsung documentation.
+
+Automated evidence at this checkpoint verifies only the code boundary:
+
+- the WidgetData credential adapter is exercised through deterministic injected fakes;
+- unavailable WidgetData fails closed;
+- native failures are converted to fixed sanitized errors;
+- the documented 20,000-character capacity is enforced before native write;
+- the Tizen package declares the public WidgetData privilege and does not declare the KeyManager privilege;
+- M2 ordinary structured persistence contains only non-secret provider/catalog/app-state stores and has no credential store;
+- structured provider/catalog repositories whitelist normalized fields so credential-shaped and raw-stream-shaped extra properties are not persisted;
+- Provider Core has no plaintext credential fallback to IndexedDB or localStorage.
+
+Therefore the M2 Provider Core code may reach a merge checkpoint with this gate explicitly pending, but **M2 must not be described as fully complete until at least one Tizen runtime probe passes**.
+
+## Transitional legacy boundary
+
+The inherited EN TV Player UI remains intentionally operational through M2 and is not yet wired to Provider Core. Its legacy `player/src/config.js` settings path still persists inherited playlist configuration in `localStorage` until the later UI/onboarding migration replaces that path.
+
+This legacy compatibility path is **not** the Provider Core credential-storage fallback and must never be used as one. Consequently:
+
+- the secure-storage claim at the M2 checkpoint applies to the new Provider Core credential boundary, not to every inherited pre-migration UI setting path;
+- BabuşTV must not claim that all legacy playlist configuration is securely persisted while that inherited path remains;
+- when onboarding/provider management is migrated to Provider Core, credential-bearing provider configuration must go through `CredentialStore`, and the legacy localStorage playlist persistence path must not become the source of truth for provider credentials.
+
 ## Consequences
 
 - M2 unit/CI tests can verify the credential abstraction and callback/error behavior without a TV by injecting a deterministic WidgetData fake.
 - A future Store-distributed build does not depend on the KeyManager API that current Seller Office guidance flags as unavailable.
 - Credential capacity is intentionally bounded. A user with enough providers/very long provider URLs to exceed the WidgetData document limit receives a safe capacity error rather than an insecure fallback.
 - Ordinary provider metadata and catalog persistence remain separate from this secure-storage document and must not contain credentials or credential-bearing URLs.
+- Release/hardware validation must preserve this ADR's distinction between automated boundary evidence and actual Tizen runtime evidence.
