@@ -27,9 +27,18 @@ test('M3 Shaka attempt uses a no-fallback policy while legacy load keeps inherit
 
   assert.match(source, /const LEGACY_PLAYBACK_POLICY = Object\.freeze\(\{[\s\S]*allowNativeFallback: true,[\s\S]*allowAutomaticRecovery: true,[\s\S]*allowAutoAdvance: true,[\s\S]*\}\);/);
   assert.match(source, /const M3_SHAKA_ATTEMPT_POLICY = Object\.freeze\(\{[\s\S]*allowNativeFallback: false,[\s\S]*allowAutomaticRecovery: false,[\s\S]*allowAutoAdvance: false,[\s\S]*\}\);/);
-  assert.match(source, /export async function loadChannel\(channel\)[\s\S]*loadChannelWithPolicy\(channel, LEGACY_PLAYBACK_POLICY\)/);
-  assert.match(source, /export async function playShakaAttempt\(channel\)[\s\S]*loadChannelWithPolicy\(channel, M3_SHAKA_ATTEMPT_POLICY(?:, attempt)?\)/);
+  assert.match(source, /export async function loadChannel\(channel\) \{\s*const result = await loadChannelWithPolicy\(channel, LEGACY_PLAYBACK_POLICY\);\s*return result\.ok;\s*\}/);
+  assert.match(source, /export async function playShakaAttempt\(channel\) \{\s*return loadChannelWithPolicy\(channel, M3_SHAKA_ATTEMPT_POLICY\);\s*\}/);
   assert.match(source, /policy\.allowNativeFallback && avplayPreferredUrls\.has\(channel\.url\)/);
+});
+
+test('player.js leaves M3 failure normalization to the TypeScript adapter', async () => {
+  const source = await readFile(playerUrl, 'utf8');
+
+  assert.doesNotMatch(source, /classifyShakaFailure/);
+  assert.match(source, /failure: \{ m3Code: 'TIMEOUT' \}/);
+  assert.match(source, /failure: \{ m3Code: 'ENGINE_FAILURE' \}/);
+  assert.match(source, /return \{ ok: false, failure: error \};/);
 });
 
 test('transient StreamRequest playback redacts resolved URLs and raw Shaka errors from logs', async () => {
