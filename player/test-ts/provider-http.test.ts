@@ -93,6 +93,26 @@ void test('provider http maps a rejected fetch to NETWORK without exposing the n
   assert.equal(error.message.includes('demo-pass'), false);
 });
 
+void test('provider http maps response body read failures to sanitized NETWORK errors', async () => {
+  const brokenResponse = {
+    ok: true,
+    status: 200,
+    async text() {
+      throw new Error('body read failed for demo-user:demo-pass');
+    },
+  } as Response;
+  const client = makeClient(async () => brokenResponse);
+
+  const error = await expectProviderError(
+    client.getText('https://example.com/list.m3u?password=demo-pass'),
+    'NETWORK',
+    null,
+  );
+
+  assert.equal(error.message.includes('demo-user'), false);
+  assert.equal(error.message.includes('demo-pass'), false);
+});
+
 void test('provider http maps malformed JSON to MALFORMED', async () => {
   const client = makeClient(async () => response('{not-json'));
 
@@ -117,6 +137,28 @@ void test('provider http timeout is deterministic and does not sleep', async () 
 
   await expectProviderError(client.getJson('https://example.com/slow', 1234), 'TIMEOUT', null);
   assert.equal(timeoutMs, 1234);
+});
+
+void test('provider http keeps timeout active while consuming the response body', async () => {
+  let timeoutCallback: (() => void) | null = null;
+  const timers: ProviderHttpTimers = {
+    setTimeout(callback) {
+      timeoutCallback = callback;
+      return 1;
+    },
+    clearTimeout() {},
+  };
+  const slowBodyResponse = {
+    ok: true,
+    status: 200,
+    async text() {
+      timeoutCallback?.();
+      throw new DOMException('aborted', 'AbortError');
+    },
+  } as Response;
+  const client = new FetchProviderHttpClient(async () => slowBodyResponse, timers);
+
+  await expectProviderError(client.getText('https://example.com/slow-body', 2500), 'TIMEOUT', null);
 });
 
 void test('provider http maps other non-success responses to UNAVAILABLE with safe message', async () => {
