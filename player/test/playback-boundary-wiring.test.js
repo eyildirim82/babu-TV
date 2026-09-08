@@ -21,3 +21,13 @@ test('legacy player routes native calls through AvplayAdapter and exposes active
   assert.doesNotMatch(source, /import \* as avplay from '\.\/avplay\.js';/);
   assert.match(source, /export function getPlaybackEngine\(\)/);
 });
+
+test('M3 Shaka attempt uses a no-fallback policy while legacy load keeps inherited recovery enabled', async () => {
+  const source = await readFile(playerUrl, 'utf8');
+
+  assert.match(source, /const LEGACY_PLAYBACK_POLICY = Object\.freeze\(\{[\s\S]*allowNativeFallback: true,[\s\S]*allowAutomaticRecovery: true,[\s\S]*allowAutoAdvance: true,[\s\S]*\}\);/);
+  assert.match(source, /const M3_SHAKA_ATTEMPT_POLICY = Object\.freeze\(\{[\s\S]*allowNativeFallback: false,[\s\S]*allowAutomaticRecovery: false,[\s\S]*allowAutoAdvance: false,[\s\S]*\}\);/);
+  assert.match(source, /export async function loadChannel\(channel\)[\s\S]*loadChannelWithPolicy\(channel, LEGACY_PLAYBACK_POLICY\)/);
+  assert.match(source, /export async function playShakaAttempt\(channel\)[\s\S]*loadChannelWithPolicy\(channel, M3_SHAKA_ATTEMPT_POLICY\)/);
+  assert.match(source, /policy\.allowNativeFallback && avplayPreferredUrls\.has\(channel\.url\)/);
+});
