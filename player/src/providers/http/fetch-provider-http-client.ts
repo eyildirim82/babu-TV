@@ -28,13 +28,18 @@ function errorForStatus(status: number): ProviderError {
   return new ProviderError('UNAVAILABLE', status, 'Provider request failed.');
 }
 
+interface ProviderTextResponse {
+  body: string;
+  status: number;
+}
+
 export class FetchProviderHttpClient implements ProviderHttpClient {
   constructor(
     private readonly fetchImpl: typeof fetch,
     private readonly timers: ProviderHttpTimers = DEFAULT_TIMERS,
   ) {}
 
-  private async request(url: string, timeoutMs: number): Promise<Response> {
+  private async requestText(url: string, timeoutMs: number): Promise<ProviderTextResponse> {
     const controller = new AbortController();
     let timedOut = false;
     const timeoutHandle = this.timers.setTimeout(() => {
@@ -45,7 +50,8 @@ export class FetchProviderHttpClient implements ProviderHttpClient {
     try {
       const response = await this.fetchImpl(url, { signal: controller.signal });
       if (!response.ok) throw errorForStatus(response.status);
-      return response;
+      const body = await response.text();
+      return { body, status: response.status };
     } catch (error) {
       if (error instanceof ProviderError) throw error;
       if (timedOut) {
@@ -58,16 +64,15 @@ export class FetchProviderHttpClient implements ProviderHttpClient {
   }
 
   async getJson<T>(url: string, timeoutMs = 10_000): Promise<T> {
-    const response = await this.request(url, timeoutMs);
+    const response = await this.requestText(url, timeoutMs);
     try {
-      return await response.json() as T;
+      return JSON.parse(response.body) as T;
     } catch {
       throw new ProviderError('MALFORMED', response.status, 'Provider response was malformed.');
     }
   }
 
   async getText(url: string, timeoutMs = 10_000): Promise<string> {
-    const response = await this.request(url, timeoutMs);
-    return response.text();
+    return (await this.requestText(url, timeoutMs)).body;
   }
 }
