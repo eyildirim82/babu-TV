@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const mainUrl = new URL('../src/main.js', import.meta.url);
 const indexUrl = new URL('../index.html', import.meta.url);
-const stylesUrl = new URL('../src/styles.css', import.meta.url);
+const m3StylesUrl = new URL('../src/m3-live-tv.css', import.meta.url);
 
 void test('main starts M3 before the inherited legacy remote and playlist path', async () => {
   const source = await readFile(mainUrl, 'utf8');
@@ -46,10 +46,13 @@ void test('index exposes dedicated M3 status and numeric nodes', async () => {
   assert.match(html, /id="numeric-zap"/);
 });
 
-void test('M3 state-only classes have dedicated presentation styles', async () => {
-  const styles = await readFile(stylesUrl, 'utf8');
+void test('M3 state-only classes have a dedicated presentation layer loaded after legacy styles', async () => {
+  const [html, styles] = await Promise.all([
+    readFile(indexUrl, 'utf8'),
+    readFile(m3StylesUrl, 'utf8'),
+  ]);
 
+  assert.match(html, /<link rel="stylesheet" href="\/src\/styles\.css">[\s\S]*<link rel="stylesheet" href="\/src\/m3-live-tv\.css">/);
   assert.match(styles, /\.channel-item\.playing\s*\{/);
-  assert.match(styles, /\.live-tv-status\s*\{/);
-  assert.match(styles, /\.numeric-zap\s*\{/);
+  assert.match(styles, /\.live-tv-status\s*,?[\s\S]*\.numeric-zap\s*\{/);
 });
