@@ -9,7 +9,7 @@ void test('main starts M3 before the inherited legacy remote and playlist path',
   const source = await readFile(mainUrl, 'utf8');
   const m3Start = source.indexOf('await tryStartM3LiveTv()');
   const legacyRemote = source.indexOf('remote.init(handleRemoteAction)');
-  const legacyPlaylist = source.indexOf('settings.getPlaylistUrl()');
+  const legacyPlaylist = source.indexOf('const activePlaylist = getActivePlaylist()');
 
   assert.notEqual(m3Start, -1);
   assert.notEqual(legacyRemote, -1);
