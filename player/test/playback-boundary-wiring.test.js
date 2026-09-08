@@ -31,3 +31,14 @@ test('M3 Shaka attempt uses a no-fallback policy while legacy load keeps inherit
   assert.match(source, /export async function playShakaAttempt\(channel\)[\s\S]*loadChannelWithPolicy\(channel, M3_SHAKA_ATTEMPT_POLICY(?:, attempt)?\)/);
   assert.match(source, /policy\.allowNativeFallback && avplayPreferredUrls\.has\(channel\.url\)/);
 });
+
+test('transient StreamRequest playback redacts resolved URLs and raw Shaka errors from logs', async () => {
+  const source = await readFile(playerUrl, 'utf8');
+
+  assert.match(source, /function isSensitiveStream\(channel\)[\s\S]*redactStreamUrl === true/);
+  assert.match(source, /function streamUrlForLog\(channel, url, maxLength\)[\s\S]*\[redacted stream URL\]/);
+  assert.match(source, /lastShakaReq = 't' \+ type \+ ' ' \+ streamUrlForLog\(currentChannel, requestUri, 55\)/);
+  assert.match(source, /lastShakaResp = 't' \+ type \+ ' ' \+ streamUrlForLog\(currentChannel, responseUri, 40\)/);
+  assert.match(source, /if \(isSensitiveStream\(currentChannel\)\) \{\s*console\.error\('Shaka error code:', error && error\.code \? error\.code : 'native'\);/);
+  assert.match(source, /function channelForLog\(channel, maxLength\)[\s\S]*if \(isSensitiveStream\(channel\)\) return '\[redacted stream\]';/);
+});
