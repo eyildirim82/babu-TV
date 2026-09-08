@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget xmlns:tizen="http://tizen.org/ns/widgets"
         xmlns="http://www.w3.org/ns/widgets"
-        id="https://babus.tv/babustvapp"
+        id="https://iptvplayer"
         version="1.0.0"
         viewmodes="maximized">
   <access origin="*" subdomains="true"/>
-  <tizen:application id="BabusTVApp.BabusTV" package="BabusTVApp" required_version="5.0"/>
-  <author href="https://babus.tv">BABUS</author>
+  <tizen:application id="IPTVPlayer.IPTV" package="IPTVPlayer" required_version="5.0"/>
+  <author href="http://iptvplayer">EN-IPTV Player</author>
   <content src="index.html"/>
   <feature name="http://tizen.org/feature/screen.size.all"/>
   <icon src="icon.png"/>
-  <name>BABUS TV</name>
+  <name>EN-IPTV Player</name>
   <tizen:privilege name="http://tizen.org/privilege/internet"/>
   <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
   <tizen:privilege name="http://developer.samsung.com/privilege/widgetdata"/>
