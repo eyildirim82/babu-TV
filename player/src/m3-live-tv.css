@@ -1,0 +1,40 @@
+/* M3 Live TV state presentation. Legacy styles remain untouched. */
+.channel-item.playing {
+  background: rgba(237, 66, 31, 0.15);
+  box-shadow: inset 4px 0 0 #ED421F;
+}
+
+.channel-item.playing.focused {
+  box-shadow: inset 4px 0 0 #ED421F, 0 0 14px rgba(237, 66, 31, 0.5);
+}
+
+.live-tv-status,
+.numeric-zap {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 105;
+  pointer-events: none;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: calc(12px * var(--tv-scale));
+  text-align: center;
+}
+
+.live-tv-status {
+  bottom: calc(82px * var(--tv-scale));
+  padding: calc(14px * var(--tv-scale)) calc(28px * var(--tv-scale));
+  font-size: calc(22px * var(--tv-scale));
+  font-weight: 600;
+}
+
+.numeric-zap {
+  top: calc(48px * var(--tv-scale));
+  min-width: calc(110px * var(--tv-scale));
+  padding: calc(10px * var(--tv-scale)) calc(24px * var(--tv-scale));
+  font-size: calc(32px * var(--tv-scale));
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #ED421F;
+}
