@@ -20,12 +20,32 @@ const M3_SHAKA_ATTEMPT_POLICY = Object.freeze({
 
 let activePlaybackPolicy = LEGACY_PLAYBACK_POLICY;
 
+function isSensitiveStream(channel) {
+  return Boolean(channel && channel.redactStreamUrl === true);
+}
+
+function streamUrlForLog(channel, url, maxLength) {
+  if (isSensitiveStream(channel)) return '[redacted stream URL]';
+  if (typeof url !== 'string' || !url) return '?';
+  return url.slice(-maxLength);
+}
+
+function channelForLog(channel, maxLength) {
+  if (isSensitiveStream(channel)) return '[redacted stream]';
+  if (channel && channel.name) return channel.name;
+  if (channel && typeof channel.url === 'string') return channel.url.slice(0, maxLength);
+  return '?';
+}
+
 function logEvent(level, message) {
+  const safeMessage = isSensitiveStream(currentChannel)
+    ? 'Sensitive stream playback event'
+    : message;
   try {
     fetch('/log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ level, message }),
+      body: JSON.stringify({ level, message: safeMessage }),
     }).catch(() => {});
   } catch (e) {}
 }
@@ -119,16 +139,19 @@ export async function initPlayer(videoEl) {
 
   const networkingEngine = player.getNetworkingEngine();
   if (networkingEngine) {
-    // Track Shaka request activity for the load watchdog below.
+    // Track Shaka request activity for the load watchdog below. Transient
+    // provider StreamRequest URLs are redacted before entering diagnostics.
     networkingEngine.registerRequestFilter((type, request) => {
       try {
-        lastShakaReq = 't' + type + ' ' + (request.uris && request.uris[0] ? request.uris[0].slice(-55) : '?');
+        const requestUri = request.uris && request.uris[0] ? request.uris[0] : null;
+        lastShakaReq = 't' + type + ' ' + streamUrlForLog(currentChannel, requestUri, 55);
         lastShakaActivity = Date.now();
       } catch {}
     });
     networkingEngine.registerResponseFilter((type, response) => {
       try {
-        lastShakaResp = 't' + type + ' ' + (response.uri ? response.uri.slice(-40) : '?');
+        const responseUri = response.uri || null;
+        lastShakaResp = 't' + type + ' ' + streamUrlForLog(currentChannel, responseUri, 40);
         lastShakaActivity = Date.now();
       } catch {}
     });
@@ -211,7 +234,10 @@ export async function initPlayer(videoEl) {
   videoEl.addEventListener('stalled', onVideoStalled);
   videoEl.addEventListener('waiting', onVideoWaiting);
 
-  await player.attach(videoEl).catch((e) => console.error('Player attach failed:', e));
+  await player.attach(videoEl).catch((e) => {
+    if (isSensitiveStream(currentChannel)) console.error('Player attach failed');
+    else console.error('Player attach failed:', e);
+  });
   return true;
 }
 
@@ -248,10 +274,11 @@ function onVideoError() {
     4: 'Video source not supported on this device — try a different quality or proxy',
   };
   const msg = mediaErrorMessages[err.code] || ('Video error (code ' + err.code + ')');
-  logEvent('ERROR', 'Video element error: ' + msg + ' (code=' + err.code + ', mediaErr=' + (err.message || '') + ')');
+  const mediaErrorDetail = isSensitiveStream(currentChannel) ? '[redacted]' : (err.message || '');
+  logEvent('ERROR', 'Video element error: ' + msg + ' (code=' + err.code + ', mediaErr=' + mediaErrorDetail + ')');
   if (videoErrorCount >= 2 && currentChannel) {
     // 2+ native errors in a row — this stream format is likely unsupported
-    logEvent('ERROR', 'Channel appears unsupported on this device: ' + (currentChannel.name || currentChannel.url.slice(0, 60)));
+    logEvent('ERROR', 'Channel appears unsupported on this device: ' + channelForLog(currentChannel, 60));
     showError('This channel could not play. Try turning on Proxy in the menu, or pick a different channel.');
     videoErrorCount = 0;
   }
@@ -415,7 +442,8 @@ async function probeChannelFormat(channel) {
     }
     return null;
   } catch (e) {
-    logEvent('WARN', 'Format probe failed: ' + (e && e.message ? e.message : e));
+    const detail = isSensitiveStream(channel) ? '[redacted]' : (e && e.message ? e.message : e);
+    logEvent('WARN', 'Format probe failed: ' + detail);
     return null;
   }
 }
@@ -544,7 +572,7 @@ async function loadChannelWithPolicy(channel, policy, attempt = null) {
     // buster (BUG-017) while the probe is stored under the original URL.
     const mimeType = sniffedMimeUrls.get(channel.url) || detectMimeType(url);
     if (mimeType) {
-      logEvent('INFO', 'Detected MIME type: ' + mimeType + ' for ' + url.slice(0, 80));
+      logEvent('INFO', 'Detected MIME type: ' + mimeType + ' for ' + streamUrlForLog(channel, url, 80));
       await player.load(url, undefined, mimeType);
     } else {
       await player.load(url);
@@ -563,7 +591,7 @@ async function loadChannelWithPolicy(channel, policy, attempt = null) {
     videoErrorCount = 0;
     if (policy.allowAutomaticRecovery) startStallWatchdog();
     if (policy.allowNativeFallback) startBlackWatchdog();
-    logEvent('INFO', 'Loaded: ' + (channel.name || channel.url.slice(0, 60)));
+    logEvent('INFO', 'Loaded: ' + channelForLog(channel, 60));
     return true;
   } catch (error) {
     clearTimeout(loadingTimeout);
@@ -591,7 +619,7 @@ async function loadChannelWithPolicy(channel, policy, attempt = null) {
         scheduleReconnect();
       } else if (policy.allowAutomaticRecovery) {
         showError('Could not load this channel after several tries. It may be turned off or not available on your TV.');
-        logEvent('ERROR', 'Reconnect limit reached — ' + (channel.name || channel.url.slice(0, 60)));
+        logEvent('ERROR', 'Reconnect limit reached — ' + channelForLog(channel, 60));
       }
       return false;
     }
@@ -607,12 +635,12 @@ async function loadChannelWithPolicy(channel, policy, attempt = null) {
       probeChannelFormat(crashedChannel).then((mime) => {
         if (tokenAtCatch !== loadToken) return; // user switched channels meanwhile
         if (!mime) {
-          logEvent('WARN', 'Could not identify channel format: ' + crashedChannel.url.slice(0, 100));
+          logEvent('WARN', 'Could not identify channel format: ' + streamUrlForLog(crashedChannel, crashedChannel.url, 100));
           showError('This channel could not be identified. Try enabling Proxy in the menu, or try a different channel.');
           return;
         }
         sniffedMimeUrls.set(crashedChannel.url, mime);
-        logEvent('INFO', 'Identified channel format: ' + mime + ' for ' + crashedChannel.url.slice(0, 80) + ' — retrying');
+        logEvent('INFO', 'Identified channel format: ' + mime + ' for ' + streamUrlForLog(crashedChannel, crashedChannel.url, 80) + ' — retrying');
         loadChannel(crashedChannel);
       });
       return false;
@@ -654,23 +682,26 @@ async function loadChannelWithPolicy(channel, policy, attempt = null) {
       pdtFallbackUrls.add(currentChannel.url);
       const crashedChannel = currentChannel;
       const tokenAtCatch = loadToken;
-      logEvent('WARN', 'Native crash loading channel — retrying without PDT sync: ' +
-          (crashedChannel.name || crashedChannel.url.slice(0, 80)));
+      logEvent('WARN', 'Native crash loading channel — retrying without PDT sync: ' + channelForLog(crashedChannel, 80));
       showCustomMessage('Retrying with compatibility mode...');
       setTimeout(() => { if (tokenAtCatch === loadToken) loadChannel(crashedChannel); }, 1200);
       return false;
     }
 
     if (isNativeLoadCrash(error)) {
-      logEvent('ERROR', 'Channel failed to load (native crash): ' +
-          (currentChannel ? currentChannel.name + ' | ' + currentChannel.url.slice(0, 100) : '?') +
-          ' — ' + (error.message || ''));
-      if (typeof console !== 'undefined') console.error('Channel load crashed inside Shaka:', error, error.stack);
+      const detail = isSensitiveStream(currentChannel) ? '[redacted native error]' : (error.message || '');
+      logEvent('ERROR', 'Channel failed to load (native crash): ' + channelForLog(currentChannel, 100) + ' — ' + detail);
+      if (typeof console !== 'undefined' && !isSensitiveStream(currentChannel)) {
+        console.error('Channel load crashed inside Shaka:', error, error.stack);
+      }
       showError('This channel could not start — it uses a stream format this player could not handle. Try another channel or enable Proxy.');
       return false;
     }
 
-    logEvent('ERROR', 'Failed to load — ' + getErrorMessage(error));
+    const failureMessage = isSensitiveStream(currentChannel)
+      ? 'Sensitive stream failed with error ' + (error && error.code ? error.code : 'unknown')
+      : getErrorMessage(error);
+    logEvent('ERROR', 'Failed to load — ' + failureMessage);
     showError(getErrorMessage(error));
     return false;
   }
@@ -713,7 +744,11 @@ function handlePlayerError(error) {
   // Ignore interruptions from switching channels
   if (error.code === 7000) return;
 
-  console.error('Shaka error:', error);
+  if (isSensitiveStream(currentChannel)) {
+    console.error('Shaka error code:', error && error.code ? error.code : 'native');
+  } else {
+    console.error('Shaka error:', error);
+  }
 
   const policy = activePlaybackPolicy;
 
@@ -727,16 +762,16 @@ function handlePlayerError(error) {
   if (isNativeLoadCrash(error) && !loadingTimeout) {
     if (policy.allowAutomaticRecovery && currentChannel && !pdtFallbackUrls.has(currentChannel.url)) {
       pdtFallbackUrls.add(currentChannel.url);
-      logEvent('WARN', 'Native crash during playback — reloading without PDT sync: ' +
-          (currentChannel.name || currentChannel.url.slice(0, 80)));
+      logEvent('WARN', 'Native crash during playback — reloading without PDT sync: ' + channelForLog(currentChannel, 80));
       showReloadingMessage();
       loadChannel(currentChannel);
       return;
     }
-    logEvent('ERROR', 'Playback crashed (native): ' +
-        (currentChannel ? currentChannel.name + ' | ' + currentChannel.url.slice(0, 100) : '?') +
-        ' — ' + (error.message || ''));
-    if (typeof console !== 'undefined') console.error('Shaka runtime crash:', error, error.stack);
+    const detail = isSensitiveStream(currentChannel) ? '[redacted native error]' : (error.message || '');
+    logEvent('ERROR', 'Playback crashed (native): ' + channelForLog(currentChannel, 100) + ' — ' + detail);
+    if (typeof console !== 'undefined' && !isSensitiveStream(currentChannel)) {
+      console.error('Shaka runtime crash:', error, error.stack);
+    }
     showError('This channel stopped unexpectedly — it uses a stream format this player could not handle. Try another channel or enable Proxy.');
     return;
   }
@@ -778,7 +813,10 @@ function handlePlayerError(error) {
     return;
   }
 
-  logEvent('ERROR', 'Unrecoverable error ' + error.code + ' (' + (currentChannel && currentChannel.name ? currentChannel.name : 'unknown') + ') — ' + getErrorMessage(error));
+  const errorMessage = isSensitiveStream(currentChannel)
+    ? 'Sensitive stream error ' + (error && error.code ? error.code : 'unknown')
+    : getErrorMessage(error);
+  logEvent('ERROR', 'Unrecoverable error ' + error.code + ' (' + channelForLog(currentChannel, 60) + ') — ' + errorMessage);
   showError(getErrorMessage(error));
 
   // Auto-advance to next channel after 3 failed 401/403 retries, legacy only.
@@ -943,7 +981,7 @@ function onBlackScreen() {
   if (!activePlaybackPolicy.allowNativeFallback) return;
   if (!currentChannel || avplayFailedUrls.has(currentChannel.url)) return;
   if (!avplay.isAvailable()) {
-    logEvent('ERROR', 'Undecodable stream, no native fallback: ' + currentChannel.url.slice(0, 100));
+    logEvent('ERROR', 'Undecodable stream, no native fallback: ' + streamUrlForLog(currentChannel, currentChannel.url, 100));
     showError('This channel uses a format the TV browser cannot display. Try a native player app for this channel.');
     return;
   }
@@ -978,7 +1016,8 @@ async function loadViaAvplay(channel, myToken) {
     if (myToken !== loadToken) return;
     avplayFailedUrls.add(channel.url);
     avplayPreferredUrls.delete(channel.url);
-    logEvent('ERROR', 'Native playback failed (' + type + '): ' + (channel.name || channel.url.slice(0, 60)));
+    const nativeType = isSensitiveStream(channel) ? '[redacted]' : type;
+    logEvent('ERROR', 'Native playback failed (' + nativeType + '): ' + channelForLog(channel, 60));
     showError('This channel could not play on your TV. Try another channel.');
   });
   let referer = null;
@@ -1003,7 +1042,7 @@ async function loadViaAvplay(channel, myToken) {
   hideError();
   reconnectAttempts = 0;
   consecutiveErrors = 0;
-  logEvent('INFO', 'Playing natively: ' + (channel.name || channel.url.slice(0, 60)));
+  logEvent('INFO', 'Playing natively: ' + channelForLog(channel, 60));
   return true;
 }
 
@@ -1014,8 +1053,7 @@ async function switchToAvplay() {
   if (!channel || !avplay.isAvailable()) return;
   stopBlackWatchdog();
   stopStallWatchdog();
-  logEvent('WARN', 'No frames rendered — switching to native playback: ' +
-      (channel.name || channel.url.slice(0, 80)));
+  logEvent('WARN', 'No frames rendered — switching to native playback: ' + channelForLog(channel, 80));
   showCustomMessage('Switching to native playback...');
   if (player) {
     try { await player.destroy(); } catch {}
