@@ -37,7 +37,7 @@ export class ProviderCoreService {
     private readonly sync: ProviderSyncPort,
   ) {}
 
-  async loadCacheFirst(providerId: ProviderId): Promise<CacheFirstLoad> {
+  async loadCached(providerId: ProviderId): Promise<ProviderSnapshot> {
     const provider = await this.providers.getProvider(providerId);
     if (provider === null) throw missingProvider();
 
@@ -46,11 +46,13 @@ export class ProviderCoreService {
       this.catalog.listChannels(providerId),
     ]);
 
+    return { provider, categories, channels };
+  }
+
+  async loadCacheFirst(providerId: ProviderId): Promise<CacheFirstLoad> {
+    const cached = await this.loadCached(providerId);
     const refresh = this.sync.refresh(providerId);
-    return {
-      cached: { provider, categories, channels },
-      refresh,
-    };
+    return { cached, refresh };
   }
 
   async switchActiveProvider(providerId: ProviderId): Promise<void> {
