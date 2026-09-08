@@ -39,7 +39,13 @@ function requestToLegacyChannel(request: StreamRequest): Record<string, unknown>
   const customHeaders: Record<string, string> = { ...(request.headers ?? {}) };
   if (request.referer) customHeaders.Referer = request.referer;
 
-  const channel: Record<string, unknown> = { url: request.url };
+  const channel: Record<string, unknown> = {
+    url: request.url,
+    // StreamRequest URLs are transient provider material and may contain
+    // credentials/tokens. The inherited player can consume the URL, but its
+    // diagnostic logging must treat it as sensitive.
+    redactStreamUrl: true,
+  };
   if (request.userAgent) channel.userAgent = request.userAgent;
   if (Object.keys(customHeaders).length > 0) channel.customHeaders = customHeaders;
   if (request.drm) channel.drm = request.drm;
