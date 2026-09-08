@@ -100,7 +100,7 @@ void test('provider http maps response body read failures to sanitized NETWORK e
     async text() {
       throw new Error('body read failed for demo-user:demo-pass');
     },
-  } as Response;
+  } as unknown as Response;
   const client = makeClient(async () => brokenResponse);
 
   const error = await expectProviderError(
@@ -155,7 +155,7 @@ void test('provider http keeps timeout active while consuming the response body'
       timeoutCallback?.();
       throw new DOMException('aborted', 'AbortError');
     },
-  } as Response;
+  } as unknown as Response;
   const client = new FetchProviderHttpClient(async () => slowBodyResponse, timers);
 
   await expectProviderError(client.getText('https://example.com/slow-body', 2500), 'TIMEOUT', null);
