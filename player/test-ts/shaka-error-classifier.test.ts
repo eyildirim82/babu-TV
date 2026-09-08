@@ -2,6 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyShakaFailure } from '../src/playback/shaka-error-classifier.js';
 
+void test('classifies safe M3 failure sentinels without inspecting provider material', () => {
+  assert.equal(classifyShakaFailure({ m3Code: 'AUTH' }), 'AUTH');
+  assert.equal(classifyShakaFailure({ m3Code: 'NETWORK' }), 'NETWORK');
+  assert.equal(classifyShakaFailure({ m3Code: 'TIMEOUT' }), 'TIMEOUT');
+  assert.equal(classifyShakaFailure({ m3Code: 'STREAM_NOT_FOUND' }), 'STREAM_NOT_FOUND');
+  assert.equal(classifyShakaFailure({ m3Code: 'UNSUPPORTED_CODEC' }), 'UNSUPPORTED_CODEC');
+  assert.equal(classifyShakaFailure({ m3Code: 'ENGINE_FAILURE' }), 'ENGINE_FAILURE');
+});
+
 void test('classifies inherited Shaka network and HTTP failures into M3 playback errors', () => {
   assert.equal(classifyShakaFailure({ code: 1001, data: [null, 401] }), 'AUTH');
   assert.equal(classifyShakaFailure({ code: 1001, data: [null, 403] }), 'AUTH');
@@ -20,5 +29,6 @@ void test('classifies inherited Shaka media and native failures into M3 playback
   assert.equal(classifyShakaFailure({ code: 3016 }), 'ENGINE_FAILURE');
   assert.equal(classifyShakaFailure(new TypeError('native player crash')), 'ENGINE_FAILURE');
   assert.equal(classifyShakaFailure({ code: 9999 }), 'UNKNOWN');
+  assert.equal(classifyShakaFailure({ m3Code: 'NOT_A_REAL_CODE' }), 'UNKNOWN');
   assert.equal(classifyShakaFailure(null), 'UNKNOWN');
 });
