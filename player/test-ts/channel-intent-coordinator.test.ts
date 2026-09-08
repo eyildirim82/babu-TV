@@ -145,13 +145,11 @@ void test('stale recovery callbacks and stale failed completion are suppressed',
   const resolver = new QueueResolver();
   resolver.enqueue(Promise.resolve(stream('a')), Promise.resolve(stream('b')));
   const firstResult = deferred<SessionSwitchResult>();
-  const firstEntered = deferred<void>();
-  let firstRequest: SessionSwitchRequest | null = null;
+  const firstRequestReady = deferred<SessionSwitchRequest>();
   const events: ChannelIntentEvent[] = [];
   const session = new RecordingSession(async (request) => {
     if (request.targetChannelId === 'a') {
-      firstRequest = request;
-      firstEntered.resolve();
+      firstRequestReady.resolve(request);
       return firstResult.promise;
     }
     return { status: 'playing', engine: 'shaka' };
@@ -163,7 +161,7 @@ void test('stale recovery callbacks and stale failed completion are suppressed',
     channelId: 'a',
     previousChannelId: null,
   });
-  await firstEntered.promise;
+  const firstRequest = await firstRequestReady.promise;
   const p2 = coordinator.requestChannel({
     providerId: 'provider-1',
     channelId: 'b',
@@ -171,7 +169,6 @@ void test('stale recovery callbacks and stale failed completion are suppressed',
   });
   assert.equal(await p2, 'playing');
 
-  assert.ok(firstRequest);
   firstRequest.onRecovering();
   firstResult.resolve({
     status: 'failed',
