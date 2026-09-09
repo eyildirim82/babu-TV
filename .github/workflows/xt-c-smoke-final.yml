@@ -1,0 +1,108 @@
+name: XT-C final browser smoke
+
+on:
+  push:
+    branches:
+      - evidence/xt-c-95a2313
+    paths:
+      - .github/workflows/xt-c-smoke-final.yml
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact production head
+        uses: actions/checkout@v4
+        with:
+          ref: 95a23139a206f923f1d8ee1badccaee6ff784231
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "95a23139a206f923f1d8ee1badccaee6ff784231"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prepare synthetic Xtream page
+        run: |
+          cat > player/xt-c-smoke.html <<'EOF'
+          <!doctype html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+          <script type="module">
+            import './src/ui/tokens.css';
+            import './src/ui/theme.css';
+            import './src/ui/primitives.css';
+            import './src/styles.css';
+            import './src/ui/xtream-entry.css';
+            import * as settings from './src/settings.js';
+            import { XtreamEntryView } from './src/xtream-entry.ts';
+            import { createXtreamEntryCallbacks } from './src/xtream-entry-integration.ts';
+            import { ProviderError } from './src/providers/errors.ts';
+            import { UI_COPY } from './src/ui/copy.js';
+            window.__reloadCount=0; window.__authCopy=UI_COPY.xtreamEntry.auth; window.__requiredCopy=UI_COPY.xtreamEntry.required;
+            let view;
+            const onboarding={async connect(){throw new ProviderError('AUTH',401,'synthetic rejection')}};
+            const showXtream=()=>{settings.hide();view.show()};
+            view=new XtreamEntryView(document,createXtreamEntryCallbacks({onboarding,reload:()=>{window.__reloadCount+=1},onBack:()=>{view.hide();settings.show()}}));
+            window.__xtreamView=view;
+            settings.init(document.getElementById('settings-page'),{onPlaylistFetched:()=>{},onClose:()=>{},onRender:()=>{},onXtreamRequested:showXtream});
+            settings.show(); window.__smokeReady=true;
+          </script></head><body><div id="settings-page" class="hidden"></div></body></html>
+          EOF
+          CHROME="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --prefix /tmp/xtc-playwright playwright-core@1.55.0
+      - name: Run 1920x1080 smoke
+        run: |
+          npm run dev -w player >/tmp/xtc-vite-final.log 2>&1 &
+          VITE_PID=$!; trap 'kill $VITE_PID 2>/dev/null || true' EXIT
+          URL=http://127.0.0.1:5173/babustv/xt-c-smoke.html
+          for i in $(seq 1 40); do curl -fsS "$URL" >/dev/null && break; sleep .25; done
+          curl -fsS "$URL" >/dev/null
+          cat >/tmp/xtc-final.mjs <<'EOF'
+          import fs from 'node:fs'; import {createRequire} from 'node:module';
+          const require=createRequire(import.meta.url); const {chromium}=require('/tmp/xtc-playwright/node_modules/playwright-core');
+          const out='/tmp/xtc-smoke-final'; fs.mkdirSync(out,{recursive:true});
+          const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME,args:['--no-sandbox']});
+          const context=await browser.newContext({viewport:{width:1920,height:1080},reducedMotion:'reduce'}); const page=await context.newPage();
+          const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
+          await page.goto('http://127.0.0.1:5173/babustv/xt-c-smoke.html',{waitUntil:'domcontentloaded'}); await page.waitForFunction(()=>window.__smokeReady===true);
+          const btn=page.locator('#settings-xtream-btn'); await btn.waitFor({state:'visible'}); const label=(await btn.textContent())?.trim();
+          if(label!=='Xtream Codes ile Bağlan') throw new Error(`label ${label}`); await page.screenshot({path:`${out}/01-settings.png`});
+          await btn.click(); const entry=page.locator('#xtream-entry-page'); await entry.waitFor({state:'visible'});
+          if(await page.locator('#settings-page').isVisible()) throw new Error('Settings visible under entry');
+          if(await page.locator('#xtream-password').getAttribute('type')!=='password') throw new Error('password unmasked');
+          const active=()=>page.evaluate(()=>document.activeElement?.id||''); const route=a=>page.evaluate(x=>window.__xtreamView.handleAction(x),a); const reset=()=>page.evaluate(()=>window.__xtreamView.show());
+          const seq=[await active()]; for(const a of ['down','down','down','down']){await route(a);seq.push(await active())}
+          const expected=['xtream-server-url','xtream-username','xtream-password','xtream-connect','xtream-back']; if(JSON.stringify(seq)!==JSON.stringify(expected)) throw new Error(`focus ${JSON.stringify(seq)}`);
+          await page.locator('#xtream-server-url').focus();
+          const css=await page.locator('#xtream-server-url').evaluate(el=>{const s=getComputedStyle(el);return{color:s.outlineColor,width:s.outlineWidth,offset:s.outlineOffset,accent:getComputedStyle(document.documentElement).getPropertyValue('--babu-accent-strong').trim()}});
+          if(css.accent!=='#a78bfa'||css.color!=='rgb(167, 139, 250)'||css.width!=='3px'||css.offset!=='3px') throw new Error(`focus css ${JSON.stringify(css)}`);
+          await page.screenshot({path:`${out}/02-entry-violet-focus.png`});
+          await reset(); for(const a of ['down','down','down']) await route(a); await route('select'); await page.waitForFunction(()=>document.getElementById('xtream-status')?.textContent===window.__requiredCopy); if(await active()!=='xtream-connect') throw new Error('required focus');
+          await page.locator('#xtream-server-url').fill('https://example.invalid'); await page.locator('#xtream-username').fill('demo-user'); await page.locator('#xtream-password').fill('demo-pass'); await route('select');
+          await page.waitForFunction(()=>document.getElementById('xtream-status')?.textContent===window.__authCopy);
+          const v=await page.evaluate(()=>({s:document.getElementById('xtream-server-url').value,u:document.getElementById('xtream-username').value,p:document.getElementById('xtream-password').value,r:window.__reloadCount,a:document.activeElement?.id||''}));
+          if(v.s!=='https://example.invalid'||v.u!=='demo-user'||v.p!=='demo-pass'||v.r!==0||v.a!=='xtream-connect') throw new Error(`AUTH state ${JSON.stringify(v)}`);
+          await page.screenshot({path:`${out}/03-auth-error.png`}); await route('down'); await route('select'); await entry.waitFor({state:'detached'}); await btn.waitFor({state:'visible'}); await page.screenshot({path:`${out}/04-back-settings.png`});
+          if(errors.length) throw new Error(`page errors ${JSON.stringify(errors)}`);
+          const report={head:'95a23139a206f923f1d8ee1badccaee6ff784231',viewport:'1920x1080',reducedMotion:'reduce',settingsLabel:label,focusSequence:seq,focusCss:css,passwordMasked:true,requiredMessage:true,authFailurePreservedFields:true,failedSubmitReloadCount:v.r,backRestoredSettings:true,browserErrors:errors};
+          fs.writeFileSync(`${out}/smoke-report.json`,JSON.stringify(report,null,2)); console.log(JSON.stringify(report)); await browser.close();
+          EOF
+          CHROME="$CHROME" node /tmp/xtc-final.mjs
+      - name: Verify exact checkout remains clean
+        run: |
+          rm player/xt-c-smoke.html
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+      - name: Upload final evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xt-c-smoke-95a2313-final
+          path: |
+            /tmp/xtc-smoke-final
+            /tmp/xtc-vite-final.log
+          if-no-files-found: warn
