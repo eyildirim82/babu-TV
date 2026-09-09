@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a remote-first Xtream Codes entry flow that safely registers, initially syncs, activates, and boots an Xtream provider before M4 EPG work.
+**Goal:** Add a remote-first Xtream Codes entry flow that safely registers, initially syncs, validates cache, activates as the final commit point, and boots an Xtream provider before M4 EPG work.
 
 **Architecture:** XT-A builds a UI-independent onboarding transaction service. XT-B builds a dedicated remote-first entry surface that depends only on a submit callback. After both are independently GREEN, XT-C factors shared browser Provider Core construction and wires the surface into the existing Settings/first-launch path; success reloads the app so the existing M3 startup path owns runtime initialization exactly once.
 
@@ -66,27 +66,30 @@ export class XtreamOnboardingService {
 Cover these exact cases with synthetic credential values:
 
 ```ts
-it('registers, syncs channels, activates, and returns the cached snapshot in order', async () => {});
+it('registers, syncs channels, validates cache, activates, and returns the snapshot in order', async () => {});
 it('trims inputs and rejects empty fields before Provider Core work', async () => {});
 it('preserves ProviderError from registration without post-registration cleanup', async () => {});
 it('rolls back the new provider when initial sync throws', async () => {});
 it('rolls back and preserves the channel-stage error code when channel sync fails', async () => {});
 it('allows category failure when channel sync succeeds', async () => {});
-it('rolls back when active-provider selection fails', async () => {});
-it('rolls back when post-sync cache loading fails', async () => {});
+it('rolls back when active-provider selection fails after cache validation', async () => {});
+it('rolls back a cache-loading failure before activation is attempted', async () => {});
+it('cleanup failure never replaces the original safe provider error', async () => {});
 it('never derives provider id from credential material', async () => {});
 ```
 
-Assert event order explicitly:
+Assert the successful commit order explicitly:
 
 ```ts
 assert.deepEqual(events, [
   'register',
   'sync',
-  'activate',
   'loadCached',
+  'activate',
 ]);
 ```
+
+`switchActiveProvider()` is the final onboarding commit point. A cache-loading failure must produce `['register', 'sync', 'loadCached', 'delete']` with no activation attempt.
 
 For failure paths, assert `deleteProvider(providerId)` occurs after registration and before rejection, and that the rejected error contains no synthetic username/password/server URL.
 
@@ -98,7 +101,7 @@ Run:
 node --import tsx --test player/test-ts/xtream-onboarding-service.test.ts
 ```
 
-Expected: FAIL because `xtream-onboarding-service.ts` / `XtreamOnboardingService` does not yet exist.
+Expected: FAIL because `xtream-onboarding-service.ts` / `XtreamOnboardingService` does not yet exist. If a later review hardens transaction order, add a focused RED revision before changing production code and preserve that evidence too.
 
 - [ ] **Step 3: Implement the minimum service**
 
@@ -132,8 +135,8 @@ try {
       'Initial provider channel sync failed.',
     );
   }
-  await deps.core.switchActiveProvider(providerId);
   const snapshot = await deps.core.loadCached(providerId);
+  await deps.core.switchActiveProvider(providerId);
   return { providerId, profile, snapshot };
 } catch (error) {
   try { await deps.core.deleteProvider(providerId); } catch {}
@@ -288,6 +291,8 @@ No `data-*` field may contain form values.
 
 `handleAction()` owns the five-item focus index. On failed submit it leaves input values unchanged, renders safe copy from `ProviderError.code` (unknown → unavailable), clears pending state, and focuses `xtream-connect`.
 
+While submit is pending, a second submit is ignored and Back does not tear down the entry surface. On failure, pending clears and Back becomes available again.
+
 - [ ] **Step 5: Add BabuşTV presentation CSS**
 
 `player/src/ui/xtream-entry.css` must consume semantic tokens from the existing design system. Strong focus uses the BabuşTV violet focus variables; no inherited orange/red focus color is permitted. Include reduced-motion handling.
@@ -426,7 +431,7 @@ await onboarding.connect(input);
 window.location.reload();
 ```
 
-Reload occurs only after the onboarding transaction fully succeeds.
+Reload occurs only after the onboarding transaction fully succeeds, including cache validation and active-provider commit.
 
 - [ ] **Step 6: Run focused integration GREEN**
 
