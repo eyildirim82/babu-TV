@@ -2,6 +2,7 @@ import shaka from 'shaka-player';
 import config, { getSettings } from './config.js';
 import * as legacyAvplay from './avplay.js';
 import { createAvplayAdapter } from './playback/avplay-adapter.ts';
+import { UI_COPY } from './ui/copy.js';
 
 const avplay = createAvplayAdapter(legacyAvplay);
 
@@ -276,7 +277,7 @@ function onVideoError() {
   if (videoErrorCount >= 2 && currentChannel) {
     // 2+ native errors in a row — this stream format is likely unsupported
     logEvent('ERROR', 'Channel appears unsupported on this device: ' + channelForLog(currentChannel, 60));
-    showError('This channel could not play. Try turning on Proxy in the menu, or pick a different channel.');
+    showError('Bu kanal oynatılamadı. Menüden Proxy\'yi açmayı veya başka bir kanal seçmeyi deneyin.');
     videoErrorCount = 0;
   }
 }
@@ -289,7 +290,7 @@ function onVideoStalled() {
     const currentTime = videoElement.currentTime;
     if (videoElement.readyState < 3 && currentTime === (videoElement._lastStallTime || 0)) {
       logEvent('WARN', 'Video stalled for 10s — may not be playable on this device');
-      showError('This channel is taking too long to load. Please wait or try a different channel.');
+      showError('Kanalın yüklenmesi uzun sürüyor. Biraz bekleyin veya başka bir kanal deneyin.');
     }
     videoElement._lastStallTime = currentTime;
   }, 10000);
@@ -474,7 +475,7 @@ async function runChannelLoadWithPolicy(channel, policy) {
 
   if (channel.drm && !isEmeSupported()) {
     logEvent('ERROR', 'DRM not available — EME (Encrypted Media Extensions) is not supported in this browser/context');
-    showError('This channel is protected and cannot play here. Try a different channel.');
+    showError('Bu kanal korumalı ve burada oynatılamıyor. Başka bir kanal deneyin.');
     if (policy === M3_SHAKA_ATTEMPT_POLICY) {
       return { ok: false, failure: { m3Code: 'ENGINE_FAILURE' } };
     }
@@ -564,7 +565,7 @@ async function runChannelLoadWithPolicy(channel, policy) {
         clearInterval(loadingTimeout);
         loadingTimeout = null;
         logEvent('WARN', 'Load stalled (idle ' + Math.round(idleFor / 1000) + 's, lastREQ=' + lastShakaReq + ', lastRESP=' + lastShakaResp + ')');
-        showError('This channel is not responding. It may be turned off right now.');
+        showError('Kanal yanıt vermiyor. Şu anda kapalı olabilir.');
         if (player) player.destroy().catch(() => {});
         if (videoElement) {
           videoElement.src = '';
@@ -636,7 +637,7 @@ async function runChannelLoadWithPolicy(channel, policy) {
       if (policy.allowAutomaticRecovery && reconnectAttempts < 3) {
         scheduleReconnect();
       } else if (policy.allowAutomaticRecovery) {
-        showError('Could not load this channel after several tries. It may be turned off or not available on your TV.');
+        showError('Bu kanal birkaç denemeden sonra yüklenemedi. Kapalı olabilir veya TV\'nizde kullanılamıyor olabilir.');
         logEvent('ERROR', 'Reconnect limit reached — ' + channelForLog(channel, 60));
       }
       return false;
@@ -653,12 +654,12 @@ async function runChannelLoadWithPolicy(channel, policy) {
       sniffTriedUrls.add(currentChannel.url);
       const crashedChannel = currentChannel;
       const tokenAtCatch = loadToken;
-      showCustomMessage('Identifying channel format...');
+      showCustomMessage('Kanal biçimi belirleniyor…');
       probeChannelFormat(crashedChannel).then((mime) => {
         if (tokenAtCatch !== loadToken) return; // user switched channels meanwhile
         if (!mime) {
           logEvent('WARN', 'Could not identify channel format: ' + streamUrlForLog(crashedChannel, crashedChannel.url, 100));
-          showError('This channel could not be identified. Try enabling Proxy in the menu, or try a different channel.');
+          showError('Kanal biçimi belirlenemedi. Menüden Proxy\'yi açmayı veya başka bir kanal denemeyi deneyin.');
           return;
         }
         sniffedMimeUrls.set(crashedChannel.url, mime);
@@ -677,7 +678,7 @@ async function runChannelLoadWithPolicy(channel, policy) {
       if (reconnectAttempts < 3) {
         scheduleReconnect();
       } else {
-        showError(getErrorMessage(error) + ' — channel may be turned off');
+        showError(getErrorMessage(error) + ' — kanal kapalı olabilir');
       }
       return false;
     }
@@ -705,7 +706,7 @@ async function runChannelLoadWithPolicy(channel, policy) {
       const crashedChannel = currentChannel;
       const tokenAtCatch = loadToken;
       logEvent('WARN', 'Native crash loading channel — retrying without PDT sync: ' + channelForLog(crashedChannel, 80));
-      showCustomMessage('Retrying with compatibility mode...');
+      showCustomMessage('Uyumluluk moduyla yeniden deneniyor…');
       setTimeout(() => { if (tokenAtCatch === loadToken) loadChannel(crashedChannel); }, 1200);
       return false;
     }
@@ -716,7 +717,7 @@ async function runChannelLoadWithPolicy(channel, policy) {
       if (typeof console !== 'undefined' && !isSensitiveStream(currentChannel)) {
         console.error('Channel load crashed inside Shaka:', error, error.stack);
       }
-      showError('This channel could not start — it uses a stream format this player could not handle. Try another channel or enable Proxy.');
+      showError('Bu kanal başlatılamadı; oynatıcının işleyemediği bir yayın biçimi kullanıyor. Başka bir kanal deneyin veya Proxy\'yi açın.');
       return false;
     }
 
@@ -794,7 +795,7 @@ function handlePlayerError(error) {
     if (typeof console !== 'undefined' && !isSensitiveStream(currentChannel)) {
       console.error('Shaka runtime crash:', error, error.stack);
     }
-    showError('This channel stopped unexpectedly — it uses a stream format this player could not handle. Try another channel or enable Proxy.');
+    showError('Kanal beklenmedik şekilde durdu; oynatıcının işleyemediği bir yayın biçimi kullanıyor. Başka bir kanal deneyin veya Proxy\'yi açın.');
     return;
   }
 
@@ -808,7 +809,7 @@ function handlePlayerError(error) {
       logEvent('WARN', status + ' on segment — retry ' + lastResortAttempts + '/3');
       if (lastResortAttempts <= 3) {
         reconnectAttempts = Math.max(reconnectAttempts, 1);
-        showReconnectMessage('Trying again (' + lastResortAttempts + '/3)...');
+        showReconnectMessage(lastResortAttempts + '/3');
         setTimeout(() => {
           logEvent('INFO', status + ' retry ' + lastResortAttempts + '/3 — reloading channel');
           loadChannel(currentChannel);
@@ -847,7 +848,7 @@ function handlePlayerError(error) {
     if ((status === 403 || status === 401) && lastResortAttempts > 3) {
       advancePending = true;
       logEvent('INFO', '3 retries exhausted — advancing to next channel');
-      showError('This channel link has expired. Moving to the next channel...');
+      showError('Kanal bağlantısının süresi doldu. Sonraki kanala geçiliyor…');
       setTimeout(() => {
         advancePending = false;
         logEvent('INFO', 'Advancing channel');
@@ -904,7 +905,7 @@ function scheduleReconnect() {
 function showReconnectMessage(attempt) {
   const el = document.getElementById('error');
   if (el) {
-    el.textContent = 'Connection lost. Trying again... (' + attempt + ')';
+    el.textContent = UI_COPY.recovering + ' (' + attempt + ')';
     el.classList.remove('hidden');
   }
 }
@@ -920,7 +921,7 @@ function showCustomMessage(message) {
 function showReloadingMessage() {
   const el = document.getElementById('error');
   if (el) {
-    el.textContent = 'Reloading channel...';
+    el.textContent = UI_COPY.recovering;
     el.classList.remove('hidden');
   }
 }
@@ -1004,7 +1005,7 @@ function onBlackScreen() {
   if (!currentChannel || avplayFailedUrls.has(currentChannel.url)) return;
   if (!avplay.isAvailable()) {
     logEvent('ERROR', 'Undecodable stream, no native fallback: ' + streamUrlForLog(currentChannel, currentChannel.url, 100));
-    showError('This channel uses a format the TV browser cannot display. Try a native player app for this channel.');
+    showError('Bu kanal TV tarayıcısının gösteremediği bir biçim kullanıyor. Bu kanal için yerel bir oynatıcı uygulaması deneyin.');
     return;
   }
   avplayPreferredUrls.add(currentChannel.url);
@@ -1040,7 +1041,7 @@ async function loadViaAvplay(channel, myToken) {
     avplayPreferredUrls.delete(channel.url);
     const nativeType = isSensitiveStream(channel) ? '[redacted]' : type;
     logEvent('ERROR', 'Native playback failed (' + nativeType + '): ' + channelForLog(channel, 60));
-    showError('This channel could not play on your TV. Try another channel.');
+    showError('Bu kanal TV\'nizde oynatılamadı. Başka bir kanal deneyin.');
   });
   let referer = null;
   if (channel.customHeaders) {
@@ -1057,7 +1058,7 @@ async function loadViaAvplay(channel, myToken) {
   if (!ok) {
     avplayFailedUrls.add(channel.url);
     avplayPreferredUrls.delete(channel.url);
-    showError('This channel could not play on your TV. Try another channel.');
+    showError('Bu kanal TV\'nizde oynatılamadı. Başka bir kanal deneyin.');
     return false;
   }
   useAvplay = true;
@@ -1076,7 +1077,7 @@ async function switchToAvplay() {
   stopBlackWatchdog();
   stopStallWatchdog();
   logEvent('WARN', 'No frames rendered — switching to native playback: ' + channelForLog(channel, 80));
-  showCustomMessage('Switching to native playback...');
+  showCustomMessage('Yerel oynatmaya geçiliyor…');
   if (player) {
     try { await player.destroy(); } catch {}
     player = null;
@@ -1227,50 +1228,50 @@ function hideError() {
 }
 
 function getErrorMessage(error) {
-  if (!error) return 'Something went wrong. Please try another channel.';
+  if (!error) return UI_COPY.streamFailed + '. Başka bir kanal deneyin.';
 
   const code = error.code;
 
   // Simple, non-technical messages users can understand and report back
   const messages = {
-    1000: 'This channel link uses a type your TV cannot open.',
-    1001: 'The channel server rejected the request. It may be blocking this app right now.',
-    1002: 'Could not connect to the channel stream. The server may be down or blocking the app right now.',
-    1003: 'The channel took too long to respond. It may be slow or turned off right now.',
-    1004: 'This channel link is not valid.',
-    1005: 'This channel link is not valid.',
-    7000: 'Channel loading was interrupted.',
-    2000: 'This channel contains text data the app could not read.',
-    2001: 'This channel contains text data the app could not read.',
-    2002: 'This channel contains text data the app could not read.',
-    2003: 'This channel contains text with an unknown encoding.',
-    2004: 'This channel contains text data that could not be decoded.',
-    2005: 'This channel contains data that could not be read.',
-    2006: 'This channel contains captions the app could not read.',
-    6000: 'This channel uses a protection type that is not recognized.',
-    6001: 'This channel is protected and your TV cannot play protected channels.',
-    6002: 'Could not set up playback for this channel. Please restart the app and try again.',
-    6007: 'This channel is protected but the key could not be obtained.',
-    6020: 'This channel is protected and your TV does not support this type of protection.',
-    3000: 'This channel could not play on your TV.',
-    3001: 'This channel uses stream values your TV could not process.',
-    3002: 'This channel could not play on your TV.',
-    3003: 'This channel could not play on your TV.',
-    3018: 'The live stream broke up. Trying again — if it persists, try another channel.',
-    4000: 'This channel could not be identified. Try enabling Proxy in the menu, or try a different channel.',
-    4032: 'This channel stopped playing in a format your TV accepts. Trying again — if it persists, try another channel.',
+    1000: 'Bu kanal bağlantısını TV\'niz açamıyor.',
+    1001: 'Kanal sunucusu isteği reddetti. Uygulamayı şu anda engelliyor olabilir.',
+    1002: 'Kanal yayınına bağlanılamadı. Sunucu kapalı olabilir veya uygulamayı engelliyor olabilir.',
+    1003: 'Kanal çok geç yanıt verdi. Yavaş veya şu anda kapalı olabilir.',
+    1004: 'Kanal bağlantısı geçersiz.',
+    1005: 'Kanal bağlantısı geçersiz.',
+    7000: 'Kanal yükleme işlemi kesildi.',
+    2000: 'Kanal, uygulamanın okuyamadığı metin verisi içeriyor.',
+    2001: 'Kanal, uygulamanın okuyamadığı metin verisi içeriyor.',
+    2002: 'Kanal, uygulamanın okuyamadığı metin verisi içeriyor.',
+    2003: 'Kanal, bilinmeyen kodlamada metin içeriyor.',
+    2004: 'Kanaldaki metin verisi çözülemedi.',
+    2005: 'Kanaldaki veri okunamadı.',
+    2006: 'Kanaldaki altyazılar okunamadı.',
+    6000: 'Kanal tanınmayan bir koruma türü kullanıyor.',
+    6001: 'Kanal korumalı ve TV\'niz korumalı kanalları oynatamıyor.',
+    6002: 'Bu kanal için oynatma hazırlanamadı. Uygulamayı yeniden başlatıp tekrar deneyin.',
+    6007: 'Kanal korumalı ancak anahtar alınamadı.',
+    6020: 'Kanal korumalı ve TV\'niz bu koruma türünü desteklemiyor.',
+    3000: 'Bu kanal TV\'nizde oynatılamadı.',
+    3001: 'Kanal, TV\'nizin işleyemediği yayın değerleri kullanıyor.',
+    3002: 'Bu kanal TV\'nizde oynatılamadı.',
+    3003: 'Bu kanal TV\'nizde oynatılamadı.',
+    3018: 'Canlı yayın kesildi. Yeniden deneniyor; sürerse başka bir kanal deneyin.',
+    4000: 'Kanal biçimi belirlenemedi. Menüden Proxy\'yi açmayı veya başka bir kanal denemeyi deneyin.',
+    4032: 'Kanal, TV\'nizin kabul ettiği biçimde oynatmayı durdurdu. Yeniden deneniyor; sürerse başka bir kanal deneyin.',
   };
 
   // BAD_HTTP_STATUS (1001): the real HTTP status is in error.data[1].
   if (code === 1001) {
     const status = error.data && error.data[1];
-    if (status === 403) return 'This channel is not allowed to play. You may need a subscription or different access.';
-    if (status === 401) return 'This channel is not allowing access right now. Its link may have expired — try again in a bit.';
-    if (status === 404) return 'This channel was not found. The link may have changed.';
-    if (typeof status === 'number' && status >= 500) return 'The channel server is having problems. Please try again later.';
-    if (typeof status === 'number' && status) return 'Channel returned an error (code ' + status + '). Please try again.';
-    if (status) return 'Could not load this channel. Please try again.';
-    return 'The channel server rejected the request. It may be blocking this app right now.';
+    if (status === 403) return 'Bu kanalın oynatılmasına izin verilmiyor. Abonelik veya farklı erişim gerekebilir.';
+    if (status === 401) return 'Kanala şu anda erişilemiyor. Bağlantının süresi dolmuş olabilir; biraz sonra tekrar deneyin.';
+    if (status === 404) return 'Kanal bulunamadı. Bağlantı değişmiş olabilir.';
+    if (typeof status === 'number' && status >= 500) return 'Kanal sunucusunda sorun var. Daha sonra tekrar deneyin.';
+    if (typeof status === 'number' && status) return 'Kanal hata döndürdü (kod ' + status + '). Tekrar deneyin.';
+    if (status) return 'Kanal yüklenemedi. Tekrar deneyin.';
+    return 'Kanal sunucusu isteği reddetti. Uygulamayı şu anda engelliyor olabilir.';
   }
 
   if (messages[code]) {
@@ -1278,8 +1279,8 @@ function getErrorMessage(error) {
   }
 
   if (error.message) {
-    return error.message.substring(0, 100);
+    return UI_COPY.streamFailed + ' (hata ' + (code || '?') + ').';
   }
 
-  return 'Something went wrong (error ' + code + '). Please try another channel or restart the app.';
+  return UI_COPY.streamFailed + ' (hata ' + code + '). Başka bir kanal deneyin veya uygulamayı yeniden başlatın.';
 }
