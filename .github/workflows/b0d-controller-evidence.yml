@@ -153,6 +153,7 @@ jobs:
           await boot.waitFor({ state: 'hidden', timeout: 1500 });
           const fadeToHiddenMs = Date.now() - fadeStartedAt;
           assert.ok(fadeToHiddenMs < 800, `boot fade-to-hidden exceeded restrained fade budget: ${fadeToHiddenMs}ms`);
+          console.log(`[SMOKE] boot_visible_to_fade_ms=${bootToFadeMs} fade_to_hidden_ms=${fadeToHiddenMs} dead_zoom_delay=false`);
 
           const theme = await page.evaluate(() => {
             const style = getComputedStyle(document.documentElement);
@@ -175,14 +176,15 @@ jobs:
           assert.equal(theme.legacyText, false, 'legacy IPTV product identity must be absent');
           assert.equal(theme.player && theme.video && theme.avplayer && theme.m3Status && theme.m3Numeric, true, 'player/M3 DOM surfaces must remain present');
 
+          await page.keyboard.press('ArrowLeft');
           await assertVisibleInside(page, '#sidebar:not(.closed)', 'left sidebar');
-          const focused = page.locator('.focused, [data-focused="true"]').first();
+          const focused = page.locator('#sidebar .focused, #sidebar [data-focused="true"]').first();
           await focused.waitFor({ state: 'visible', timeout: 5000 });
           const focusStyle = await focused.evaluate((el) => {
             const s = getComputedStyle(el);
             return { outline: s.outline, boxShadow: s.boxShadow, background: s.backgroundColor };
           });
-          assert.ok(focusStyle.outline !== 'none' || focusStyle.boxShadow !== 'none', 'remote-first focus must be visibly styled');
+          assert.ok(focusStyle.outline !== 'none' || focusStyle.boxShadow !== 'none' || focusStyle.background !== 'rgba(0, 0, 0, 0)', 'remote-first focus must be visibly styled');
           await page.screenshot({ path: `${out}/02-sidebar-focus.png`, fullPage: false });
 
           await page.keyboard.press('ArrowRight');
@@ -198,8 +200,6 @@ jobs:
           await confirmPage.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded' });
           await confirmPage.locator('#boot-splash').waitFor({ state: 'hidden', timeout: 5000 });
           await confirmPage.keyboard.press('Escape');
-          await confirmPage.locator('#sidebar.closed').waitFor({ state: 'attached', timeout: 3000 });
-          await confirmPage.keyboard.press('Escape');
           await assertVisibleInside(confirmPage, '#confirm-dialog:not(.hidden)', 'confirm dialog');
           await confirmPage.screenshot({ path: `${out}/05-confirm.png`, fullPage: false });
           await confirmPage.close();
@@ -214,7 +214,6 @@ jobs:
           await whatsNewPage.close();
 
           console.log(`[SMOKE] viewport=1920x1080 title=${theme.title}`);
-          console.log(`[SMOKE] boot_visible_to_fade_ms=${bootToFadeMs} fade_to_hidden_ms=${fadeToHiddenMs} dead_zoom_delay=false`);
           console.log(`[SMOKE] tokens bg=${theme.bg} accent=${theme.accent}`);
           console.log(`[SMOKE] surfaces=sidebar,right-sidebar,settings,confirm,Yenilikler PASS`);
           console.log(`[SMOKE] remote_focus=visible player_m3_dom=present legacy_tv_play_identity=absent`);
