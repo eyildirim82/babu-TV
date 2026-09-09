@@ -26,21 +26,21 @@ Canonical sources:
 | Repository | `eyildirim82/babu-TV` |
 | Default branch | `main` |
 | Pre-board GREEN baseline | `a7d4770b176a7e3336a8f772ab4bc508e39a55e6` |
-| Current main at this board commit | `ffb5909f5f2b05e5f6e7c88bb0c4897a8828208c` |
-| Main tree delta vs pre-board baseline | none; the control-board setup accidentally created then reverted this docs file on `main`, leaving no net file diff |
-| Fresh current-main CI | GitHub `test-and-build` run `34370733606` completed SUCCESS on exact `ffb5909...` |
-| B0 first wave | B0A + B0B + B0C + B0F merged and post-merge GREEN |
-| Open implementation PR | #24 B0D, Draft / NOT READY |
-| Open runtime-evidence PR | #22 M3G, Draft / runtime incomplete |
+| B0D final worker head | `50ec2ab35e023041be0f1f0d6c73375961b99179` |
+| B0D merge result before controller board/status update | `ceb994b94f93c8939bad6f72e7fda354c5ad9cf9` |
+| B0D post-merge CI | GitHub `verify` run `34397292047` SUCCESS on exact `ceb994b...` |
+| B0 merged slices | B0A + B0B + B0C + B0D + B0F, all post-merge GREEN |
+| Open implementation PR | none; B0E is next eligible after this controller board/status update is exact-head GREEN |
+| Open runtime-evidence PR | #22 M3G, Draft / real Tizen runtime incomplete |
 | Merge authority | Controller window only |
 
-The accidental control-board write to `main` was corrected with an ordinary delete/revert commit rather than history rewriting. Comparison from `a7d4770...` to `ffb5909...` shows two docs-history commits and **no net changed files**. Fresh `test-and-build` run `34370733606` then completed SUCCESS on exact `ffb5909...`.
+The B0D squash merge is complete. PR #24 merged exact worker head `50ec2ab...` into `main` as `ceb994b...`, and post-merge `verify` run `34397292047` completed SUCCESS on that exact result.
 
-Do not assume a worker branch should be based on either SHA above after `main` advances. Every new dependent implementation branch must start only after the previous required merge is complete and the new exact `main` head is post-merge GREEN.
+The controller is updating this board and `docs/verification/b0-execution-status.md` after the merge. Because those controller-owned documentation commits advance `main` again, B0E must use the final exact GREEN `main` after these board/status commits, not `ceb994b...` merely because it was the production merge result.
 
 ## Dependency gates
 
-B0 sequence is intentionally constrained:
+B0 sequence remains constrained:
 
 ```text
 B0A/B0B/B0C/B0F merged + GREEN
@@ -48,7 +48,7 @@ B0A/B0B/B0C/B0F merged + GREEN
             v
            B0D
             |
-    merge + post-merge GREEN
+    MERGED + POST-MERGE GREEN
             v
            B0E
             |
@@ -59,57 +59,58 @@ B0A/B0B/B0C/B0F merged + GREEN
 
 Rules:
 
-- Do not start B0E implementation while B0D is open.
-- B0D and B0E must not be parallelized; both depend on the final shell/presentation DOM contract.
-- Do not start B0G until all B0 implementation slices are merged and GREEN.
+- B0D is complete; do not reopen its scope from a new worker window without a separately reviewed defect/hardening assignment.
+- B0E is the next implementation slice and must start from the final exact GREEN `main` after this controller board/status checkpoint.
+- B0D and B0E must not be developed from overlapping historical branches; B0E consumes the merged shell/presentation DOM contract.
+- Do not start B0G until B0E and all other B0 implementation slices are merged and GREEN.
 - M3G runtime verification may continue independently because it is evidence-oriented and must not make speculative production fixes on its docs branch.
-- M4 EPG/Search/Favorites stays outside current B0/M3 completion scope; design work may be prepared separately, but production implementation must have its own approved spec/plan and base gate.
+- M4 EPG/Search/Favorites stays outside current B0/M3 completion scope; production implementation requires its own approved spec/plan and base gate.
 
-## Active role: B0D worker
+## Completed role: B0D worker
 
 **Branch:** `feature/b0d-shell-rebrand`
 
-**Current head at this checkpoint:** `e840cb0becc9083aeb80f96b458cfcf5fad6cccf`
+**Final worker head:** `50ec2ab35e023041be0f1f0d6c73375961b99179`
 
-**PR:** #24 — Draft / NOT READY.
+**PR:** #24 — MERGED via squash.
 
-Earlier stale boot-exit delay was repaired. Full Step 7 and a 1920x1080 synthetic smoke were executed on `e840cb0...` and their mechanical checks completed successfully.
+**Resulting production main:** `ceb994b94f93c8939bad6f72e7fda354c5ad9cf9`
 
-The latest controller re-review still has one **Important** blocker:
+**Post-merge CI:** `verify` run `34397292047` — SUCCESS on exact `ceb994b...`.
 
-- `05-confirm.png` shows the focused `Onayla` button with an inherited orange outline.
-- Root cause: inherited `player/src/styles.css` rule `.confirm-dialog-buttons .btn.focused { outline: ... solid #ff6b35; }` has higher specificity than B0D's generic violet `.btn.focused` rule.
-- This belongs to B0D global shell/confirm/focus scope and must not be deferred to B0E.
+Controller re-review closure:
 
-Required repair:
+1. Latest four-file diff stayed in B0D shell/boot/global-presentation scope.
+2. The stale invisible boot zoom wait is removed without restoring zoom animation.
+3. Confirm-dialog remote focus has the required higher-specificity BabuşTV violet token override; the inherited orange focus blocker is closed.
+4. Exact-head PR `verify` run `34371869771` is SUCCESS on `50ec2ab...`.
+5. Plan-required Step 7 was executed on exact `50ec2ab...` in run `34376296841`: shell acceptance, `brand:check`, full tests, typecheck, production build, `tizen:build`, and clean-diff all completed SUCCESS. The workflow's later failure was isolated to the first synthetic-smoke Playwright import and occurred after Step 7.
+6. Corrected 1920×1080 smoke retry run `34380325702` is SUCCESS while still pinning exact production head `50ec2ab...`. Six states were uploaded as artifact `10115583195`, digest `sha256:4a9e317e2b3188625c07cabf2acb7514d1af7caf520b7e1c7aca7986996257ac`.
+7. Manual controller review of the six screenshots found no B0D clipping/stacking/focus blocker: confirm `Onayla`, settings, right-sidebar and What's New focus are violet/token-based; boot reduced-motion animation is `none`.
+8. The synthetic shell state still shows inherited channel/group orange styling. That is intentionally B0E-owned Live TV visual-reset scope and was not pulled into B0D.
 
-1. Add a focused RED acceptance that rejects inherited orange confirm-dialog focus.
-2. Apply the minimum shell-only specificity override in `player/src/ui/shell.css`.
-3. Do not broaden into B0E channel/group styling.
-4. Keep remote focus clearly visible and based on the BabuşTV violet token system.
-5. Re-run focused RED -> GREEN.
-6. Re-run the complete B0D Step 7 on the new exact head:
+**B0D blockers:** none.
 
-```bash
-node --test player/test/babustv-shell.test.js
-npm run brand:check
-npm test
-npm run typecheck
-npm run build
-npm run tizen:build
-```
+## Next eligible role: B0E worker
 
-7. Re-run the 1920x1080 synthetic smoke on the same exact head.
-8. Manually inspect the new confirm screenshot before updating the PR body.
-9. Keep the PR Draft. Do not mark Ready or merge; return evidence to the controller.
+B0E may start only after the controller confirms the final board/status-updated `main` is exact-head GREEN.
 
-**Forbidden B0D scope expansion:** provider/domain, playback engines, stream resolution, ChannelIntentCoordinator, PlayerSessionCoordinator/recovery, remote/input semantics, storage/credentials, Tizen/package identity, M3 highlight-vs-playback semantics, B0E channel/group visual reset.
+Base contract:
+
+- branch from the then-current exact GREEN `main`;
+- do not base new work on `feature/b0d-shell-rebrand` or any historical worker SHA;
+- read the approved BabuşTV brand-separation spec/plan and this board first;
+- keep implementation to the plan-defined B0E Live TV visual reset, including B0E-owned channel/group presentation surfaces;
+- preserve the merged B0D shell/boot/global presentation contract;
+- do not expand into provider/domain, playback engine, stream resolution, PlayerSessionCoordinator/recovery, storage/credential, Tizen/package identity, or M3 highlight-vs-playback semantics unless the approved B0E plan explicitly assigns a surface;
+- TDD RED -> minimum implementation -> GREEN;
+- open Draft PR and return exact-head evidence to the controller; worker must not Ready/merge.
 
 ## Active role: M3G worker
 
 **Branch:** `docs/m3-live-tv-verification`
 
-**Current evidence head:** `eee8c714ff00661297b3cbf15405378edffcaca9`
+**Evidence head at last controller checkpoint:** `eee8c714ff00661297b3cbf15405378edffcaca9`
 
 **PR:** #22 — Draft; automated CI GREEN, real Tizen runtime incomplete.
 
@@ -170,10 +171,10 @@ Rules:
 
 These are the intended compact prompts for separate ChatGPT/Codex windows. The worker must derive the detailed assignment from this file and the canonical plan/spec.
 
-### B0D
+### B0E — next eligible after final controller-board CI GREEN
 
 ```text
-Repo eyildirim82/babu-TV. Oku docs/verification/parallel-development-control.md. ROLE=B0D. Son controller blockerindan devam et. Scope disina cikma; Draft/merge yapma.
+Repo eyildirim82/babu-TV. Oku docs/verification/parallel-development-control.md. ROLE=B0E. Current exact GREEN main'den basla; plan Task B0E ile sinirli kal; Draft/merge yapma.
 ```
 
 ### M3G
@@ -188,14 +189,6 @@ Repo eyildirim82/babu-TV. Oku docs/verification/parallel-development-control.md.
 Repo eyildirim82/babu-TV. Oku docs/verification/parallel-development-control.md. ROLE=CONTROLLER. Acik worker PR'larini latest-head + scope + evidence ile review et; onaysiz merge yapma.
 ```
 
-### Future B0E
-
-Use only after B0D is merged and the resulting `main` is post-merge GREEN:
-
-```text
-Repo eyildirim82/babu-TV. Oku docs/verification/parallel-development-control.md. ROLE=B0E. Current GREEN main'den basla; plan Task B0E ile sinirli kal; Draft/merge yapma.
-```
-
 ### Future B0G
 
 Use only after B0E and all other B0 implementation slices are merged and post-merge GREEN:
@@ -206,11 +199,15 @@ Repo eyildirim82/babu-TV. Oku docs/verification/parallel-development-control.md.
 
 ## Evidence checkpoint references
 
-At the time this board was written:
+At this controller checkpoint:
 
-- Pre-board GREEN baseline: `main@a7d4770b176a7e3336a8f772ab4bc508e39a55e6`, `test-and-build` SUCCESS.
-- Current `main@ffb5909f5f2b05e5f6e7c88bb0c4897a8828208c`; compare to the pre-board baseline reports no net changed files; exact-head `test-and-build` run `34370733606` completed SUCCESS.
-- B0D PR #24: head `e840cb0becc9083aeb80f96b458cfcf5fad6cccf`, Draft; latest controller review reports the inherited orange confirm-focus blocker described above.
-- M3G PR #22: head `eee8c714ff00661297b3cbf15405378edffcaca9`, Draft; automated CI GREEN, real Tizen runtime criterion still open.
+- Historical pre-board GREEN baseline: `main@a7d4770b176a7e3336a8f772ab4bc508e39a55e6`.
+- B0D PR #24 final worker head: `50ec2ab35e023041be0f1f0d6c73375961b99179`.
+- B0D exact-head PR CI: `verify` run `34371869771` SUCCESS.
+- B0D Step 7 evidence: run `34376296841`; all required Step 7 commands SUCCESS before the later smoke-harness infrastructure failure.
+- B0D corrected smoke: run `34380325702` SUCCESS on exact production head, artifact `10115583195`.
+- B0D squash merge result: `main@ceb994b94f93c8939bad6f72e7fda354c5ad9cf9`.
+- B0D post-merge exact-head CI: `verify` run `34397292047` SUCCESS.
+- M3G PR #22 remains Draft with real-Tizen runtime acceptance incomplete at its last reviewed checkpoint.
 
 These SHAs are evidence checkpoints, not permanent branch-base instructions. Workers must refresh live GitHub state before making decisions that depend on current heads.
