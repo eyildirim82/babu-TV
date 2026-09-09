@@ -28,13 +28,13 @@ Canonical sources:
 | Pre-board GREEN baseline | `a7d4770b176a7e3336a8f772ab4bc508e39a55e6` |
 | Current main at this board commit | `ffb5909f5f2b05e5f6e7c88bb0c4897a8828208c` |
 | Main tree delta vs pre-board baseline | none; the control-board setup accidentally created then reverted this docs file on `main`, leaving no net file diff |
-| Fresh current-main CI | GitHub `test-and-build` run `34370733606` triggered for `ffb5909...`; controller must confirm final conclusion before using it as a dependent branch base |
+| Fresh current-main CI | GitHub `test-and-build` run `34370733606` completed SUCCESS on exact `ffb5909...` |
 | B0 first wave | B0A + B0B + B0C + B0F merged and post-merge GREEN |
 | Open implementation PR | #24 B0D, Draft / NOT READY |
 | Open runtime-evidence PR | #22 M3G, Draft / runtime incomplete |
 | Merge authority | Controller window only |
 
-The accidental control-board write to `main` was corrected with an ordinary delete/revert commit rather than history rewriting. Comparison from `a7d4770...` to `ffb5909...` shows two docs-history commits and **no net changed files**.
+The accidental control-board write to `main` was corrected with an ordinary delete/revert commit rather than history rewriting. Comparison from `a7d4770...` to `ffb5909...` shows two docs-history commits and **no net changed files**. Fresh `test-and-build` run `34370733606` then completed SUCCESS on exact `ffb5909...`.
 
 Do not assume a worker branch should be based on either SHA above after `main` advances. Every new dependent implementation branch must start only after the previous required merge is complete and the new exact `main` head is post-merge GREEN.
 
@@ -209,7 +209,7 @@ Repo eyildirim82/babu-TV. Oku docs/verification/parallel-development-control.md.
 At the time this board was written:
 
 - Pre-board GREEN baseline: `main@a7d4770b176a7e3336a8f772ab4bc508e39a55e6`, `test-and-build` SUCCESS.
-- Current `main@ffb5909f5f2b05e5f6e7c88bb0c4897a8828208c`; compare to the pre-board baseline reports no net changed files. Fresh `test-and-build` run `34370733606` was triggered for this exact head.
+- Current `main@ffb5909f5f2b05e5f6e7c88bb0c4897a8828208c`; compare to the pre-board baseline reports no net changed files; exact-head `test-and-build` run `34370733606` completed SUCCESS.
 - B0D PR #24: head `e840cb0becc9083aeb80f96b458cfcf5fad6cccf`, Draft; latest controller review reports the inherited orange confirm-focus blocker described above.
 - M3G PR #22: head `eee8c714ff00661297b3cbf15405378edffcaca9`, Draft; automated CI GREEN, real Tizen runtime criterion still open.
 
