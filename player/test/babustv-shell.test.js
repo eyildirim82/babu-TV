@@ -86,6 +86,18 @@ void test('boot shell consumes canonical copy without inherited typewriter motio
   assert.doesNotMatch(main, /bootTypewriterTimer/);
 });
 
+void test('boot exit has no stale decorative zoom wait when zoom presentation is disabled', async () => {
+  const [main, shell] = await Promise.all([
+    readFile(mainUrl, 'utf8'),
+    readFile(shellUrl, 'utf8'),
+  ]);
+
+  assert.match(shell, /\.boot-logo,\s*\.boot-logo\.zoom-in[\s\S]*?transform:\s*none;[\s\S]*?animation:\s*none;/);
+  assert.doesNotMatch(main, /BOOT_ZOOM_MS/);
+  assert.doesNotMatch(main, /classList\.add\(['"]zooming['"]\)/);
+  assert.doesNotMatch(main, /classList\.add\(['"]zoom-in['"]\)/);
+});
+
 void test('BabuşTV shell CSS uses semantic tokens, remote focus, and reduced-motion support', async () => {
   assert.equal(existsSync(shellUrl), true, 'player/src/ui/shell.css must exist');
   const shell = await readFile(shellUrl, 'utf8');
