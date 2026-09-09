@@ -4,7 +4,7 @@
 // required. See docs/TELEMETRY.md for the optional ping endpoint.
 import { APP_VERSION, getSettings, saveSettings } from './config.js';
 
-const VERSION_URL = 'https://cdn.jsdelivr.net/gh/Nur-allhi/en-tvplayer@main/version.json';
+const VERSION_URL = 'https://cdn.jsdelivr.net/gh/eyildirim82/babu-TV@main/version.json';
 // Deploy the worker in docs/TELEMETRY.md and paste its URL here to enable
 // anonymous install counting. Empty = ping disabled, update check still works.
 const PING_URL = '';
