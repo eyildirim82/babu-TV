@@ -177,6 +177,7 @@ jobs:
           assert.equal(theme.player && theme.video && theme.avplayer && theme.m3Status && theme.m3Numeric, true, 'player/M3 DOM surfaces must remain present');
 
           await page.keyboard.press('ArrowLeft');
+          await page.waitForTimeout(600);
           await assertVisibleInside(page, '#sidebar:not(.closed)', 'left sidebar');
           const focused = page.locator('#sidebar .focused, #sidebar [data-focused="true"]').first();
           await focused.waitFor({ state: 'visible', timeout: 5000 });
@@ -188,10 +189,12 @@ jobs:
           await page.screenshot({ path: `${out}/02-sidebar-focus.png`, fullPage: false });
 
           await page.keyboard.press('ArrowRight');
+          await page.waitForTimeout(600);
           await assertVisibleInside(page, '#right-sidebar:not(.closed)', 'right sidebar');
           await page.screenshot({ path: `${out}/03-right-sidebar.png`, fullPage: false });
 
           await page.locator('#settings-btn').click();
+          await page.waitForTimeout(150);
           await assertVisibleInside(page, '#settings-page:not(.hidden)', 'settings page');
           await page.screenshot({ path: `${out}/04-settings.png`, fullPage: false });
           await page.close();
@@ -200,6 +203,7 @@ jobs:
           await confirmPage.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded' });
           await confirmPage.locator('#boot-splash').waitFor({ state: 'hidden', timeout: 5000 });
           await confirmPage.keyboard.press('Escape');
+          await confirmPage.waitForTimeout(150);
           await assertVisibleInside(confirmPage, '#confirm-dialog:not(.hidden)', 'confirm dialog');
           await confirmPage.screenshot({ path: `${out}/05-confirm.png`, fullPage: false });
           await confirmPage.close();
