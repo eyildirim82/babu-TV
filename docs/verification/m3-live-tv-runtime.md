@@ -33,12 +33,16 @@ Sources reviewed before verification:
 
 | Gate | Result | Evidence |
 | --- | --- | --- |
-| `main` head | PASS | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
+| Branch-start `main` / runtime target | PASS | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
 | M3G branch starting head | PASS | `docs/m3-live-tv-verification` started at the same `0af80caf24eab206f303f67c177a5d716fb38a6d` |
-| Latest exact-main verify | PASS | GitHub Actions `verify` run `34286003705`, conclusion SUCCESS |
+| Merge-base with concurrent `main` | PASS | Still `0af80caf24eab206f303f67c177a5d716fb38a6d` |
+| Current `main` after concurrent review checkpoint | RECORDED / GREEN | `ca9c19b55045f111bbb7336006c1486abbd6f8ba`; only `docs/verification/b0-execution-status.md` changed from the runtime target; Actions run `34324051571` SUCCESS |
+| Exact runtime-target verify | PASS | GitHub Actions `verify` run `34286003705`, conclusion SUCCESS |
 | Open PR review | RECORDED | B0 implementation PRs were open concurrently; M3G did not modify or depend on their branch heads |
 | Upstream `Nur-allhi/en-tvplayer/main` | UNCHANGED | `58bc12f755b731cad540d50a8e16cf8bb8708738`, `release: v2.0.0`, same upstream SHA recorded by the M3 plan |
 | M2 WidgetData runtime gate | PENDING | ADR states no real Tizen runtime probe was completed; no PASS is inferred from unit tests, packaging, or documentation |
+
+The concurrent `main` move from `0af80caf...` to `ca9c19b...` is a review-status documentation commit whose parent is the required runtime target SHA. It does not alter playback, Tizen, provider, storage, remote, or M3 runtime code. The M3G branch is intentionally not rebased onto that moving review-status commit so the requested runtime target and branch-start base remain explicit.
 
 `docs/verification/b0-execution-status.md` is review-owned and was intentionally not edited by this worker.
 
@@ -140,7 +144,7 @@ The statuses below distinguish automated evidence from runtime completion. `AUTO
 | 14 | Back closes one UI layer at a time with no custom fullscreen exit modal | AUTOMATED-GREEN / RUNTIME OPEN | Controller/platform Back test; runtime smoke #9 unavailable |
 | 15 | M4 features are not shipped as placeholders in M3 | AUTOMATED/DIFF EVIDENCE | M3 controller/view contract tests and bounded M3 wiring; no runtime-specific gate identified |
 | 16 | Legacy orchestration is reduced incrementally, not rewritten wholesale | AUTOMATED/DIFF EVIDENCE | Legacy fallback/playback tests remain GREEN alongside M3 wiring |
-| 17 | Exact-head CI is green for each merge candidate | BASE CANDIDATE PASS; DOCS HEAD PENDING | `main@0af80caf...` run `34286003705` SUCCESS; docs-only branch head needs its own PR exact-head CI after this evidence commit |
+| 17 | Exact-head CI is green for each merge candidate | BASE CANDIDATE PASS; DOCS HEAD PENDING | `main@0af80caf...` run `34286003705` SUCCESS; docs-only branch head needs its own PR exact-head CI after the final evidence commit |
 | 18 | Applicable Tizen-sensitive runtime smoke is recorded before claiming M3 fully complete | OPEN | Matrix recorded truthfully, but all real Tizen runtime observations are NOT-AVAILABLE; M3 fully complete must not be claimed |
 
 ## Open gates
@@ -166,7 +170,7 @@ Do not call M2 fully complete while its WidgetData probe is pending.
 
 ## Conclusion
 
-The exact code candidate `0af80caf24eab206f303f67c177a5d716fb38a6d` has a GREEN automated baseline (`200/200`, typecheck, production build, clean diff) and the branch/base/upstream gates are recorded.
+The exact runtime target `0af80caf24eab206f303f67c177a5d716fb38a6d` has a GREEN automated baseline (`200/200`, typecheck, production build, clean diff), and the M3G branch was created from that exact GREEN main. A later concurrent `main` move to `ca9c19b55045f111bbb7336006c1486abbd6f8ba` changed only the review-owned B0 execution-status document and is independently GREEN; it does not alter the runtime target code.
 
 M3 Tizen-sensitive runtime verification is **not complete** in this execution because no Samsung Tizen Emulator, Remote Test Lab session, or physical Samsung TV was available. The 13-item runtime matrix therefore remains `NOT-AVAILABLE`, M2 WidgetData remains `PENDING`, and physical-TV release acceptance remains `DEFERRED`.
 
