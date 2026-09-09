@@ -136,18 +136,23 @@ jobs:
           }
 
           const page = await newSmokePage();
-          const started = Date.now();
           await page.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded' });
+          const boot = page.locator('#boot-splash');
           await page.locator('#boot-splash:not(.hidden)').waitFor({ state: 'visible', timeout: 5000 });
+          const bootVisibleAt = Date.now();
           assert.equal(await page.title(), 'BabuşTV');
           assert.match(await page.locator('.brand-wordmark').getAttribute('src'), /\/brand\/babustv-wordmark\.svg$/);
           assert.match(await page.locator('.boot-brand-art').getAttribute('src'), /\/brand\/babustv-boot\.svg$/);
           await page.screenshot({ path: `${out}/01-boot.png`, fullPage: false });
 
-          await page.locator('#boot-splash').waitFor({ state: 'hidden', timeout: 5000 });
-          const bootElapsed = Date.now() - started;
-          assert.ok(bootElapsed < 2400, `boot exit retained dead decorative delay: ${bootElapsed}ms`);
-          assert.ok(bootElapsed >= 1200, `boot minimum beat unexpectedly disappeared: ${bootElapsed}ms`);
+          await page.locator('#boot-splash.fade-out').waitFor({ state: 'visible', timeout: 3000 });
+          const fadeStartedAt = Date.now();
+          const bootToFadeMs = fadeStartedAt - bootVisibleAt;
+          assert.ok(bootToFadeMs < 1900, `boot retained dead decorative zoom wait before fade: ${bootToFadeMs}ms`);
+          assert.ok(bootToFadeMs >= 900, `boot minimum presentation beat unexpectedly disappeared: ${bootToFadeMs}ms`);
+          await boot.waitFor({ state: 'hidden', timeout: 1500 });
+          const fadeToHiddenMs = Date.now() - fadeStartedAt;
+          assert.ok(fadeToHiddenMs < 800, `boot fade-to-hidden exceeded restrained fade budget: ${fadeToHiddenMs}ms`);
 
           const theme = await page.evaluate(() => {
             const style = getComputedStyle(document.documentElement);
@@ -209,7 +214,7 @@ jobs:
           await whatsNewPage.close();
 
           console.log(`[SMOKE] viewport=1920x1080 title=${theme.title}`);
-          console.log(`[SMOKE] boot_exit_ms=${bootElapsed} dead_zoom_delay=false`);
+          console.log(`[SMOKE] boot_visible_to_fade_ms=${bootToFadeMs} fade_to_hidden_ms=${fadeToHiddenMs} dead_zoom_delay=false`);
           console.log(`[SMOKE] tokens bg=${theme.bg} accent=${theme.accent}`);
           console.log(`[SMOKE] surfaces=sidebar,right-sidebar,settings,confirm,Yenilikler PASS`);
           console.log(`[SMOKE] remote_focus=visible player_m3_dom=present legacy_tv_play_identity=absent`);
