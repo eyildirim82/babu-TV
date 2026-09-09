@@ -1,161 +1,137 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>IPTV Player</title>
+  <title>BabuşTV</title>
   <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/src/ui/tokens.css">
+  <link rel="stylesheet" href="/src/ui/theme.css">
+  <link rel="stylesheet" href="/src/ui/primitives.css">
   <link rel="stylesheet" href="/src/styles.css">
+  <link rel="stylesheet" href="/src/ui/shell.css">
   <link rel="stylesheet" href="/src/m3-live-tv.css">
-  <!-- Samsung AVPlay (native fallback for streams the browser can't render).
-       $WEBAPIS resolves on Tizen only; elsewhere this 404s harmlessly. -->
+  <!-- Samsung AVPlay native fallback; $WEBAPIS resolves only on Tizen. -->
   <script src="$WEBAPIS/webapis/webapis.js"></script>
 </head>
 <body>
   <div id="app">
-    <!-- Channel List Sidebar -->
+    <!-- Channel list shell -->
     <div id="sidebar" class="sidebar closed">
       <div class="sidebar-header">
-        <span class="logo">
-          <svg class="logo-icon" viewBox="0 0 24 24" width="28" height="28" fill="none">
-            <rect x="2" y="4" width="20" height="16" rx="2" stroke="#ED421F" stroke-width="1.8"/>
-            <polygon points="10,8 10,16 17,12" fill="#ED421F"/>
-          </svg>
-          IPTV
+        <span class="logo" aria-label="BabuşTV">
+          <img class="brand-wordmark" src="/brand/babustv-wordmark.svg" alt="BabuşTV">
         </span>
       </div>
       <div id="channel-list" class="channel-list"></div>
       <div id="group-list" class="group-list hidden"></div>
     </div>
 
-      <!-- Main Content -->
-      <div id="main" class="main">
+    <div id="main" class="main">
+      <!-- Pointer zones remain secondary to remote navigation. -->
+      <div id="sidebar-hover-zone" class="sidebar-hover-zone"></div>
+      <div id="right-hover-zone" class="right-hover-zone"></div>
 
-        <!-- Fullscreen left-edge hover zone to reveal the channel list -->
-        <div id="sidebar-hover-zone" class="sidebar-hover-zone"></div>
+      <div id="channel-osd" class="channel-osd hidden"></div>
+      <div id="channel-preview" class="channel-preview hidden"></div>
 
-        <!-- Fullscreen right-edge hover zone -->
-        <div id="right-hover-zone" class="right-hover-zone"></div>
+      <div id="player-container" class="player-container">
+        <object id="avplayer" type="application/avplayer" class="avplayer hidden"></object>
+        <video id="video" autoplay></video>
+        <div id="loading" class="loading hidden">
+          <div class="spinner"></div>
+          <span>Yükleniyor…</span>
+        </div>
+        <div id="resolution-badge" class="resolution-badge hidden">Otomatik</div>
+        <div id="error" class="error hidden"></div>
+        <div id="live-tv-status" class="live-tv-status hidden" aria-live="polite"></div>
+        <div id="numeric-zap" class="numeric-zap hidden" aria-live="polite"></div>
 
-        <!-- Channel OSD (brief overlay when switching channels) -->
-        <div id="channel-osd" class="channel-osd hidden"></div>
-        <!-- Channel preview toast (before switching) -->
-        <div id="channel-preview" class="channel-preview hidden"></div>
-
-        <!-- Video Player -->
-        <div id="player-container" class="player-container">
-          <object id="avplayer" type="application/avplayer" class="avplayer hidden"></object>
-          <video id="video" autoplay></video>
-          <div id="loading" class="loading hidden">
-            <div class="spinner"></div>
-            <span>Loading...</span>
-          </div>
-          <div id="resolution-badge" class="resolution-badge hidden">Auto</div>
-          <div id="error" class="error hidden"></div>
-          <div id="live-tv-status" class="live-tv-status hidden" aria-live="polite"></div>
-          <div id="numeric-zap" class="numeric-zap hidden" aria-live="polite"></div>
-
-          <!-- Channel name toast (above the buffering pill, full name) -->
-          <div id="channel-toast" class="channel-toast hidden">
-            <span id="channel-toast-name">Loading</span>
-          </div>
-          <!-- Buffering pill -->
-          <div id="buffering-indicator" class="buffering-indicator hidden">
-            <div class="spinner small"></div>
-            <span>Buffering <span id="buffering-percent">0%</span><span id="buffering-hint" class="buffering-hint"></span></span>
-          </div>
-
-          <!-- Play/Pause status overlay -->
-          <div id="play-state" class="play-state hidden">
-            <div class="play-state-icon"><span></span><span></span></div>
-          </div>
-
-          <!-- Progress toast for right sidebar actions -->
-          <div id="progress-toast" class="progress-toast hidden">
-            <div class="progress-spinner"></div>
-            <span id="progress-text">Loading</span>
-          </div>
-
-          <!-- Proxy suggestion toast -->
-          <div id="proxy-toast" class="proxy-toast hidden">
-            <span id="proxy-toast-text">Stream not loading — try enabling Proxy in the right menu</span>
-          </div>
+        <div id="channel-toast" class="channel-toast hidden">
+          <span id="channel-toast-name">Yükleniyor…</span>
+        </div>
+        <div id="buffering-indicator" class="buffering-indicator hidden">
+          <div class="spinner small"></div>
+          <span>Arabelleğe alınıyor <span id="buffering-percent">0%</span><span id="buffering-hint" class="buffering-hint"></span></span>
         </div>
 
-        <!-- Now Playing Bar -->
-        <div id="now-playing" class="now-playing">
-          <span id="channel-name" class="channel-name">No Channel</span>
-          <span id="channel-info" class="channel-info"></span>
-          <button id="playpause-button" class="playpause-button" type="button">&#10073;&#10073;</button>
+        <div id="play-state" class="play-state hidden">
+          <div class="play-state-icon"><span></span><span></span></div>
         </div>
 
-      </div>
-
-      <!-- Right Sidebar -->
-      <div id="right-sidebar" class="right-sidebar closed">
-        <div class="right-sidebar-header">
-          <span class="right-sidebar-title">Menu</span>
+        <div id="progress-toast" class="progress-toast hidden">
+          <div class="progress-spinner"></div>
+          <span id="progress-text">Yükleniyor…</span>
         </div>
-        <div class="right-sidebar-content">
-          <div class="section-label">Quality</div>
-          <div id="resolution-list-right" class="resolution-list-right"></div>
-          <div class="section-label">Actions</div>
-          <button id="refresh-stream-btn" class="right-sidebar-btn" type="button">&#8635; Reload Stream</button>
-          <button id="refresh-channels-btn" class="right-sidebar-btn" type="button">&#8634; Refresh Channels</button>
-          <button id="toggle-proxy-btn" class="right-sidebar-btn" type="button">Proxy: OFF</button>
-          <button id="settings-btn" class="right-sidebar-btn" type="button">&#9881; Settings</button>
+
+        <div id="proxy-toast" class="proxy-toast hidden">
+          <span id="proxy-toast-text">Yayın açılmıyorsa sağ menüden Proxy'yi etkinleştirin</span>
         </div>
       </div>
 
-      <!-- Boot splash / loading overlay -->
-      <div id="boot-splash" class="boot-splash hidden">
-        <div class="boot-splash-content">
-          <div class="boot-logo" id="boot-logo">
-            <svg class="boot-logo-icon" id="boot-logo-icon" viewBox="0 0 24 24" width="56" height="56" fill="none">
-              <rect x="2" y="4" width="20" height="16" rx="2" stroke="#ED421F" stroke-width="1.8"/>
-              <polygon points="10,8 10,16 17,12" fill="#ED421F"/>
-            </svg>
-            <div class="boot-text-group">
-              <span class="boot-logo-text" id="boot-logo-text">EN <span>IPTV</span></span>
-              <span id="boot-version" class="boot-version"></span>
-              <span id="boot-typewriter" class="boot-typewriter"></span>
-            </div>
-          </div>
-          <div class="boot-loading" id="boot-loading">
-            <div class="boot-spinner"></div>
-            <span id="boot-status" class="boot-status">Updating playlist...</span>
+      <div id="now-playing" class="now-playing">
+        <span id="channel-name" class="channel-name">Kanal seçilmedi</span>
+        <span id="channel-info" class="channel-info"></span>
+        <button id="playpause-button" class="playpause-button" type="button" aria-label="Oynat veya duraklat">&#10073;&#10073;</button>
+      </div>
+    </div>
+
+    <div id="right-sidebar" class="right-sidebar closed">
+      <div class="right-sidebar-header">
+        <span class="right-sidebar-title">Menü</span>
+      </div>
+      <div class="right-sidebar-content">
+        <div class="section-label">Kalite</div>
+        <div id="resolution-list-right" class="resolution-list-right"></div>
+        <div class="section-label">İşlemler</div>
+        <button id="refresh-stream-btn" class="right-sidebar-btn" type="button">Yayını yeniden yükle</button>
+        <button id="refresh-channels-btn" class="right-sidebar-btn" type="button">Kanalları yenile</button>
+        <button id="toggle-proxy-btn" class="right-sidebar-btn" type="button">Proxy: Kapalı</button>
+        <button id="settings-btn" class="right-sidebar-btn" type="button">Ayarlar</button>
+      </div>
+    </div>
+
+    <div id="boot-splash" class="boot-splash hidden">
+      <div class="boot-splash-content">
+        <div class="boot-logo" id="boot-logo">
+          <img class="boot-brand-art" src="/brand/babustv-boot.svg" alt="BabuşTV">
+          <div class="boot-text-group">
+            <span id="boot-version" class="boot-version"></span>
+            <span id="boot-typewriter" class="boot-typewriter">Samsung Tizen için BabuşTV</span>
           </div>
         </div>
-      </div>
-
-      <!-- Settings Page (hidden by default) -->
-      <div id="settings-page" class="settings-page hidden"></div>
-
-      <!-- What's New modal -->
-      <div id="whats-new-modal" class="whats-new-modal hidden">
-        <div class="whats-new-box">
-          <div class="whats-new-header">
-            <h2>What's New</h2>
-            <span id="whats-new-version" class="whats-new-version"></span>
-          </div>
-          <div id="whats-new-body" class="whats-new-body"></div>
-          <div class="whats-new-footer">
-            <button id="whats-new-close" class="btn btn-primary" type="button">Got it</button>
-          </div>
+        <div class="boot-loading" id="boot-loading">
+          <div class="boot-spinner"></div>
+          <span id="boot-status" class="boot-status">Hazırlanıyor…</span>
         </div>
       </div>
+    </div>
 
-      <!-- Confirm Dialog -->
-      <div id="confirm-dialog" class="confirm-dialog hidden">
-        <div class="confirm-dialog-box">
-          <p id="confirm-dialog-message" class="confirm-dialog-message"></p>
-          <div class="confirm-dialog-buttons">
-            <button id="confirm-dialog-cancel" class="btn btn-secondary" type="button">Cancel</button>
-            <button id="confirm-dialog-confirm" class="btn btn-primary" type="button">Confirm</button>
-          </div>
+    <div id="settings-page" class="settings-page hidden"></div>
+
+    <div id="whats-new-modal" class="whats-new-modal hidden">
+      <div class="whats-new-box babu-surface-raised">
+        <div class="whats-new-header">
+          <h2>Yenilikler</h2>
+          <span id="whats-new-version" class="whats-new-version"></span>
+        </div>
+        <div id="whats-new-body" class="whats-new-body"></div>
+        <div class="whats-new-footer">
+          <button id="whats-new-close" class="btn btn-primary" type="button">Kapat</button>
         </div>
       </div>
+    </div>
+
+    <div id="confirm-dialog" class="confirm-dialog hidden">
+      <div class="confirm-dialog-box babu-surface-raised">
+        <p id="confirm-dialog-message" class="confirm-dialog-message"></p>
+        <div class="confirm-dialog-buttons">
+          <button id="confirm-dialog-cancel" class="btn btn-secondary" type="button">İptal</button>
+          <button id="confirm-dialog-confirm" class="btn btn-primary" type="button">Onayla</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/src/main.js"></script>
