@@ -75,12 +75,15 @@ void test('static shell copy is Turkish-first and inherited English/ENTV labels 
   }
 });
 
-void test('boot shell continues to consume canonical B0F copy wiring', async () => {
+void test('boot shell consumes canonical copy without inherited typewriter motion', async () => {
   const main = await readFile(mainUrl, 'utf8');
 
   assert.match(main, /import\s*\{\s*UI_COPY\s*\}\s*from\s*['"]\.\/ui\/copy\.js['"]/);
   assert.match(main, /showBootSplash\(UI_COPY\.preparing\)/);
   assert.match(main, /showBootSplash\(UI_COPY\.loading\)/);
+  assert.match(main, /if \(typeEl\) typeEl\.textContent = BOOT_TAGLINE;/);
+  assert.doesNotMatch(main, /startTypewriter\(/);
+  assert.doesNotMatch(main, /bootTypewriterTimer/);
 });
 
 void test('BabuşTV shell CSS uses semantic tokens, remote focus, and reduced-motion support', async () => {
