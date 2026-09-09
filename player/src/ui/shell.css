@@ -1,0 +1,399 @@
+/* BabuşTV shell presentation layer.
+   Loaded after inherited styles so shell surfaces migrate incrementally
+   without changing Live TV playback/highlight behavior owned by B0E. */
+
+html,
+body,
+#app {
+  background: var(--babu-bg);
+  color: var(--babu-text-primary);
+  font-family: var(--babu-font-family);
+}
+
+.sidebar,
+.right-sidebar,
+.now-playing {
+  background: var(--babu-surface);
+  color: var(--babu-text-primary);
+  border-color: var(--babu-surface-raised);
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.42);
+}
+
+.sidebar,
+.right-sidebar {
+  transition: transform var(--babu-motion-base) ease;
+}
+
+.sidebar-header,
+.right-sidebar-header {
+  background: var(--babu-surface-raised);
+  border-color: var(--babu-surface-focus);
+}
+
+.sidebar-header {
+  min-height: calc(88px * var(--tv-scale));
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  width: 100%;
+  color: var(--babu-text-primary);
+  letter-spacing: 0;
+}
+
+.brand-wordmark {
+  display: block;
+  width: calc(270px * var(--tv-scale));
+  max-width: 82%;
+  height: auto;
+}
+
+.right-sidebar-title {
+  color: var(--babu-text-primary);
+  font-weight: var(--babu-font-weight-semibold);
+  letter-spacing: 0.04em;
+}
+
+.section-label {
+  color: var(--babu-text-muted);
+  font-weight: var(--babu-font-weight-semibold);
+}
+
+.right-sidebar-btn,
+.resolution-item-right {
+  color: var(--babu-text-secondary);
+  border-color: var(--babu-surface-raised);
+  transition:
+    background-color var(--babu-motion-fast) ease,
+    color var(--babu-motion-fast) ease,
+    box-shadow var(--babu-motion-fast) ease;
+}
+
+.right-sidebar-btn.focused,
+.resolution-item-right.focused {
+  background: var(--babu-surface-focus);
+  color: var(--babu-text-primary);
+  box-shadow: inset var(--babu-focus-width) 0 0 var(--babu-accent-strong);
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: calc(-1 * var(--babu-focus-width));
+}
+
+.right-sidebar-btn:hover,
+.resolution-item-right:hover {
+  background: var(--babu-surface-focus);
+  color: var(--babu-text-primary);
+  box-shadow: inset var(--babu-focus-width) 0 0 var(--babu-accent);
+}
+
+.right-sidebar-btn:focus-visible,
+.resolution-item-right:focus-visible {
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: calc(-1 * var(--babu-focus-width));
+}
+
+.resolution-item-right.active {
+  background: rgba(139, 92, 246, 0.14);
+  color: var(--babu-text-primary);
+  box-shadow: inset var(--babu-focus-width) 0 0 var(--babu-accent);
+}
+
+.right-sidebar-btn.has-update::after {
+  background: var(--babu-accent-strong);
+}
+
+.now-playing {
+  border-top: 1px solid var(--babu-surface-raised);
+}
+
+.now-playing .channel-name {
+  color: var(--babu-text-primary);
+}
+
+.now-playing .channel-info,
+.resolution-badge {
+  color: var(--babu-text-secondary);
+}
+
+.playpause-button {
+  color: var(--babu-text-primary);
+  border-color: var(--babu-surface-focus);
+}
+
+.playpause-button.focused {
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: var(--babu-focus-offset);
+  box-shadow: var(--babu-focus-shadow);
+}
+
+.playpause-button:focus-visible {
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: var(--babu-focus-offset);
+  box-shadow: var(--babu-focus-shadow);
+}
+
+.progress-toast,
+.proxy-toast {
+  background: var(--babu-surface-raised);
+  color: var(--babu-text-primary);
+  border: 1px solid var(--babu-surface-focus);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.progress-spinner,
+.spinner,
+.boot-spinner {
+  border-color: var(--babu-surface-focus);
+  border-top-color: var(--babu-accent-strong);
+}
+
+/* Boot: the calico composition is intentionally limited to startup. */
+.boot-splash {
+  background: var(--babu-bg);
+  color: var(--babu-text-primary);
+  transition: opacity var(--babu-motion-base) ease;
+}
+
+.boot-splash.zooming,
+.boot-splash.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.boot-splash-content {
+  width: 86vw;
+  max-width: 900px;
+}
+
+.boot-logo,
+.boot-logo.zoom-in {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  opacity: 1;
+  transform: none;
+  animation: none;
+}
+
+.boot-brand-art {
+  display: block;
+  width: 78vw;
+  max-width: 760px;
+  max-height: 62vh;
+  object-fit: contain;
+}
+
+.boot-text-group {
+  align-items: center;
+  margin-top: var(--babu-space-sm);
+}
+
+.boot-version {
+  color: var(--babu-text-muted);
+  font-size: var(--babu-font-size-sm);
+  letter-spacing: 0.06em;
+}
+
+.boot-typewriter {
+  min-height: 0;
+  color: var(--babu-text-muted);
+  font-size: var(--babu-font-size-sm);
+  letter-spacing: 0.03em;
+}
+
+.boot-typewriter::after {
+  display: none;
+}
+
+.boot-loading {
+  margin-top: var(--babu-space-lg);
+  opacity: 1;
+  animation: none;
+  color: var(--babu-text-secondary);
+}
+
+.boot-status {
+  color: var(--babu-text-secondary);
+  font-size: var(--babu-font-size-sm);
+}
+
+/* Settings/global shell surfaces. Runtime copy and control flow stay untouched. */
+.settings-page {
+  background: var(--babu-bg);
+  color: var(--babu-text-primary);
+}
+
+.settings-page .bg-glow {
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.09) 0%, transparent 70%);
+}
+
+.settings-nav,
+.nav-header,
+.settings-footer,
+.toggle-row,
+.card-header {
+  border-color: var(--babu-surface-raised);
+}
+
+.nav-logo .icon {
+  background: var(--babu-surface-focus);
+  color: var(--babu-accent-strong);
+  border: 1px solid var(--babu-accent);
+}
+
+.nav-logo .text,
+.page-title,
+.card-header h3,
+.settings-page .playlist-name {
+  color: var(--babu-text-primary);
+}
+
+.nav-logo .text span,
+.nav-item.active,
+.nav-item.active .nav-icon,
+.whats-new-version,
+.wn-section-title {
+  color: var(--babu-accent-strong);
+}
+
+.nav-item.active,
+.nav-item[data-focused] {
+  background: var(--babu-surface-focus);
+  border-left-color: var(--babu-accent-strong);
+}
+
+.nav-item[data-focused],
+.page-title .back-btn[data-focused],
+.input-field[data-focused],
+.input-field:focus,
+.btn[data-focused],
+.btn.focused,
+.toggle[data-focused],
+.select-opt[data-focused],
+.settings-page .playlist-entry[data-focused] {
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: var(--babu-focus-offset);
+  box-shadow: var(--babu-focus-shadow);
+}
+
+.confirm-dialog-buttons .btn.focused {
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: var(--babu-focus-offset);
+}
+
+.btn:focus-visible {
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: var(--babu-focus-offset);
+  box-shadow: var(--babu-focus-shadow);
+}
+
+.setting-card,
+.whats-new-box,
+.confirm-dialog-box {
+  background: var(--babu-surface-raised);
+  color: var(--babu-text-primary);
+  border-color: var(--babu-surface-focus);
+}
+
+.card-header .card-icon,
+.whats-new-version {
+  background: var(--babu-surface-focus);
+  color: var(--babu-accent-strong);
+  border-color: var(--babu-accent);
+}
+
+.input-field,
+.status-row,
+.select-opt,
+.settings-page .playlist-entry {
+  background: var(--babu-surface);
+  color: var(--babu-text-primary);
+  border-color: var(--babu-surface-focus);
+  caret-color: var(--babu-accent-strong);
+}
+
+.input-field:focus,
+.input-field[data-focused],
+.select-opt.active,
+.select-opt[data-focused],
+.settings-page .playlist-entry.active,
+.settings-page .playlist-entry[data-focused] {
+  border-color: var(--babu-accent-strong);
+}
+
+.select-opt.active {
+  background: var(--babu-surface-focus);
+  color: var(--babu-accent-strong);
+}
+
+.toggle.on,
+.btn-primary {
+  background: var(--babu-accent);
+  color: var(--babu-text-primary);
+}
+
+.btn-secondary {
+  background: var(--babu-surface);
+  color: var(--babu-text-secondary);
+  border-color: var(--babu-surface-focus);
+}
+
+.status-dot.error {
+  background: var(--babu-error);
+  box-shadow: 0 0 10px rgba(248, 113, 113, 0.38);
+}
+
+.whats-new-modal,
+.confirm-dialog {
+  background: rgba(11, 11, 15, 0.86);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.whats-new-modal,
+.whats-new-box {
+  animation: none;
+}
+
+.whats-new-header,
+.whats-new-footer {
+  border-color: var(--babu-surface-focus);
+}
+
+.whats-new-header h2,
+.confirm-dialog-message {
+  color: var(--babu-text-primary);
+}
+
+.wn-item {
+  color: var(--babu-text-secondary);
+}
+
+/* Remote focus remains first-class even when :focus-visible is unavailable. */
+.focused,
+[data-focused] {
+  scroll-margin: var(--babu-space-lg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .right-sidebar,
+  .right-sidebar-btn,
+  .resolution-item-right,
+  .boot-splash,
+  .boot-logo,
+  .boot-loading,
+  .boot-spinner,
+  .progress-spinner,
+  .spinner,
+  .whats-new-modal,
+  .whats-new-box,
+  .btn,
+  .toggle,
+  .toggle .knob {
+    transition: none;
+    animation: none;
+  }
+}

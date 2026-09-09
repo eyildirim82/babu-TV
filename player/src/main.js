@@ -107,10 +107,8 @@ function getDisplayChannels() {
 }
 
 const BOOT_TAGLINE = 'Samsung Tizen için BabuşTV';
-let bootTypewriterTimer = null;
 let bootShownAt = 0;
 const BOOT_MIN_MS = 1500; // logo stays at least this long on every launch
-const BOOT_ZOOM_MS = 700; // fly-into-the-logo exit
 
 function showBootSplash(statusText) {
   const el = document.getElementById('boot-splash');
@@ -121,50 +119,27 @@ function showBootSplash(statusText) {
   if (!el) return;
   if (statusEl && statusText) statusEl.textContent = statusText;
   if (verEl) verEl.textContent = 'v' + APP_VERSION;
-  // Reset animation state
-  if (typeEl) { typeEl.textContent = ''; typeEl.classList.remove('done'); }
+  if (typeEl) typeEl.textContent = BOOT_TAGLINE;
   if (loadingEl) { loadingEl.style.animation = 'none'; loadingEl.offsetHeight; loadingEl.style.animation = ''; }
   const logo = document.getElementById('boot-logo');
   if (logo) logo.classList.remove('zoom-in');
   el.classList.remove('hidden', 'fade-out', 'zooming');
   bootShownAt = Date.now();
-  // Start typewriter after logo animation
-  clearTimeout(bootTypewriterTimer);
-  startTypewriter(typeEl, BOOT_TAGLINE, 40, 800);
-}
-
-function startTypewriter(el, text, charDelay, startDelay) {
-  if (!el) return;
-  let i = 0;
-  bootTypewriterTimer = setTimeout(function tick() {
-    if (i < text.length) {
-      el.textContent = text.slice(0, i + 1);
-      i++;
-      bootTypewriterTimer = setTimeout(tick, charDelay);
-    } else {
-      el.classList.add('done');
-    }
-  }, startDelay);
 }
 
 function hideBootSplash() {
-  clearTimeout(bootTypewriterTimer);
   const el = document.getElementById('boot-splash');
   if (!el || el.classList.contains('hidden')) return;
-  // Hold the logo for a beat, then fly into it before fading the overlay.
+  // Hold the boot mark for the minimum beat, then fade the overlay.
   const wait = Math.max(0, BOOT_MIN_MS - (Date.now() - bootShownAt));
   setTimeout(() => {
-    el.classList.add('zooming');
-    const logo = document.getElementById('boot-logo');
-    if (logo) logo.classList.add('zoom-in');
+    el.classList.add('fade-out');
     setTimeout(() => {
-      el.classList.add('fade-out');
-      setTimeout(() => {
-        el.classList.add('hidden');
-        el.classList.remove('fade-out', 'zooming');
-        if (logo) logo.classList.remove('zoom-in');
-      }, 500);
-    }, BOOT_ZOOM_MS);
+      el.classList.add('hidden');
+      el.classList.remove('fade-out', 'zooming');
+      const logo = document.getElementById('boot-logo');
+      if (logo) logo.classList.remove('zoom-in');
+    }, 500);
   }, wait);
 }
 
@@ -175,7 +150,7 @@ const CHANGELOG = [
     version: '1.10.1',
     sections: [
       { type: 'fixed', items: ['Boş yeni kurulum artık sizi işlevsiz bir sayfada bırakmıyor', 'Çözünürlük rozeti her zaman gerçek kaliteyi gösteriyor', 'Geçmeli taramalı kanallar yerel oynatmayla açılıyor', 'Kararsız aktarımlar yeni bağlantıyla yeniden denenerek toparlanıyor'] },
-      { type: 'changed', items: ['Aşamalı yükleme: gösterge, ilk kare, ardından arabelleğe alma', 'Bekleme ipuçlarıyla kanal ve arabelleğe alma bildirimleri', 'Açılışta logo size doğru yakınlaşıyor'] },
+      { type: 'changed', items: ['Aşamalı yükleme: gösterge, ilk kare, ardından arabelleğe alma', 'Bekleme ipuçlarıyla kanal ve arabelleğe alma bildirimleri', 'Açılış ekranı daha sade ve hızlı kapanıyor'] },
     ],
   },
   {
