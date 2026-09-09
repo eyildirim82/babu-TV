@@ -15,7 +15,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(getAppVersion()),
   },
   root: '.',
-  base: '/enplayer/',
+  base: '/babustv/',
   resolve: {
     alias: {
       '@root': path.resolve(__dirname, '..', '..'),

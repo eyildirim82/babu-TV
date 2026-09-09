@@ -56,7 +56,7 @@ npm workspaces ile iki paket: `player/` ve `tizen/`.
 
 Statik çıktı `player/dist` altında üretiliyor. Tizen paketi için build
 `--base=./` ile çalıştırılıyor, böylece asset yolları göreli oluyor ve `.wgt`
-kendi kökünden servis edebiliyor.
+kendi kökünden servis edebiliyor. Normal browser development base'i `/babustv/`.
 
 ## Uygulama kimliği
 
@@ -64,10 +64,10 @@ kendi kökünden servis edebiliyor.
 
 - Paket: `BabusTVApp` (Samsung kuralı gereği tam 10 karakter)
 - Uygulama kimliği: `BabusTVApp.BabusTV`
-- Ad: `BABUS TV`
+- Ad: `BABUŞ TV`
 - Privilege'lar: `internet`, `tv.inputdevice`, `widgetdata`
 
-Önceki kimlik `tizen/config.xml.bak` içinde duruyor.
+Canonical identity `tizen/config.xml` ve `tizen/product-identity.mjs` tarafından tanımlanır. Packaging sırasında farklı bir uygulama kimliği üretilmez.
 
 ## Komutlar
 
@@ -77,6 +77,15 @@ npm run tizen:package    # tizen package -t wgt -s dev
 npm run tizen:emu        # build + package + sdb'den hedef seç + install + run
 npm run tizen:log        # sdb dlog, uygulama ve web çalışma zamanı filtreli
 ```
+
+Custom packaging hattı için:
+
+```
+npm run build
+npm run tizen
+```
+
+Her iki packaging hattında artifact adı branch'e göre `babustv_stable_v<version>_<commit>.wgt` veya `babustv_beta_v<version>_<commit>.wgt` biçimindedir.
 
 Emülatör yönetimi:
 
@@ -93,7 +102,7 @@ Tarayıcıda hızlı test (Tizen API'leri çalışmaz, arayüz ve oynatıcı ça
 npm run dev -w player
 ```
 
-Adres: `http://localhost:5173/enplayer/`
+Adres: `http://localhost:5173/babustv/`
 
 ## Sertifika
 
@@ -123,12 +132,16 @@ emülatör kilitlenebilir.
 **Performans gerçeği yansıtmaz.** Emülatör masaüstü CPU ve GPU kullanır. Gerçek
 TV donanımı çok daha yavaştır. Akıcılık kararlarını emülatöre bakarak verme.
 
-**Eski paketleme hattı duruyor.** `tizen/package.mjs` ve `tizen/install.mjs`
-OpenSSL ve Python ile kendi `.wgt` üretip fiziksel TV'ye HTTP ile yüklüyor.
-Bunlara dokunulmadı, `npm run tizen` ile hâlâ çalışıyor. Dikkat: o script
-`config.xml`'i kendi içinde yeniden üretiyor, yani hâlâ eski `IPTVPlayer`
-kimliğini kullanıyor. Yeni Tizen CLI hattı ise `tizen/config.xml` dosyasını
-okuyor. İki hat farklı kimlik üretir.
+**Packaging hatları aynı canonical identity'ye bağlıdır.** `tizen/package.mjs`
+custom OpenSSL/Python akışında canonical `tizen/config.xml` dosyasını okur ve
+yalnız widget version attribute'unu root package version ile günceller.
+`tizen/stage.mjs` + `tizen/wgt.mjs` official Tizen CLI hattı da aynı manifesti
+ve aynı artifact adlandırmasını kullanır.
+
+**Storage / upgrade gate.** Tizen package veya application identity değişikliği
+IndexedDB/storage origin ve credential erişimini etkileyebilir. Desteklenen
+kurulu bir kimlikten farklı kimliğe otomatik migration bu görevde yapılmaz;
+böyle bir upgrade hedefi varsa ayrıca onaylanmış migration tasarımı gerekir.
 
 ## Aşılan SDK hataları
 
