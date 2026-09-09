@@ -128,14 +128,6 @@ export class XtreamEntryView {
     root.appendChild(panel);
 
     appendTextElement(this.document, panel, 'h1', UI_COPY.xtreamEntry.title, 'xtream-entry-title');
-    appendTextElement(
-      this.document,
-      panel,
-      'p',
-      'Xtream Codes hesap bilgileriniz yalnız güvenli sağlayıcı deposunda saklanır.',
-      'xtream-entry-note',
-    );
-
     appendInput(this.document, panel, 'xtream-server-url', 'url', UI_COPY.xtreamEntry.serverUrl);
     appendInput(this.document, panel, 'xtream-username', 'text', UI_COPY.xtreamEntry.username);
     appendInput(this.document, panel, 'xtream-password', 'password', UI_COPY.xtreamEntry.password);
