@@ -1,0 +1,185 @@
+/* BabuşTV Live TV overlay. M3 state remains authoritative; this file is presentation only. */
+
+.sidebar.babu-live-tv-overlay {
+  width: calc(920px * var(--tv-scale));
+  max-width: 62vw;
+  display: grid;
+  grid-template-columns: minmax(calc(250px * var(--tv-scale)), 34%) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--babu-surface);
+  color: var(--babu-text-primary);
+  border-right: 1px solid var(--babu-surface-focus);
+  box-shadow: 18px 0 44px rgba(0, 0, 0, 0.48);
+}
+
+.babu-live-tv-overlay .sidebar-header {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  background: var(--babu-surface-raised);
+  border-color: var(--babu-surface-focus);
+}
+
+.babu-live-tv-overlay .group-list,
+.babu-live-tv-overlay .channel-list {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.babu-live-tv-overlay .group-list {
+  grid-column: 1;
+  grid-row: 2;
+  display: block;
+  background: var(--babu-surface);
+  border-right: 1px solid var(--babu-surface-focus);
+}
+
+.babu-live-tv-overlay .channel-list {
+  grid-column: 2;
+  grid-row: 2;
+  display: block;
+  background: var(--babu-surface-raised);
+}
+
+.babu-live-tv-overlay .channel-item,
+.babu-live-tv-overlay .group-item {
+  position: relative;
+  display: block;
+  min-height: calc(64px * var(--tv-scale));
+  padding: calc(18px * var(--tv-scale)) calc(24px * var(--tv-scale));
+  overflow: hidden;
+  color: var(--babu-text-secondary);
+  background: transparent;
+  border-bottom: 1px solid var(--babu-surface-focus);
+  box-shadow: none;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition:
+    background-color var(--babu-motion-fast) ease,
+    color var(--babu-motion-fast) ease,
+    box-shadow var(--babu-motion-fast) ease,
+    outline-color var(--babu-motion-fast) ease;
+}
+
+.babu-live-tv-overlay .channel-item:hover,
+.babu-live-tv-overlay .group-item:hover {
+  background: var(--babu-surface-focus);
+  color: var(--babu-text-primary);
+  box-shadow: inset 2px 0 0 var(--babu-accent);
+}
+
+.babu-live-tv-overlay .channel-item.highlighted {
+  background: var(--babu-surface-focus);
+  color: var(--babu-text-primary);
+  box-shadow: inset 3px 0 0 var(--babu-accent);
+}
+
+.babu-live-tv-overlay .channel-item.focused {
+  background: var(--babu-surface-focus);
+  color: var(--babu-text-primary);
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: calc(-1 * var(--babu-focus-width));
+  box-shadow: inset 5px 0 0 var(--babu-accent-strong), var(--babu-focus-shadow);
+  font-weight: var(--babu-font-weight-semibold);
+}
+
+.babu-live-tv-overlay .channel-item.playing {
+  padding-right: calc(132px * var(--tv-scale));
+  color: var(--babu-text-primary);
+  font-weight: var(--babu-font-weight-medium);
+}
+
+.babu-live-tv-overlay .channel-item.playing::after {
+  content: "Yayında";
+  position: absolute;
+  top: 50%;
+  right: calc(18px * var(--tv-scale));
+  transform: translateY(-50%);
+  padding: calc(4px * var(--tv-scale)) calc(10px * var(--tv-scale));
+  border: 1px solid var(--babu-accent);
+  border-radius: var(--babu-radius-md);
+  background: var(--babu-surface);
+  color: var(--babu-accent-strong);
+  font-size: calc(15px * var(--tv-scale));
+  font-weight: var(--babu-font-weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+.babu-live-tv-overlay .channel-item.focused.playing {
+  background: var(--babu-surface-focus);
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: calc(-1 * var(--babu-focus-width));
+  box-shadow: inset 5px 0 0 var(--babu-accent-strong), var(--babu-focus-shadow);
+}
+
+.babu-live-tv-overlay .group-item.active {
+  background: var(--babu-surface-raised);
+  color: var(--babu-text-primary);
+  box-shadow: inset 3px 0 0 var(--babu-accent);
+  font-weight: var(--babu-font-weight-medium);
+}
+
+.babu-live-tv-overlay .group-item.focused {
+  background: var(--babu-surface-focus);
+  color: var(--babu-text-primary);
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: calc(-1 * var(--babu-focus-width));
+  box-shadow: inset 5px 0 0 var(--babu-accent-strong), var(--babu-focus-shadow);
+  font-weight: var(--babu-font-weight-semibold);
+}
+
+.babu-live-tv-overlay .group-list.zone-active,
+.babu-live-tv-overlay .channel-list.zone-active {
+  box-shadow: inset 0 0 0 1px var(--babu-surface-focus);
+}
+
+.live-tv-status,
+.numeric-zap {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 105;
+  pointer-events: none;
+  color: var(--babu-text-primary);
+  background: var(--babu-surface-raised);
+  border: 1px solid var(--babu-surface-focus);
+  border-radius: var(--babu-radius-md);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42);
+  text-align: center;
+}
+
+.live-tv-status {
+  bottom: calc(82px * var(--tv-scale));
+  max-width: 70vw;
+  padding: calc(14px * var(--tv-scale)) calc(28px * var(--tv-scale));
+  overflow: hidden;
+  font-size: calc(22px * var(--tv-scale));
+  font-weight: var(--babu-font-weight-semibold);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.live-tv-status[data-playback-status="FAILED"] {
+  border-color: var(--babu-error);
+}
+
+.numeric-zap {
+  top: calc(48px * var(--tv-scale));
+  min-width: calc(110px * var(--tv-scale));
+  padding: calc(10px * var(--tv-scale)) calc(24px * var(--tv-scale));
+  color: var(--babu-accent-strong);
+  font-size: calc(32px * var(--tv-scale));
+  font-weight: var(--babu-font-weight-semibold);
+  letter-spacing: 0.08em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .babu-live-tv-overlay .channel-item,
+  .babu-live-tv-overlay .group-item,
+  .live-tv-status,
+  .numeric-zap {
+    transition: none;
+    animation: none;
+  }
+}
