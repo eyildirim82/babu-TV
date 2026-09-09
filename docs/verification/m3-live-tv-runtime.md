@@ -140,11 +140,13 @@ The install failure is expected and is not an app defect. The available signed a
 
 Building that profile is blocked on this host by three separate Tizen Studio defects, on top of the CLI target-lookup crash already recorded:
 
-1. `tizen security-profiles list` and `add` throw `NullPointerException` in `SigningProfile.readProfileItem` whenever a profile entry uses the developer certificate shape, so profiles cannot be listed or registered while such an entry exists.
+1. `tizen security-profiles list` and `add` throw `NullPointerException` in `SigningProfile.readProfileItem` whenever a profile entry stores its password as a path to a `.pwd` file. The bundled password encryptor still writes that file format, but the Java side of the same SDK build can no longer read it. Entries that carry the password inline load without complaint, which isolates the defect to the file-path form.
 2. `tizen certificate` reports its parameters and exits without writing any keystore file.
 3. The pre-existing `dev` profile entry, restored from the host's own backup, reproduces defect 1 and had to be removed again.
 
-A replacement author certificate signed by the SDK's bundled Tizen Developers CA was generated successfully with OpenSSL and is held outside the repository. Registering it still requires writing a security profile entry, which this session did not do. The host's `profiles.xml` was returned to its original single-profile state and verified to load cleanly.
+A replacement author certificate signed by the SDK's bundled Tizen Developers CA was generated successfully with OpenSSL and is held outside the repository. It cannot be used yet: a profile entry that loads is not enough, because packaging then fails with `CertificationException: Invaild password` when the inline value is not in the SDK's own encrypted form. Producing that form, or re-wrapping the SDK signer key to avoid it, is credential handling that this session deliberately did not carry out on its own. The host's `profiles.xml` was returned to its original single-profile state and verified to load cleanly, and the two scratch files written into the SDK tree were removed.
+
+Closing the emulator path therefore needs one human step: create a Tizen developer security profile through Certificate Manager, or supply an already-working one. Everything after that is automatable, and the emulator itself is proven to boot and accept transfers.
 
 Emulator results, once they exist, must be labelled `EMULATOR-PASS` rather than `PASS`. The image is Tizen 10.0 while the retail set is Tizen 9.0, and emulator AVPlay and Shaka behaviour is not equivalent to a real set.
 
