@@ -1,0 +1,63 @@
+name: B0D smoke retry
+
+on:
+  push:
+    branches:
+      - evidence/b0d-final-50ec2ab
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact B0D production head
+        uses: actions/checkout@v4
+        with:
+          ref: 50ec2ab35e023041be0f1f0d6c73375961b99179
+          fetch-depth: 1
+
+      - name: Assert exact production head
+        run: test "$(git rev-parse HEAD)" = "50ec2ab35e023041be0f1f0d6c73375961b99179"
+
+      - name: Prepare Chrome and Playwright
+        run: |
+          CHROME="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium || true)"
+          test -n "$CHROME"
+          echo "B0D_CHROME=$CHROME" >> "$GITHUB_ENV"
+          mkdir -p /tmp/b0d-playwright
+          npm install --prefix /tmp/b0d-playwright --no-save playwright-core@1.55.0
+
+      - name: Recover harness and fix import
+        run: |
+          git fetch origin evidence/b0d-final-50ec2ab --depth=1
+          git show FETCH_HEAD:.github/workflows/b0d-exact-head-evidence.yml > /tmp/evidence.yml
+          awk '
+            /cat > \/tmp\/b0d-smoke\.mjs <<.NODE./ { capture=1; next }
+            capture && /^          NODE$/ { exit }
+            capture { sub(/^          /, ""); print }
+          ' /tmp/evidence.yml > /tmp/b0d-smoke.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('/tmp/b0d-smoke.mjs')
+          s = p.read_text()
+          old = "const { chromium } = await import(pathToFileURL('/tmp/b0d-playwright/node_modules/playwright-core/index.js').href);"
+          new = "const pw = await import(pathToFileURL('/tmp/b0d-playwright/node_modules/playwright-core/index.js').href); const chromium = pw.chromium ?? pw.default?.chromium;"
+          if old not in s:
+              raise SystemExit('expected import line not found')
+          p.write_text(s.replace(old, new))
+          PY
+          grep -q "const chromium =" /tmp/b0d-smoke.mjs
+
+      - name: Run six-state 1920x1080 synthetic smoke
+        run: node /tmp/b0d-smoke.mjs
+
+      - name: Upload B0D smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: b0d-smoke-50ec2ab-retry
+          path: /tmp/b0d-smoke
+          if-no-files-found: error
+          retention-days: 14
