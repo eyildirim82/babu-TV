@@ -148,6 +148,8 @@ A replacement author certificate signed by the SDK's bundled Tizen Developers CA
 
 Closing the emulator path therefore needs one human step: create a Tizen developer security profile through Certificate Manager, or supply an already-working one. Everything after that is automatable, and the emulator itself is proven to boot and accept transfers.
 
+Two operational notes for a later session. The emulator shuts itself down after a few idle minutes, twice in this session, so a run should install and drive the app promptly after boot. And Certificate Manager was tried here: the profile it writes uses the password-as-file-path form plus an empty third distributor entry, which is exactly the shape the CLI cannot read, and it rewrote the previously working Samsung entry into the same broken shape. A backup of the working file was kept alongside it.
+
 Emulator results, once they exist, must be labelled `EMULATOR-PASS` rather than `PASS`. The image is Tizen 10.0 while the retail set is Tizen 9.0, and emulator AVPlay and Shaka behaviour is not equivalent to a real set.
 
 ## Runtime environment
