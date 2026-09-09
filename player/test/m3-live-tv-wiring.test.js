@@ -36,7 +36,7 @@ void test('M3 startup keeps inherited legacy initialization available as fallbac
 
   assert.match(source, /remote\.init\(handleRemoteAction\)/);
   assert.match(source, /platform\.registerOptionalKeys\(LEGACY_OPTIONAL_TIZEN_KEYS\)/);
-  assert.match(source, /ui\.showConfirmDialog\('Exit the app\?'/);
+  assert.match(source, /ui\.showConfirmDialog\('Uygulamadan çıkılsın mı\?'/);
 });
 
 void test('index exposes dedicated M3 status and numeric nodes', async () => {
