@@ -103,11 +103,11 @@ function createHarness(options: {
   return { service, events, registered, deleted };
 }
 
-test('registers, syncs channels, activates, and returns the cached snapshot in order', async () => {
+test('registers, syncs channels, validates cache, activates, and returns the snapshot in order', async () => {
   const { service, events, registered, deleted } = createHarness();
   const result = await service.connect(input);
 
-  assert.deepEqual(events, ['register', 'sync', 'activate', 'loadCached']);
+  assert.deepEqual(events, ['register', 'sync', 'loadCached', 'activate']);
   assert.equal(result.providerId, 'provider-1');
   assert.equal(result.profile, profile);
   assert.equal(result.snapshot, snapshot);
@@ -177,27 +177,27 @@ test('allows category failure when channel sync succeeds', async () => {
 
   const result = await service.connect(input);
   assert.equal(result.providerId, 'provider-1');
-  assert.deepEqual(events, ['register', 'sync', 'activate', 'loadCached']);
+  assert.deepEqual(events, ['register', 'sync', 'loadCached', 'activate']);
 });
 
-test('rolls back when active-provider selection fails', async () => {
+test('rolls back when active-provider selection fails after cache validation', async () => {
   const { service, events } = createHarness({ activateError: new Error('active write failed') });
 
   await assert.rejects(
     service.connect(input),
     (error: unknown) => error instanceof ProviderError && error.code === 'UNAVAILABLE',
   );
-  assert.deepEqual(events, ['register', 'sync', 'activate', 'delete']);
+  assert.deepEqual(events, ['register', 'sync', 'loadCached', 'activate', 'delete']);
 });
 
-test('rolls back when post-sync cache loading fails', async () => {
+test('rolls back a cache-loading failure before activation is attempted', async () => {
   const { service, events } = createHarness({ loadError: new Error('cache read failed') });
 
   await assert.rejects(
     service.connect(input),
     (error: unknown) => error instanceof ProviderError && error.code === 'UNAVAILABLE',
   );
-  assert.deepEqual(events, ['register', 'sync', 'activate', 'loadCached', 'delete']);
+  assert.deepEqual(events, ['register', 'sync', 'loadCached', 'delete']);
 });
 
 test('cleanup failure never replaces the original safe provider error', async () => {
