@@ -135,7 +135,7 @@ jobs:
       - name: Credential surface audit
         run: |
           set +e
-          rg -n "xtream.*(password|username)|password.*xtream|username.*xtream" player/src player/index.html
+          grep -REni "xtream.*(password|username)|password.*xtream|username.*xtream" player/src player/index.html
           code=$?
           if [ "$code" -gt 1 ]; then exit "$code"; fi
           exit 0
