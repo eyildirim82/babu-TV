@@ -3,8 +3,11 @@
 Date: 2026-09-09
 Track: M3G — Tizen-sensitive runtime verification/evidence
 Branch: `docs/m3-live-tv-verification`
-Runtime target code SHA: `0af80caf24eab206f303f67c177a5d716fb38a6d`
+Runtime target code SHA (session 1): `0af80caf24eab206f303f67c177a5d716fb38a6d`
+Runtime target code SHA (session 2): `cb36a4f` — `docs/m3-live-tv-verification` merged with `main@688f6ab`, tree identical to `main` except this evidence file
 Status: RUNTIME EVIDENCE INCOMPLETE — do not claim M3 fully complete
+
+Session 2 (2026-09-09, later) reached a real retail Samsung set. Packaging, signing, install and launch are now PASS on real hardware. The 13-item UI smoke matrix is still open because the remote-control channel is unpaired and no screen observation has been recorded.
 
 ## Scope and evidence rules
 
@@ -75,13 +78,48 @@ Both warning categories were already present in pre-M3 design verification run `
 
 GitHub Actions also reports an actions-runtime Node 20 deprecation compatibility warning; this is runner/action infrastructure output, not an M3 runtime finding.
 
+## Session 2 automated baseline — exact runtime candidate
+
+Run locally on `cb36a4f` (Windows 11, Node v24.15.0, npm 11.12.1) because this session builds the artifact that is actually installed on hardware.
+
+| Command / stage | Result | Evidence |
+| --- | --- | --- |
+| `npm ci` | PASS | 0 vulnerabilities |
+| `node --test player/test/*.test.js` | 39/40 | 1 failure, see below |
+| `npm run test:ts -w player` | PASS | 173/173 |
+| `npm run typecheck` | PASS | exit 0 |
+| `npm run brand:check` | PASS | 11 owned identity/build surfaces clean |
+| `npm run build` | PASS | Vite production build, inherited 500 kB chunk warning only |
+
+The single JS failure is `copy.d.ts matches the exact UI_COPY declaration shape`. It is a Windows checkout line-ending artifact: the assertion compares a CRLF file against an LF literal. The same tree is GREEN in CI on Linux, and a fix already exists on the local branch `fix/copy-declaration-line-endings` (`5e28851`). It is not an M3 runtime defect and was not fixed on this docs branch.
+
 ## Tizen package / signing evidence
 
-Status: `NOT-AVAILABLE`.
+Status: `PASS` on a real retail set.
 
-The M3 plan requires `npm run tizen` only in a secret-safe signing environment. This execution environment has no Samsung Tizen SDK/emulator session, device/RTL session, or approved signing material available to the worker. Therefore no WGT package/sign/deploy result is claimed here, and no certificate/private-key material was accessed or recorded.
+| Stage | Result | Evidence |
+| --- | --- | --- |
+| `npm run tizen:build` | PASS | staged `tizen/build` from a `--base=./` Vite build |
+| `TIZEN_PROFILE=samsung npm run tizen:package` | PASS | signed `babustv_beta_v1.10.1_cb36a4f.wgt`, 315.8 KB |
+| Author certificate | PASS | Samsung VD Author CA profile `samsung` |
+| Distributor certificate | PASS | Samsung VD DEVELOPER Public CA, bound to the target set DUID |
+| Install on retail TV | PASS | `vd_appinstall` reached `install completed` |
+| Launch on retail TV | PASS | `was_execute BabusTVApp.BabusTV` reported `launched` |
+| On-device identity | PASS | `applist` reports `'BABUŞ TV' 'BabusTVApp.BabusTV'` |
 
-The repository exposes `tizen`, `tizen:build`, `tizen:package`, `tizen:emu`, and `tizen:log` scripts, but script presence is not runtime/package evidence.
+No certificate password, private key, DUID value, or provider material is recorded in this document. The signed artifact name carries the exact head short SHA so the installed build is traceable.
+
+### SDK defect blocking the documented deploy path
+
+`node tizen/deploy.mjs` fails before it reaches the device:
+
+```
+java.lang.NullPointerException: null
+	at org.tizen.ncli.util.TargetUtil.getTargets(TargetUtil.java:96)
+	at org.tizen.ncli.subcommands.target.InstallCLICommand.setTarget(InstallCLICommand.java:182)
+```
+
+`tizen install -s <serial>` and `tizen run -s <serial>` both crash in the CLI target lookup while `sdb devices` lists the set correctly. This is a Tizen Studio CLI defect, not an M3 runtime defect, so no production change was made here. Install and launch were completed through the TV's own `vd_appinstall` / `was_execute` commands over `sdb`. A repository-side fallback for this already exists as an unpushed local commit (`c68b519` on `chore/tizen-real-tv-deploy`); promoting it is packaging/tooling scope, not M3G scope.
 
 ## Runtime environment
 
@@ -89,12 +127,17 @@ The repository exposes `tizen`, `tizen:build`, `tizen:package`, `tizen:emu`, and
 | --- | --- |
 | Samsung Tizen Emulator | NOT-AVAILABLE |
 | Samsung Remote Test Lab | NOT-AVAILABLE |
-| Physical Samsung TV | NOT-AVAILABLE |
-| Runtime/model/version | N/A — no real Tizen runtime session was available |
+| Physical Samsung set | AVAILABLE — connected over `sdb` at port 26101 |
+| Model | `LS43FM700UUXUF` |
+| Platform version | Tizen 9.0, `profile_name:tv`, `cpu_arch:armv7`, `sdbd_version:2.2.31` |
+| Developer mode | enabled; the set reports this host as its developer IP |
+| Device log | NOT-AVAILABLE — `dlog` returns an empty stream on this retail set, so no console/runtime log evidence can be captured |
+| Remote key channel | NOT-AVAILABLE — the remote-control WebSocket answers `ms.channel.unauthorized`; pairing must be accepted on the set |
+| Screen observation | NOT-AVAILABLE — no screen capture path exists on a retail set, so UI results need a human observer |
 | Test data | Synthetic/test data required; no real provider material recorded |
 | Screenshots | None captured |
 
-Because no real Tizen runtime was available, the matrix below deliberately contains no runtime PASS results. Automated evidence is provided only as corroboration and must not be read as a substitute for the missing runtime observation.
+Hardware is now reachable, but the two channels the UI matrix depends on are not. Driving the smokes needs an accepted remote-control pairing and a person watching the screen. Until both exist, the matrix below deliberately contains no runtime PASS results. Automated evidence is corroboration only and never substitutes for the missing runtime observation.
 
 ## M3 runtime smoke matrix
 
@@ -153,9 +196,11 @@ The statuses below distinguish automated evidence from runtime completion. `AUTO
 - Dual-session capability spike: not required for M3 production completion; remains a future capability investigation.
 - Physical-TV release acceptance: deferred to release/RC gate unless performed now.
 
-Additional M3G gate:
+Additional M3G gates:
 
-- Real Emulator and/or Samsung Remote Test Lab execution of the applicable M3 smoke matrix remains required before criterion 18 can close.
+- Execution of the applicable M3 smoke matrix remains required before criterion 18 can close. Session 2 removes the hardware obstacle; what remains is an accepted remote-control pairing plus a human observer for the screen.
+- Retail-set logging is unavailable, so every UI smoke result must come from direct screen observation and must name the observer and the exact head.
+- A synthetic playlist reachable from the set is required before the playback, zap, failure-rollback and refresh smokes can run at all.
 
 Do not call M2 fully complete while its WidgetData probe is pending.
 
@@ -167,11 +212,16 @@ Do not call M2 fully complete while its WidgetData probe is pending.
 - No secret header or DRM clear key was recorded.
 - No runtime screenshot was captured.
 - Automated baseline includes GREEN redaction coverage for transient StreamRequest/log handling.
+- Signing used the existing local Samsung profile. No certificate path content, password, private key, or set DUID value is reproduced in this document.
+- The set's own network address and developer-mode host address were observed during connection checks and are deliberately not written down here.
+- Verification helpers written for this session live outside the repository, in the session scratchpad, and are not part of any branch.
 
 ## Conclusion
 
 The exact runtime target `0af80caf24eab206f303f67c177a5d716fb38a6d` has a GREEN automated baseline (`200/200`, typecheck, production build, clean diff), and the M3G branch was created from that exact GREEN main. A later concurrent `main` move to `ca9c19b55045f111bbb7336006c1486abbd6f8ba` changed only the review-owned B0 execution-status document and is independently GREEN; it does not alter the runtime target code.
 
-M3 Tizen-sensitive runtime verification is **not complete** in this execution because no Samsung Tizen Emulator, Remote Test Lab session, or physical Samsung TV was available. The 13-item runtime matrix therefore remains `NOT-AVAILABLE`, M2 WidgetData remains `PENDING`, and physical-TV release acceptance remains `DEFERRED`.
+Session 2 verified the same code as current `main` at merge head `cb36a4f`, whose only difference from `main@688f6ab` is this evidence file. On that head the packaging chain is proven end to end on real hardware: signed with the Samsung profile, installed on the retail set `LS43FM700UUXUF` running Tizen 9.0, launched, and listed on the device as `BABUŞ TV`. Session 1's `NOT-AVAILABLE` verdict on packaging and signing is therefore superseded.
 
-No production bug fix or B0 implementation change was made on this docs/evidence branch.
+M3 Tizen-sensitive runtime verification is still **not complete**. The 13-item UI smoke matrix remains `NOT-AVAILABLE` because the retail set exposes neither a device log nor a screen capture path, and its remote-control channel is unpaired. M2 WidgetData remains `PENDING` and physical-TV release acceptance remains `DEFERRED`.
+
+One defect was found and reproduced: the Tizen Studio CLI crashes in its own target lookup, which blocks the documented `tizen install` deploy path. It is SDK tooling, not M3 runtime behaviour, and no production or B0 implementation change was made on this docs/evidence branch.
