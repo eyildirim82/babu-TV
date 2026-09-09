@@ -1,0 +1,122 @@
+name: B0E smoke diagnostic
+
+on:
+  push:
+    branches:
+      - evidence/b0e-ea9a4b9
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact B0E production head
+        uses: actions/checkout@v4
+        with:
+          ref: ea9a4b974025032cd50c3fa192c2fd4187eb2abf
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Diagnose one 1920x1080 browser state
+        run: |
+          set -u
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          echo "CHROME=$CHROME"
+          test -n "$CHROME"
+          cat > player/b0e-smoke.html <<'HTML'
+          <!doctype html>
+          <html lang="tr">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>B0E</title>
+            <link rel="stylesheet" href="./src/ui/tokens.css">
+            <link rel="stylesheet" href="./src/ui/theme.css">
+            <link rel="stylesheet" href="./src/ui/primitives.css">
+            <link rel="stylesheet" href="./src/styles.css">
+            <link rel="stylesheet" href="./src/ui/shell.css">
+            <link rel="stylesheet" href="./src/m3-live-tv.css">
+          </head>
+          <body>
+            <div id="app" class="fullscreen">
+              <div id="sidebar" class="sidebar babu-live-tv-overlay">
+                <div class="sidebar-header"><div class="logo">BabuşTV</div></div>
+                <div id="channel-list" class="channel-list zone-active">
+                  <div class="channel-item playing" data-channel-id="a">1 Haber Kanalı — şu anda oynayan kanal</div>
+                  <div class="channel-item highlighted focused" data-channel-id="b">2 Bu özellikle çok uzun bir kanal adıdır ve 1920×1080 görünümünde güvenli biçimde kırpılmalıdır — BabuşTV Uzun Kanal Adı Denemesi</div>
+                  <div class="channel-item" data-channel-id="c">3 Belgesel</div>
+                </div>
+                <div id="group-list" class="group-list">
+                  <div class="group-item">Tümü</div>
+                  <div class="group-item active" data-scope-key="category:news">Haber</div>
+                  <div class="group-item">Belgesel</div>
+                </div>
+              </div>
+              <div id="live-tv-status" class="live-tv-status hidden"></div>
+              <div id="numeric-zap" class="numeric-zap hidden"></div>
+            </div>
+            <script>
+              const sidebar = document.getElementById('sidebar');
+              const channelList = document.getElementById('channel-list');
+              const groupList = document.getElementById('group-list');
+              const focusedChannel = document.querySelector('.channel-item.highlighted');
+              const playing = document.querySelector('.channel-item.playing');
+              const checks = [];
+              const add = (name, pass, actual = null) => checks.push({ name, pass: Boolean(pass), actual });
+              const playingContent = getComputedStyle(playing, '::after').content;
+              const focusedStyle = getComputedStyle(focusedChannel);
+              add('viewport', innerWidth === 1920 && innerHeight === 1080, `${innerWidth}x${innerHeight}`);
+              add('categories-visible', getComputedStyle(groupList).display !== 'none', getComputedStyle(groupList).display);
+              add('channels-visible', getComputedStyle(channelList).display !== 'none', getComputedStyle(channelList).display);
+              add('playing-label', playingContent.includes('Yayında'), playingContent);
+              add('long-name-clips', focusedChannel.scrollWidth > focusedChannel.clientWidth, `${focusedChannel.scrollWidth}>${focusedChannel.clientWidth}`);
+              add('channel-focus-strong', focusedStyle.outlineWidth === '3px', focusedStyle.outlineWidth);
+              add('focus-vs-playing-distinct', !playing.classList.contains('focused'));
+              const failures = checks.filter((entry) => !entry.pass);
+              document.title = failures.length === 0 ? 'PASS-channel' : 'FAIL-channel';
+              const result = document.createElement('pre');
+              result.id = 'smoke-result';
+              result.textContent = JSON.stringify({ checks, failures });
+              document.body.append(result);
+            </script>
+          </body>
+          </html>
+          HTML
+
+          npm run dev -w player -- --host 127.0.0.1 > /tmp/b0e-vite.log 2>&1 &
+          VITE_PID=$!
+          trap 'kill "$VITE_PID" 2>/dev/null || true; rm -f player/b0e-smoke.html' EXIT
+          READY=0
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5173/babustv/b0e-smoke.html >/dev/null; then READY=1; break; fi
+            sleep 1
+          done
+          echo "READY=$READY"
+          cat /tmp/b0e-vite.log || true
+          test "$READY" -eq 1
+
+          URL="http://127.0.0.1:5173/babustv/b0e-smoke.html"
+          set +e
+          DUMP="$($CHROME --headless=new --no-sandbox --disable-gpu --window-size=1920,1080 --force-device-scale-factor=1 --virtual-time-budget=1000 --dump-dom "$URL" 2>/tmp/b0e-chrome.err)"
+          CHROME_RC=$?
+          set -e
+          echo "CHROME_RC=$CHROME_RC"
+          echo "TITLE=$(printf '%s' "$DUMP" | grep -o '<title>[^<]*</title>' | head -1 || true)"
+          echo "RESULT=$(printf '%s' "$DUMP" | grep -o '<pre id="smoke-result">[^<]*</pre>' | head -1 || true)"
+          echo "CHROME_STDERR_BEGIN"
+          cat /tmp/b0e-chrome.err || true
+          echo "CHROME_STDERR_END"
+          test "$CHROME_RC" -eq 0
+          kill "$VITE_PID" 2>/dev/null || true
+          rm -f player/b0e-smoke.html
+          trap - EXIT
