@@ -125,3 +125,12 @@ void test('BabuşTV shell CSS uses semantic tokens, remote focus, and reduced-mo
   assert.doesNotMatch(shell, /\.group-item\b/);
   assert.doesNotMatch(shell, /@keyframes\b/);
 });
+
+void test('confirm dialog remote focus overrides inherited orange focus with BabuşTV violet token', async () => {
+  const shell = await readFile(shellUrl, 'utf8');
+
+  assert.match(
+    shell,
+    /\.confirm-dialog-buttons\s+\.btn\.focused\s*\{[\s\S]*?outline:\s*var\(--babu-focus-width\)\s+solid\s+var\(--babu-accent-strong\);[\s\S]*?\}/,
+  );
+});
