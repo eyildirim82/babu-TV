@@ -2,7 +2,7 @@
 
 Date: 2026-09-09
 Owner: REVIEW / Integration Controller only
-Status: FIRST-WAVE ACTIVE — B0B MERGED + POST-MERGE GREEN
+Status: FIRST-WAVE ACTIVE — B0A+B0B MERGED + POST-MERGE GREEN
 
 ## Purpose
 
@@ -30,12 +30,13 @@ If this status file conflicts with the approved spec or implementation plan, the
 | First-wave GREEN base SHA | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
 | B0 docs merge | MERGED via PR #17 -> `0af80caf24eab206f303f67c177a5d716fb38a6d` |
 | Baseline suite | GitHub `verify` run `34286003705` SUCCESS on exact first-wave base |
-| Last merged B0 slice | B0B via PR #19 |
-| B0B worker head | `a460c331ac830833a2f23dd020b7c2626473cd7c` |
-| B0B resulting main | `2f90b6fda5ef1da572104fada2467fa56905789a` |
-| B0B post-merge verify | run `34325656261` SUCCESS |
-| Current integration state | FIRST-WAVE DEVELOPMENT ACTIVE; one slice merged |
-| Next eligible merge | NONE YET — B0A/B0C/B0F final controller review pending |
+| Last merged B0 slice | B0A via PR #18 |
+| B0A worker head | `9b5380b7123a43c2606e3cc826a311d1522e8ef6` |
+| B0A resulting main | `3c772eebfd2c950d5c2957055b4d3b184154238e` |
+| B0A post-merge verify | run `34326136408` SUCCESS |
+| Previously merged B0 slice | B0B via PR #19; resulting main `2f90b6fda5ef1da572104fada2467fa56905789a`; post-merge run `34325656261` SUCCESS |
+| Current integration state | FIRST-WAVE DEVELOPMENT ACTIVE; two slices merged |
+| Next eligible merge | NONE YET — B0C/B0F final controller review pending |
 
 The exact first-wave base above remains authoritative for B0A/B0B/B0C/B0F even though review-owned status commits and approved merges advance `main` afterward.
 
@@ -49,14 +50,17 @@ The exact first-wave base above remains authoritative for B0A/B0B/B0C/B0F even t
 | --- | --- |
 | Branch | `refactor/b0a-product-identity` |
 | Base / merge-base | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
-| Head | `9b5380b7123a43c2606e3cc826a311d1522e8ef6` |
-| PR | #18 DRAFT |
-| Status | WORKER GREEN — CONTROLLER FINAL REVIEW PENDING |
+| Worker head | `9b5380b7123a43c2606e3cc826a311d1522e8ef6` |
+| PR | #18 MERGED |
+| Status | MERGED + POST-MERGE GREEN |
 | RED evidence | `2903141b348938055d23181d06d4c6bdf6136754`, run `34323764569` |
 | Exact-head CI | run `34325042994` SUCCESS |
-| Worker evidence | identity test PASS; brand scanner PASS; tests/typecheck/build/tizen:build PASS; custom signed WGT produced |
-| Merge readiness | NOT YET APPROVED |
-| Blockers | Controller final scope/security/regression/conflict review + explicit user merge approval |
+| Resulting main | `3c772eebfd2c950d5c2957055b4d3b184154238e` |
+| Post-merge CI | run `34326136408` SUCCESS |
+| Scope review | PASS: only planned package/Vite/Tizen/identity/build-doc/test surfaces; no playback/provider/domain/focus/recovery changes |
+| Security/identity review | PASS: no provider/credential leakage found; canonical Tizen identity and privileges preserved; first-stage brand scanner GREEN |
+| Merge readiness | COMPLETE FOR B0A |
+| Blockers | None for B0A |
 
 Owned scope: package metadata, `package-lock.json`, Vite base identity, Tizen identity/packaging, identity scanner, active build docs.
 
@@ -147,7 +151,7 @@ Code fixes are not allowed on this docs branch. A reproduced runtime defect requ
 
 Current queue:
 
-1. Re-review B0A/B0C/B0F individually against the now-advanced `main`, including correct first-wave merge-base, current ahead/behind, conflict/divergence, changed-file discipline, TDD, exact-head evidence, secret leakage, ENTV identity reduction, and behavior-regression boundaries.
+1. Re-review B0C/B0F individually against the now-advanced `main`, including correct first-wave merge-base, current ahead/behind, conflict/divergence, changed-file discipline, TDD, exact-head evidence, secret leakage, ENTV identity reduction, and behavior-regression boundaries.
 2. Present exactly one eligible first-wave merge checkpoint at a time and obtain explicit user approval before merging.
 3. After each approved merge, require post-merge `main` GREEN before advancing to the next merge checkpoint.
 4. Monitor M3G independently; do not convert unavailable Tizen/physical-TV checks into PASS.
@@ -162,6 +166,7 @@ Current queue:
 | Order | Slice | PR | Merged head | Resulting main | Post-merge CI |
 | ---: | --- | --- | --- | --- | --- |
 | 1 | B0B | #19 | `a460c331ac830833a2f23dd020b7c2626473cd7c` | `2f90b6fda5ef1da572104fada2467fa56905789a` | `34325656261` SUCCESS |
+| 2 | B0A | #18 | `9b5380b7123a43c2606e3cc826a311d1522e8ef6` | `3c772eebfd2c950d5c2957055b4d3b184154238e` | `34326136408` SUCCESS |
 
 ---
 
@@ -173,7 +178,7 @@ Current queue:
 
 ### Important
 
-- B0A, B0C, and B0F have worker-reported/exact-head GREEN evidence but have not yet completed the controller's final merge review against the current integration state.
+- B0C and B0F have worker-reported/exact-head GREEN evidence but have not yet completed the controller's final merge review against the current integration state.
 - M3G exact-head automated CI is GREEN, but all real Tizen smoke observations remain unavailable; M2 WidgetData remains pending and physical-TV acceptance deferred.
 
 ### Minor
