@@ -1,0 +1,18 @@
+export const UI_COPY = Object.freeze({
+  loading: 'Yükleniyor…',
+  preparing: 'Hazırlanıyor…',
+  channels: 'Kanallar',
+  settings: 'Ayarlar',
+  quality: 'Kalite',
+  actions: 'İşlemler',
+  reloadStream: 'Yayını yeniden yükle',
+  refreshChannels: 'Kanalları yenile',
+  noChannel: 'Kanal seçilmedi',
+  buffering: 'Arabelleğe alınıyor',
+  streamOpening: 'Yayın açılıyor…',
+  recovering: 'Yayın yeniden deneniyor…',
+  streamFailed: 'Yayın açılamadı',
+  cancel: 'İptal',
+  confirm: 'Onayla',
+  close: 'Kapat',
+});
