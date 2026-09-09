@@ -4,7 +4,7 @@
 
 ## 1. Goal
 
-Add a remote-first Xtream Codes provider-entry flow that accepts server URL, username, and password, validates and persists the provider through Provider Core, performs an initial sync, activates the provider only after channel sync succeeds, and then enters the existing M3 Live TV runtime through a clean application reload.
+Add a remote-first Xtream Codes provider-entry flow that accepts server URL, username, and password, validates and persists the provider through Provider Core, performs an initial sync, validates the resulting cache, activates the provider only as the final onboarding commit point, and then enters the existing M3 Live TV runtime through a clean application reload.
 
 This is a bounded pre-M4 product slice. It does not implement EPG, Home, favorites, search, QR/phone pairing, or M3U migration.
 
@@ -14,7 +14,8 @@ The implementation must reuse, not duplicate:
 
 - `ProviderCoreService.registerProvider(provider, credential)` for validation-before-persist and registration rollback.
 - `ProviderSyncService.refresh(providerId)` for provider-scoped initial catalog sync.
-- `ProviderCoreService.switchActiveProvider(providerId)` for active-provider selection.
+- `ProviderCoreService.loadCached(providerId)` for post-sync cache validation before activation.
+- `ProviderCoreService.switchActiveProvider(providerId)` for the final active-provider commit point.
 - `ProviderCoreService.deleteProvider(providerId)` for compensation if post-registration onboarding fails.
 - the existing `createBrowserLiveTvRuntime()` boot path for M3 startup after reload.
 
@@ -50,8 +51,8 @@ trim form values
 → registerProvider()
 → initial ProviderSyncService.refresh()
 → require channels.status === 'success'
-→ switchActiveProvider()
 → load/confirm cached snapshot
+→ switchActiveProvider()
 → report success to integration callback
 → reload the application
 → existing boot path starts M3 from the active provider
@@ -59,24 +60,26 @@ trim form values
 
 A successful channel sync with zero channels is still a successful provider connection. The UI may show an empty Live TV catalog; it must not invent a provider failure merely because the valid provider returned zero live channels.
 
-Category sync is non-blocking for onboarding. If categories fail but channels succeed, activation proceeds because Live TV can operate with the channel catalog.
+Category sync is non-blocking for onboarding. If categories fail but channels succeed, cache validation and activation proceed because Live TV can operate with the channel catalog.
 
 ## 4. Transaction and compensation policy
 
 Registration itself remains governed by the existing Provider Core transaction contract.
 
-After `registerProvider()` succeeds, the onboarding service owns compensation until activation completes. If any of these occur:
+After `registerProvider()` succeeds, the onboarding service owns compensation until activation completes. The active provider must not change until sync and cache validation have both succeeded. If any of these occur:
 
 - initial sync throws;
 - initial sync reports `channels.status === 'failed'`;
-- active-provider selection fails;
 - loading the post-sync cache fails;
+- active-provider selection fails;
 
 then the onboarding service calls `deleteProvider(providerId)` before surfacing a sanitized error.
 
 Compensation is best-effort. Cleanup failures must never replace a more useful original safe provider error and must never expose credential values.
 
-No failed onboarding attempt may leave the new provider active.
+Because cache validation happens before `switchActiveProvider()`, any pre-activation failure leaves the previously active provider untouched. Activation is the final onboarding commit point.
+
+No failed onboarding attempt may intentionally leave the new provider active. If the repository itself throws during active-provider persistence after partially mutating state, the onboarding service still performs best-effort `deleteProvider(providerId)` compensation.
 
 ## 5. Provider identity and display name
 
@@ -149,7 +152,7 @@ While a connection attempt is in flight:
 - `Bağlan` cannot start a second concurrent attempt;
 - fields remain rendered;
 - status text shows `Bağlanıyor…`;
-- Back does not destroy persisted state because no new state is considered committed until orchestration succeeds.
+- Back does not tear down the in-flight entry surface; it becomes effective again after a failure clears the pending state.
 
 On failure, focus returns to `Bağlan` and the safe error appears without clearing inputs.
 
@@ -191,7 +194,7 @@ Owns only the dedicated Xtream provider-entry surface, Turkish copy, focus behav
 
 Expected primary files:
 
-- `player/src/xtream-entry.js` or an equivalently focused UI module
+- `player/src/xtream-entry.ts`
 - `player/src/ui/xtream-entry.css`
 - `player/src/ui/copy.js` / `copy.d.ts` only for shared user-visible strings if needed
 - focused UI acceptance tests
@@ -216,10 +219,11 @@ The slice is complete when all of the following are true:
 6. Initial sync occurs after registration.
 7. Channel sync failure compensates by deleting the newly registered provider and credentials/catalog.
 8. Category-only failure does not block activation when channel sync succeeds.
-9. Active provider changes only after successful channel sync.
-10. Post-registration activation/cache failure compensates the new provider.
-11. Successful connection triggers exactly one integration success callback and reload path.
-12. No credential material enters logs, localStorage, ordinary provider/catalog persistence, IDs, or test artifacts.
-13. Existing M3U/legacy flow and M3 playback/remote semantics remain unchanged.
-14. Focused tests, full `npm test`, typecheck, production build, and clean-diff are GREEN on exact final heads.
-15. Tizen-only credential persistence/runtime behavior is not claimed PASS without real Tizen evidence.
+9. Post-sync cache is loaded successfully before active-provider state changes.
+10. Active provider changes only as the final onboarding commit point after channel sync and cache validation succeed.
+11. Pre-activation failure compensates the new provider without changing the previous active provider; activation failure also triggers best-effort compensation.
+12. Successful connection triggers exactly one integration success callback and reload path.
+13. No credential material enters logs, localStorage, ordinary provider/catalog persistence, IDs, or test artifacts.
+14. Existing M3U/legacy flow and M3 playback/remote semantics remain unchanged.
+15. Focused tests, full `npm test`, typecheck, production build, and clean-diff are GREEN on exact final heads.
+16. Tizen-only credential persistence/runtime behavior is not claimed PASS without real Tizen evidence.
