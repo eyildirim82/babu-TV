@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const assets = [
@@ -11,6 +11,7 @@ const assets = [
   new URL('../../tizen/icons/icon_128.png', import.meta.url),
 ];
 
+const inheritedPublicAsset = new URL('../public/en-tvplayer_logo_light.png', import.meta.url);
 const svgAssets = assets.slice(0, 3);
 const pngAssets = assets.slice(3);
 const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -23,6 +24,11 @@ test('BabuşTV brand asset set exists and is non-empty', () => {
     const path = fileURLToPath(asset);
     assert.ok(statSync(path).size > 0, `${path} must be non-empty`);
   }
+});
+
+test('inherited public brand artwork is not shipped with BabuşTV', () => {
+  const path = fileURLToPath(inheritedPublicAsset);
+  assert.equal(existsSync(path), false, `${path} must be removed from the public asset bundle`);
 });
 
 test('BabuşTV SVG assets identify the owned brand and exclude inherited product marks', () => {
