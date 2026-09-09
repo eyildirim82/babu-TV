@@ -1,0 +1,244 @@
+name: B0D exact-head evidence
+
+on:
+  push:
+    branches:
+      - evidence/b0d-final-50ec2ab
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact B0D production head
+        uses: actions/checkout@v4
+        with:
+          ref: 50ec2ab35e023041be0f1f0d6c73375961b99179
+
+      - name: Assert exact production head
+        run: test "$(git rev-parse HEAD)" = "50ec2ab35e023041be0f1f0d6c73375961b99179"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: B0D focused shell acceptance
+        run: node --test player/test/babustv-shell.test.js
+
+      - name: Brand check
+        run: npm run brand:check
+
+      - name: Full tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Production build
+        run: npm run build
+
+      - name: Tizen staging build
+        run: npm run tizen:build
+
+      - name: Ensure verification did not modify tracked files
+        run: git diff --exit-code
+
+      - name: Prepare synthetic smoke renderer
+        run: |
+          CHROME="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium || true)"
+          test -n "$CHROME"
+          echo "B0D_CHROME=$CHROME" >> "$GITHUB_ENV"
+          mkdir -p /tmp/b0d-playwright
+          npm install --prefix /tmp/b0d-playwright --no-save playwright-core@1.55.0
+
+      - name: Run six-state 1920x1080 synthetic smoke
+        run: |
+          cat > /tmp/b0d-smoke.mjs <<'NODE'
+          import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+          import path from 'node:path';
+          import { pathToFileURL } from 'node:url';
+
+          const { chromium } = await import(pathToFileURL('/tmp/b0d-playwright/node_modules/playwright-core/index.js').href);
+          const repo = process.cwd();
+          const out = '/tmp/b0d-smoke';
+          mkdirSync(out, { recursive: true });
+
+          const text = (relative) => readFileSync(path.join(repo, relative), 'utf8');
+          const dataSvg = (relative) => `data:image/svg+xml;base64,${Buffer.from(readFileSync(path.join(repo, relative))).toString('base64')}`;
+          const cssFiles = [
+            'player/src/ui/tokens.css',
+            'player/src/ui/theme.css',
+            'player/src/ui/primitives.css',
+            'player/src/styles.css',
+            'player/src/ui/shell.css',
+            'player/src/m3-live-tv.css',
+          ];
+          const css = cssFiles.map(text).join('\n');
+          let html = text('player/index.html')
+            .replace(/<link\b[^>]*rel=["']stylesheet["'][^>]*>/gi, '')
+            .replace(/<script\b[\s\S]*?<\/script>/gi, '')
+            .replaceAll('/brand/babustv-wordmark.svg', dataSvg('player/public/brand/babustv-wordmark.svg'))
+            .replaceAll('/brand/babustv-boot.svg', dataSvg('player/public/brand/babustv-boot.svg'));
+          html = html.replace('</head>', `<style>${css}</style></head>`);
+
+          const browser = await chromium.launch({
+            executablePath: process.env.B0D_CHROME,
+            headless: true,
+            args: ['--no-sandbox', '--disable-dev-shm-usage'],
+          });
+          const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+          await page.setContent(html, { waitUntil: 'domcontentloaded' });
+          await page.emulateMedia({ reducedMotion: 'reduce' });
+
+          const reset = async () => {
+            await page.evaluate(() => {
+              for (const id of ['boot-splash', 'settings-page', 'whats-new-modal', 'confirm-dialog']) {
+                document.getElementById(id)?.classList.add('hidden');
+              }
+              document.getElementById('sidebar')?.classList.add('closed');
+              document.getElementById('right-sidebar')?.classList.add('closed');
+              for (const id of ['loading', 'error', 'live-tv-status', 'numeric-zap', 'channel-toast', 'buffering-indicator', 'play-state', 'progress-toast', 'proxy-toast']) {
+                document.getElementById(id)?.classList.add('hidden');
+              }
+              document.querySelectorAll('.focused,[data-focused]').forEach((el) => {
+                el.classList.remove('focused');
+                el.removeAttribute('data-focused');
+              });
+              const list = document.getElementById('channel-list');
+              if (list) list.innerHTML = '';
+              const resolutions = document.getElementById('resolution-list-right');
+              if (resolutions) resolutions.innerHTML = '';
+            });
+          };
+
+          const assertVioletOutline = async (selector, label) => {
+            const style = await page.locator(selector).evaluate((el) => {
+              const s = getComputedStyle(el);
+              return { color: s.outlineColor, width: s.outlineWidth, offset: s.outlineOffset };
+            });
+            if (style.color !== 'rgb(167, 139, 250)' || style.width !== '3px') {
+              throw new Error(`${label}: unexpected focus style ${JSON.stringify(style)}`);
+            }
+            return style;
+          };
+
+          const report = { head: '50ec2ab35e023041be0f1f0d6c73375961b99179', viewport: '1920x1080', states: [] };
+          const shot = async (name, checks = {}) => {
+            await page.screenshot({ path: path.join(out, `${name}.png`) });
+            report.states.push({ name, ...checks });
+          };
+
+          await reset();
+          await page.evaluate(() => {
+            const splash = document.getElementById('boot-splash');
+            splash.classList.remove('hidden');
+            document.getElementById('boot-version').textContent = 'v1.10.1';
+            document.getElementById('boot-status').textContent = 'Hazırlanıyor…';
+          });
+          const bootAnimation = await page.locator('#boot-logo').evaluate((el) => getComputedStyle(el).animationName);
+          if (bootAnimation !== 'none') throw new Error(`boot animation must be none, got ${bootAnimation}`);
+          await shot('01-boot', { bootAnimation });
+
+          await reset();
+          await page.evaluate(() => {
+            document.getElementById('sidebar').classList.remove('closed');
+            document.getElementById('channel-list').innerHTML = [
+              ['1', 'Haber 24', ''],
+              ['2', 'Çok Uzun Kanal Adı — Sentetik Görsel Taşma Kontrolü', 'focused'],
+              ['3', 'Belgesel', ''],
+            ].map(([n, name, state]) => `<div class="channel-item ${state}"><span class="channel-number">${n}</span><div class="channel-name"><span class="channel-name-text">${name}</span></div></div>`).join('');
+            document.getElementById('channel-name').textContent = 'Haber 24';
+            document.getElementById('channel-info').textContent = '1080p';
+          });
+          await shot('02-shell');
+
+          await reset();
+          await page.evaluate(() => {
+            document.getElementById('right-sidebar').classList.remove('closed');
+            document.getElementById('resolution-list-right').innerHTML = '<div class="resolution-item-right">Otomatik</div><div class="resolution-item-right focused">1080p</div>';
+            document.getElementById('channel-name').textContent = 'Haber 24';
+          });
+          const rightFocus = await assertVioletOutline('.resolution-item-right.focused', 'right-sidebar');
+          await shot('03-right-sidebar', { rightFocus });
+
+          await reset();
+          await page.evaluate(() => {
+            const settings = document.getElementById('settings-page');
+            settings.classList.remove('hidden');
+            settings.innerHTML = `
+              <div class="bg-glow"></div>
+              <div class="settings-layout">
+                <nav class="settings-nav">
+                  <div class="nav-header"><div class="nav-logo"><div class="icon">B</div><div class="text">Babuş<span>TV</span></div></div><div class="nav-sub">Ayarlar</div></div>
+                  <div class="nav-items">
+                    <div class="nav-item active"><span class="nav-icon">📡</span> Kanal Kaynağı</div>
+                    <div class="nav-item"><span class="nav-icon">🔗</span> Bağlantı</div>
+                    <div class="nav-item"><span class="nav-icon">▶</span> Oynatma</div>
+                    <div class="nav-item"><span class="nav-icon">ℹ</span> Hakkında</div>
+                  </div>
+                </nav>
+                <main class="settings-main">
+                  <div class="page-title"><button class="back-btn">‹</button>Ayarlar</div>
+                  <div class="setting-card">
+                    <div class="card-header"><h3><span class="card-icon">📡</span> Kanal Kaynağı</h3></div>
+                    <div class="card-body">
+                      <div class="status-row"><span class="status-dot connected"></span><span class="status-info">Sentetik test kaynağı hazır</span></div>
+                      <div class="input-group"><input class="input-field" value="https://example.invalid/test.m3u" aria-label="Sentetik test URL"></div>
+                      <div class="btn-group"><button class="btn btn-primary" data-focused>Kanalları getir</button></div>
+                    </div>
+                  </div>
+                  <div class="settings-footer"><span class="footer-info">Tüm ayarlar otomatik kaydedilir</span><span class="footer-version">1.10.1</span></div>
+                </main>
+              </div>`;
+          });
+          const settingsFocus = await assertVioletOutline('.settings-page .btn[data-focused]', 'settings');
+          await shot('04-settings', { settingsFocus });
+
+          await reset();
+          await page.evaluate(() => {
+            const dialog = document.getElementById('confirm-dialog');
+            dialog.classList.remove('hidden');
+            document.getElementById('confirm-dialog-message').textContent = 'Bu işlemi onaylıyor musunuz?';
+            document.getElementById('confirm-dialog-confirm').classList.add('focused');
+          });
+          const confirmFocus = await assertVioletOutline('#confirm-dialog-confirm.focused', 'confirm');
+          const confirmBackground = await page.locator('#confirm-dialog-confirm').evaluate((el) => getComputedStyle(el).backgroundColor);
+          if (confirmBackground !== 'rgb(139, 92, 246)') throw new Error(`confirm background unexpected: ${confirmBackground}`);
+          await shot('05-confirm', { confirmFocus, confirmBackground });
+
+          await reset();
+          await page.evaluate(() => {
+            const modal = document.getElementById('whats-new-modal');
+            modal.classList.remove('hidden');
+            document.getElementById('whats-new-version').textContent = 'v1.10.1';
+            document.getElementById('whats-new-body').innerHTML = `
+              <div class="wn-section"><div class="wn-section-title">BABUŞTV</div>
+              <div class="wn-item"><span class="wn-icon added">✓</span><span>Shell ve boot kimliği BabuşTV olarak güncellendi.</span></div>
+              <div class="wn-item"><span class="wn-icon changed">✓</span><span>Remote-first odak görünürlüğü güçlendirildi.</span></div>
+              <div class="wn-item"><span class="wn-icon fixed">✓</span><span>Türkçe kullanıcı arayüzü metinleri korundu.</span></div></div>`;
+            document.getElementById('whats-new-close').classList.add('focused');
+          });
+          const whatsNewFocus = await assertVioletOutline('#whats-new-close.focused', 'whats-new');
+          await shot('06-whats-new', { whatsNewFocus });
+
+          writeFileSync(path.join(out, 'smoke-report.json'), `${JSON.stringify(report, null, 2)}\n`);
+          console.log(JSON.stringify(report, null, 2));
+          await browser.close();
+          NODE
+          node /tmp/b0d-smoke.mjs
+
+      - name: Upload B0D smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: b0d-smoke-50ec2ab
+          path: /tmp/b0d-smoke
+          if-no-files-found: error
+          retention-days: 14
