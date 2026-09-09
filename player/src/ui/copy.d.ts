@@ -15,4 +15,21 @@ export declare const UI_COPY: Readonly<{
   cancel: string;
   confirm: string;
   close: string;
+  xtreamEntry: Readonly<{
+    title: string;
+    serverUrl: string;
+    username: string;
+    password: string;
+    connect: string;
+    back: string;
+    connecting: string;
+    required: string;
+    auth: string;
+    network: string;
+    timeout: string;
+    notFound: string;
+    server: string;
+    malformed: string;
+    unavailable: string;
+  }>;
 }>;
