@@ -1,25 +1,16 @@
 import type { CredentialStore } from '../credentials/contracts.js';
-import {
-  SamsungWidgetDataCredentialStore,
-  type WidgetDataLike,
-} from '../credentials/samsung-widgetdata-credential-store.js';
+import type { WidgetDataLike } from '../credentials/samsung-widgetdata-credential-store.js';
 import type { ProviderId } from '../domain/models.js';
 import type { Platform } from '../platform/contracts.js';
 import { AvplayAdapter } from '../playback/avplay-adapter.js';
 import { PlayerSessionCoordinator } from '../playback/player-session-coordinator.js';
 import { ShakaAdapter } from '../playback/shaka-adapter.js';
-import { ProviderAdapterFactoryImpl } from '../providers/provider-adapter-factory.js';
-import {
-  ProviderCoreService,
-  type CacheFirstLoad,
-  type ProviderSnapshot,
+import { createBrowserProviderRuntime } from '../providers/create-browser-provider-runtime.js';
+import type {
+  CacheFirstLoad,
+  ProviderSnapshot,
 } from '../providers/provider-core-service.js';
-import { ProviderSyncService } from '../providers/provider-sync-service.js';
-import { FetchProviderHttpClient } from '../providers/http/fetch-provider-http-client.js';
-import { StructuredCatalogRepository } from '../repository/structured-catalog-repository.js';
 import type { ProviderRepository } from '../repository/provider-repository.js';
-import { StructuredProviderRepository } from '../repository/structured-provider-repository.js';
-import { IndexedDbStructuredStore } from '../storage/indexeddb-structured-store.js';
 import { ChannelIntentCoordinator } from './channel-intent-coordinator.js';
 import { DomLiveTvView } from './dom-live-tv-view.js';
 import { LiveTvController } from './live-tv-controller.js';
@@ -109,14 +100,17 @@ export async function createBrowserLiveTvRuntime(
   deps: BrowserLiveTvRuntimeDependencies,
 ): Promise<LiveTvRuntimeStart> {
   try {
-    const store = new IndexedDbStructuredStore(deps.indexedDb);
-    const providers = new StructuredProviderRepository(store);
-    const catalog = new StructuredCatalogRepository(store);
-    const credentials = new SamsungWidgetDataCredentialStore(deps.widgetData);
-    const http = new FetchProviderHttpClient(deps.fetchImpl);
-    const adapters = new ProviderAdapterFactoryImpl(http);
-    const sync = new ProviderSyncService(providers, catalog, credentials, adapters);
-    const core = new ProviderCoreService(providers, catalog, credentials, sync, adapters);
+    const {
+      providers,
+      catalog,
+      credentials,
+      adapters,
+      core,
+    } = createBrowserProviderRuntime({
+      indexedDb: deps.indexedDb,
+      widgetData: deps.widgetData,
+      fetchImpl: deps.fetchImpl,
+    });
     const resolver = new ProviderStreamResolver(providers, credentials, adapters);
     const session = new PlayerSessionCoordinator(
       new ShakaAdapter(deps.legacyPlayer),
