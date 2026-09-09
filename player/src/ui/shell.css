@@ -278,6 +278,11 @@ body,
   box-shadow: var(--babu-focus-shadow);
 }
 
+.confirm-dialog-buttons .btn.focused {
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: var(--babu-focus-offset);
+}
+
 .btn:focus-visible {
   outline: var(--babu-focus-width) solid var(--babu-accent-strong);
   outline-offset: var(--babu-focus-offset);
