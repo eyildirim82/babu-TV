@@ -25,6 +25,23 @@ const EXPECTED_COPY = {
   cancel: 'İptal',
   confirm: 'Onayla',
   close: 'Kapat',
+  xtreamEntry: {
+    title: 'Xtream Codes ile Bağlan',
+    serverUrl: "Sunucu URL'si",
+    username: 'Kullanıcı adı',
+    password: 'Şifre',
+    connect: 'Bağlan',
+    back: 'Geri',
+    connecting: 'Bağlanıyor…',
+    required: 'Sunucu, kullanıcı adı ve şifre gerekli.',
+    auth: 'Kullanıcı adı veya şifre hatalı.',
+    network: 'Sunucuya ulaşılamadı.',
+    timeout: 'Bağlantı zaman aşımına uğradı.',
+    notFound: 'Sunucu kaynağı bulunamadı.',
+    server: 'Sunucu geçici bir hata döndürdü.',
+    malformed: 'Sunucu yanıtı desteklenmiyor.',
+    unavailable: 'Bağlantı kurulamadı.',
+  },
 };
 
 const EXPECTED_DECLARATION = `export declare const UI_COPY: Readonly<{
@@ -44,6 +61,23 @@ const EXPECTED_DECLARATION = `export declare const UI_COPY: Readonly<{
   cancel: string;
   confirm: string;
   close: string;
+  xtreamEntry: Readonly<{
+    title: string;
+    serverUrl: string;
+    username: string;
+    password: string;
+    connect: string;
+    back: string;
+    connecting: string;
+    required: string;
+    auth: string;
+    network: string;
+    timeout: string;
+    notFound: string;
+    server: string;
+    malformed: string;
+    unavailable: string;
+  }>;
 }>;`;
 
 async function assertFileExists(url, label) {
@@ -60,9 +94,8 @@ void test('UI_COPY exposes the exact approved Turkish runtime contract', async (
 
   assert.deepEqual(UI_COPY, EXPECTED_COPY);
   assert.equal(Object.isFrozen(UI_COPY), true);
-  for (const value of Object.values(UI_COPY)) {
-    assert.doesNotMatch(value, /EN[- ]?IPTV|IPTVPlayer|ENTV/i);
-  }
+  assert.equal(Object.isFrozen(UI_COPY.xtreamEntry), true);
+  assert.doesNotMatch(JSON.stringify(UI_COPY), /EN[- ]?IPTV|IPTVPlayer|ENTV/i);
 });
 
 void test('copy.d.ts matches the exact UI_COPY declaration shape', async () => {
