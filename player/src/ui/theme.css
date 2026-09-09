@@ -1,0 +1,21 @@
+html {
+  color-scheme: dark;
+  background: var(--babu-bg);
+}
+
+html,
+body {
+  min-width: 100%;
+  min-height: 100%;
+  margin: 0;
+  background: var(--babu-bg);
+  color: var(--babu-text-primary);
+  font-family: var(--babu-font-family);
+  font-size: var(--babu-font-size-base);
+  line-height: var(--babu-line-height-base);
+  text-rendering: optimizeLegibility;
+}
+
+video {
+  background: var(--babu-video-bg);
+}
