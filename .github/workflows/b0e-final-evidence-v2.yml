@@ -1,0 +1,193 @@
+name: B0E final exact-head evidence v2
+
+on:
+  push:
+    branches:
+      - evidence/b0e-ea9a4b9
+
+permissions:
+  contents: read
+
+jobs:
+  verify-b0e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact B0E production head
+        uses: actions/checkout@v4
+        with:
+          ref: ea9a4b974025032cd50c3fa192c2fd4187eb2abf
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Assert exact production head
+        run: test "$(git rev-parse HEAD)" = "ea9a4b974025032cd50c3fa192c2fd4187eb2abf"
+
+      - name: Focused B0E acceptance and M3 safety contracts
+        run: |
+          set -euo pipefail
+          node --test player/test/babustv-live-tv-presentation.test.js
+          npm run test:ts -w player | tee /tmp/b0e-ts.log
+          grep -F "category movement changes scope and highlight but never requests playback" /tmp/b0e-ts.log
+          grep -F "CHANNEL_UP and CHANNEL_DOWN use active scope and clamp without wrapping" /tmp/b0e-ts.log
+          grep -F "failed selected channel stays highlighted and overlay stays open after rollback restores previous playback" /tmp/b0e-ts.log
+          grep -F "numeric commit requires capability and exactly one matching provider channel number" /tmp/b0e-ts.log
+          grep -F "Back closes option layer, then overlay, then exits through platform with no modal" /tmp/b0e-ts.log
+          grep -F "a stale resolve can never reach the session after a newer intent exists" /tmp/b0e-ts.log
+          grep -F "overlapping switch requests serialize engine ownership and stale completion cannot reopen over the winner" /tmp/b0e-ts.log
+
+      - name: Brand identity check
+        run: npm run brand:check
+
+      - name: Full regression, typecheck, and production build
+        run: |
+          npm test
+          npm run typecheck
+          npm run build
+
+      - name: Synthetic 1920x1080 browser smoke
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$CHROME"
+          mkdir -p /tmp/b0e-smoke
+          cat > player/b0e-smoke.html <<'HTML'
+          <!doctype html>
+          <html lang="tr">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>B0E</title>
+            <link rel="stylesheet" href="./src/ui/tokens.css">
+            <link rel="stylesheet" href="./src/ui/theme.css">
+            <link rel="stylesheet" href="./src/ui/primitives.css">
+            <link rel="stylesheet" href="./src/styles.css">
+            <link rel="stylesheet" href="./src/ui/shell.css">
+            <link rel="stylesheet" href="./src/m3-live-tv.css">
+            <style>.smoke-video{position:absolute;inset:0;background:#000}</style>
+          </head>
+          <body>
+            <div id="app" class="fullscreen">
+              <div class="smoke-video"></div>
+              <div id="sidebar" class="sidebar babu-live-tv-overlay">
+                <div class="sidebar-header"><div class="logo">BabuşTV</div></div>
+                <div id="channel-list" class="channel-list zone-active">
+                  <div class="channel-item playing" data-channel-id="a">1 Haber Kanalı — şu anda oynayan kanal</div>
+                  <div class="channel-item highlighted focused" data-channel-id="b">2 Bu özellikle çok uzun bir kanal adıdır ve 1920×1080 görünümünde güvenli biçimde kırpılmalıdır — BabuşTV Uzun Kanal Adı Denemesi</div>
+                  <div class="channel-item" data-channel-id="c">3 Belgesel</div>
+                </div>
+                <div id="group-list" class="group-list">
+                  <div class="group-item">Tümü</div>
+                  <div class="group-item active" data-scope-key="category:news">Haber</div>
+                  <div class="group-item">Belgesel</div>
+                </div>
+              </div>
+              <div id="live-tv-status" class="live-tv-status hidden"></div>
+              <div id="numeric-zap" class="numeric-zap hidden"></div>
+            </div>
+            <script>
+              const state = new URLSearchParams(location.search).get('state') || 'channel';
+              const sidebar = document.getElementById('sidebar');
+              const channelList = document.getElementById('channel-list');
+              const groupList = document.getElementById('group-list');
+              const focusedChannel = document.querySelector('.channel-item.highlighted');
+              const playing = document.querySelector('.channel-item.playing');
+              const activeGroup = document.querySelector('.group-item.active');
+              const status = document.getElementById('live-tv-status');
+              const numeric = document.getElementById('numeric-zap');
+
+              if (state === 'category') {
+                channelList.classList.remove('zone-active');
+                focusedChannel.classList.remove('focused');
+                groupList.classList.add('zone-active');
+                activeGroup.classList.add('focused');
+              }
+              if (state === 'numeric') {
+                numeric.classList.remove('hidden');
+                numeric.dataset.presentationState = 'active';
+                numeric.textContent = '42';
+              }
+              if (state === 'failed') {
+                status.classList.remove('hidden');
+                status.dataset.playbackStatus = 'FAILED';
+                status.textContent = 'Yayın açılamadı';
+              }
+              if (state === 'closed') sidebar.classList.add('closed');
+
+              const finish = () => {
+                const checks = [];
+                const add = (name, pass, actual = null) => checks.push({name, pass:Boolean(pass), actual});
+                add('viewport', innerWidth === 1920 && innerHeight === 1080, `${innerWidth}x${innerHeight}`);
+                add('categories-visible', getComputedStyle(groupList).display !== 'none', getComputedStyle(groupList).display);
+                add('channels-visible', getComputedStyle(channelList).display !== 'none', getComputedStyle(channelList).display);
+                add('playing-label', getComputedStyle(playing, '::after').content.includes('Yayında'), getComputedStyle(playing, '::after').content);
+                add('long-name-clips', focusedChannel.scrollWidth > focusedChannel.clientWidth, `${focusedChannel.scrollWidth}>${focusedChannel.clientWidth}`);
+                if (state === 'channel') {
+                  add('channel-focus-strong', getComputedStyle(focusedChannel).outlineWidth === '3px', getComputedStyle(focusedChannel).outlineWidth);
+                  add('focus-vs-playing-distinct', !playing.classList.contains('focused'));
+                }
+                if (state === 'category') add('category-focus-strong', getComputedStyle(activeGroup).outlineWidth === '3px', getComputedStyle(activeGroup).outlineWidth);
+                if (state === 'numeric') add('numeric-visible', getComputedStyle(numeric).display !== 'none' && numeric.textContent === '42');
+                if (state === 'failed') add('failure-visible', getComputedStyle(status).display !== 'none' && status.dataset.playbackStatus === 'FAILED');
+                if (state === 'closed') add('overlay-closed', sidebar.getBoundingClientRect().right <= 1, sidebar.getBoundingClientRect().right);
+                const failures = checks.filter((entry) => !entry.pass);
+                document.title = failures.length === 0 ? `PASS-${state}` : `FAIL-${state}`;
+                const result = document.createElement('pre');
+                result.id = 'smoke-result';
+                result.textContent = JSON.stringify({state, checks, failures});
+                document.body.append(result);
+              };
+
+              // The production sidebar intentionally animates close for 250ms.
+              // Measure its terminal geometry, not the synchronous transition start.
+              if (state === 'closed') setTimeout(finish, 350);
+              else finish();
+            </script>
+          </body>
+          </html>
+          HTML
+
+          npm run dev -w player -- --host 127.0.0.1 > /tmp/b0e-vite.log 2>&1 &
+          VITE_PID=$!
+          trap 'kill "$VITE_PID" 2>/dev/null || true; rm -f player/b0e-smoke.html' EXIT
+          READY=0
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5173/babustv/b0e-smoke.html >/dev/null; then READY=1; break; fi
+            sleep 1
+          done
+          test "$READY" -eq 1
+
+          # Current new-headless reserves 87px from --window-size height in this runner;
+          # 1920x1167 produces a measured CSS viewport of exactly 1920x1080.
+          for state in channel category numeric failed closed; do
+            URL="http://127.0.0.1:5173/babustv/b0e-smoke.html?state=$state"
+            DUMP="$($CHROME --headless=new --no-sandbox --disable-gpu --window-size=1920,1167 --force-device-scale-factor=1 --virtual-time-budget=1000 --dump-dom "$URL" 2>/tmp/b0e-chrome.err)"
+            RESULT="$(printf '%s' "$DUMP" | grep -o '<pre id="smoke-result">[^<]*</pre>' | head -1 || true)"
+            echo "$state $RESULT"
+            printf '%s' "$DUMP" | grep -F "<title>PASS-$state</title>"
+            $CHROME --headless=new --no-sandbox --disable-gpu --window-size=1920,1167 --force-device-scale-factor=1 --virtual-time-budget=1000 --screenshot="/tmp/b0e-smoke/$state.png" "$URL" >/dev/null 2>&1
+          done
+
+          kill "$VITE_PID" 2>/dev/null || true
+          rm -f player/b0e-smoke.html
+          trap - EXIT
+          test "$(find /tmp/b0e-smoke -name '*.png' | wc -l)" -eq 5
+
+      - name: Ensure exact-head checkout stayed clean
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+      - name: Upload smoke screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: b0e-final-smoke-ea9a4b9-v2
+          path: /tmp/b0e-smoke/*.png
+          if-no-files-found: error
