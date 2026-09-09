@@ -81,8 +81,8 @@ export class XtreamOnboardingService {
         throw initialChannelSyncFailed(report.channels.code);
       }
 
-      await this.deps.core.switchActiveProvider(providerId);
       const snapshot = await this.deps.core.loadCached(providerId);
+      await this.deps.core.switchActiveProvider(providerId);
       return { providerId, profile, snapshot };
     } catch (error) {
       try {
