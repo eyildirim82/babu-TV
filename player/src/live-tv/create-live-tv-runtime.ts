@@ -116,7 +116,7 @@ export async function createBrowserLiveTvRuntime(
     const http = new FetchProviderHttpClient(deps.fetchImpl);
     const adapters = new ProviderAdapterFactoryImpl(http);
     const sync = new ProviderSyncService(providers, catalog, credentials, adapters);
-    const core = new ProviderCoreService(providers, catalog, credentials, sync);
+    const core = new ProviderCoreService(providers, catalog, credentials, sync, adapters);
     const resolver = new ProviderStreamResolver(providers, credentials, adapters);
     const session = new PlayerSessionCoordinator(
       new ShakaAdapter(deps.legacyPlayer),
