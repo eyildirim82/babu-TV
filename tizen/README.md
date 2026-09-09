@@ -1,98 +1,121 @@
-# Tizen OS Build — EN IPTV Player
+# Tizen OS Build — BabuşTV
 
-> See the [main README](../../README.md) for the full project overview and quick start.
+> Genel proje ve doğrulama komutları için [ana README](../README.md) dosyasına bakın.
 
-Packages the IPTV web app into a `.wgt` package installable on Samsung Tizen TVs (5.0+).
+Bu dizin BabuşTV web uygulamasını Samsung Tizen TV'lere kurulabilen `.wgt` paketine dönüştüren iki desteklenen packaging yolunu içerir. Her iki yol da canonical Tizen kimliğini ve aynı artifact adlandırma kuralını kullanır.
 
-## Prerequisites
+## Canonical identity
 
-1. **Node.js** — Already have it (used for the main project)
-2. **Python 3** — Required for the zip ordering helper
-3. **OpenSSL** — Used for code signing (bundled with Git for Windows, or install via `winget install OpenSSL.OpenSSL`)
-4. **Samsung Developer Mode app** — Install from Samsung Smart Hub on your TV
-   - Go to **Apps** → Search **"Developer Mode"** → Install and enable it
-   - Note the IP address shown on TV
+`tizen/config.xml` source of truth'tır:
 
-## Quick Start
+- widget: `https://babus.tv/babustvapp`
+- package: `BabusTVApp`
+- application: `BabusTVApp.BabusTV`
+- display name: `BABUŞ TV`
+- required Tizen version: `5.0`
+- privileges: `internet`, `tv.inputdevice`, `widgetdata`
 
-From the project root:
+Artifact adları:
+
+```text
+babustv_stable_v<version>_<commit>.wgt
+babustv_beta_v<version>_<commit>.wgt
+```
+
+`main` stable, diğer branch'ler beta kanalı üretir. Version root `package.json` dosyasından, commit ise kısa Git SHA'dan alınır.
+
+## Custom packaging
+
+### Gereksinimler
+
+1. Node.js ve npm
+2. Python 3
+3. OpenSSL
+4. Fiziksel TV kurulumu için Samsung Developer Mode
+
+Project root'tan:
 
 ```bash
+npm ci
+npm run build
 npm run tizen
 ```
 
-This runs `npm build` and packages/signs the `.wgt` in one step.
+`npm run tizen`, `player/dist/` içeriğini geçici package köküne kopyalar, canonical `tizen/config.xml` dosyasındaki yalnız widget `version` attribute'unu root package version ile günceller, `/babustv/` asset base'ini WGT köküne uygun `/` formuna çevirir ve paketi imzalar.
 
-## Step-by-Step
+Çıktı:
 
-### 1. Build the Web App
+```text
+beta/babustv_beta_v<version>_<commit>.wgt
+```
+
+`main` üzerinde aynı dosya `stable/` dizinine `babustv_stable_...` adıyla yazılır.
+
+Custom signer için development certificate yoksa `tizen/package.mjs` OpenSSL ile bir developer certificate üretir. Bu self-signed akış development içindir; mağaza veya cihaz politikası Samsung-issued certificate gerektiriyorsa Tizen Studio certificate akışını kullanın.
+
+## Tizen Studio CLI packaging
+
+Önce uygulamayı stage edin:
 
 ```bash
-npm run build
+npm run tizen:build
 ```
 
-Outputs the production build to `packages/player/dist/`.
+Bu komut Vite build'ini Tizen package için relative asset base ile üretip `tizen/build/` altına stage eder ve canonical `config.xml` manifestini kullanır.
 
-### 2. Package the Tizen .wgt
+Ardından:
 
 ```bash
-node packages/tizen/package.mjs
+npm run tizen:package
 ```
 
-This:
-1. Auto-generates a self-signed certificate (`author-key.pem` / `author-cert.pem`) if absent
-2. Copies `dist/` into a temp directory with `config.xml` and icons
-3. Signs it with your certificate
-4. Outputs to the repo root: `EN-IPTV_Player_{stable|beta}_{version}_{commit}.wgt`
+`TIZEN_PROFILE` verilmezse `dev` signing profile kullanılır. Tizen CLI exactly one `.wgt` üretmelidir; `tizen/wgt.mjs` bu dosyayı canonical artifact adıyla `tizen/build/` altında yeniden adlandırır.
 
-### 3. Install on TV
+Feature branch örneği:
+
+```text
+tizen/build/babustv_beta_v1.10.1_abc1234.wgt
+```
+
+## TV'ye kurulum
+
+Official CLI ile üretilen paket Tizen CLI/sdb akışıyla kurulabilir. Custom physical-TV helper kullanılıyorsa:
 
 ```bash
-node packages/tizen/install.mjs --ip=<TV_IP_ADDRESS>
+node tizen/install.mjs --ip=<TV_IP_ADDRESS>
 ```
 
-Make sure Developer Mode is running on your TV.
+Developer Mode açık olmalı ve TV ile geliştirme makinesi aynı ağda olmalıdır.
 
-## Build Output
+## Dosya yapısı
 
-| Branch | Output Example |
-|---|---|
-| `main` | `EN-IPTV_Player_stable_0.8.0_abc1234.wgt` |
-| Any other | `EN-IPTV_Player_beta_0.8.0_abc1234.wgt` |
-
-### Certificate & Signing Note
-
-> **Current packaging uses a single self-signed `signature.xml`.** Samsung's official flow via **Tizen Studio Certificate Manager** creates a Samsung-issued author certificate (tied to your TV's DUID) and produces three signatures (`author-signature.xml`, `signature1.xml`, `signature2.xml`). The current single-signature WGT has not been verified on hardware and **may fail to install on some TVs** — see `docs/BUGS.md` BUG-003. To verify:
-
-1. Build a WGT with `npm run tizen` on `dev` (now at `stable/`).
-2. Enable Developer Mode on a Tizen 5.0+ TV and note its DUID (shown in Developer Mode).
-3. Install via `node packages/tizen/install.mjs --ip=<TV_IP>` or Tizen Studio's Device Manager. If you see "Invalid certificate" or "Signature verification failed", generate a Samsung certificate via Tizen Studio (Certificate Manager → Samsung → DUID) and replace `author-*.pem` (see `SECURITY.md`), then rebuild.
-
-For local development the self-signed flow is sufficient; for distribution, use the Samsung flow.
-
-## File Structure
-
-```
-packages/tizen/
-├── README.md                 # This file
-├── config.xml                # Tizen web app manifest (reference)
-├── package.mjs               # Build & sign the .wgt
-├── install.mjs               # Install .wgt to TV via Developer Mode
-├── ziphelper.py              # Python helper for Tizen-compliant zip ordering
+```text
+tizen/
+├── README.md
+├── config.xml
+├── product-identity.mjs
+├── package.mjs
+├── wgt.mjs
+├── stage.mjs
+├── install.mjs
+├── ziphelper.py
 ├── icons/
-│   └── icon_128.png          # App icon (128x128)
-├── author-key.pem            # Private key (auto-generated, gitignored)
-├── author-cert.pem           # Certificate (auto-generated, gitignored)
-└── temp-wgt/                 # Temporary build directory (gitignored)
+│   └── icon_128.png
+├── author-key.pem       # generated, gitignored
+├── author-cert.pem      # generated, gitignored
+└── build/               # staged official-CLI package output
 ```
+
+## Storage / upgrade gate
+
+Tizen package/application identity değişikliği storage origin'i ve credential erişimini etkileyebilir. Desteklenen kurulu bir kimlikten farklı kimliğe otomatik migration bu packaging kodunda yapılmaz. Böyle bir upgrade hedefi varsa migration ayrıca tasarlanıp onaylanmadan identity değişikliği Ready/merge yapılmamalıdır.
 
 ## Troubleshooting
 
-| Problem | Fix |
+| Problem | Kontrol |
 |---|---|
-| TV says "Invalid certificate" | Delete `author-key.pem` and `author-cert.pem`, re-run `package.mjs` to regenerate |
-| App doesn't appear after install | Restart TV, check **Apps** → **My Apps** again |
-| Video won't play | Make sure the CORS proxy (`npm run proxy`) is running on your PC |
-| Install fails | Ensure TV and PC are on the same network, Developer Mode is enabled |
-| OpenSSL not found | Install via `winget install OpenSSL.OpenSSL` or use Git for Windows which bundles it |
-| Python not found | Install Python 3 and ensure it's on your PATH |
+| `player/dist` yok | Önce `npm run build` çalıştırın |
+| OpenSSL bulunamıyor | OpenSSL kurun veya PATH'e ekleyin |
+| Python bulunamıyor | Python 3 kurup PATH'e ekleyin |
+| Official package imzalanmıyor | `TIZEN_PROFILE` ve Tizen Studio signing profile'ını doğrulayın |
+| TV kurulumu başarısız | Developer Mode, ağ erişimi ve Samsung certificate/DUID gereksinimlerini kontrol edin |
