@@ -6,6 +6,11 @@ import { createBrowserLiveTvRuntime } from './live-tv/create-live-tv-runtime.ts'
 import * as ui from './ui.js';
 import * as remote from './remote.js';
 import * as settings from './settings.js';
+import { XtreamEntryView } from './xtream-entry.ts';
+import './ui/xtream-entry.css';
+import { XtreamOnboardingService } from './providers/xtream-onboarding-service.ts';
+import { createBrowserProviderRuntime } from './providers/create-browser-provider-runtime.ts';
+import { createXtreamEntryCallbacks, routeXtreamEntryAction } from './xtream-entry-integration.ts';
 import { UI_COPY } from './ui/copy.js';
 import { checkForUpdate, sendUsagePing, consentAsked, hasConsented, setConsented } from './update.js';
 import { processStreamUrl, parseM3u, fetchPlaylist as fetchFromPlaylistUrl } from './utils.js';
@@ -17,6 +22,42 @@ import {
 
 const platform = createPlatform(window);
 const player = createPlaybackService(legacyPlayer);
+const providerRuntime = createBrowserProviderRuntime({
+  indexedDb: window.indexedDB || null,
+  widgetData: window.webapis && window.webapis.widgetdata
+    ? window.webapis.widgetdata
+    : null,
+  fetchImpl: window.fetch.bind(window),
+});
+const xtreamOnboarding = new XtreamOnboardingService({
+  core: providerRuntime.core,
+  sync: providerRuntime.sync,
+  createProviderId: createXtreamProviderId,
+  now: () => Date.now(),
+});
+let xtreamEntryView = null;
+
+function createXtreamProviderId() {
+  return `xtream-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function getXtreamEntryView() {
+  if (xtreamEntryView) return xtreamEntryView;
+  xtreamEntryView = new XtreamEntryView(document, createXtreamEntryCallbacks({
+    onboarding: xtreamOnboarding,
+    reload: () => window.location.reload(),
+    onBack: () => {
+      xtreamEntryView.hide();
+      settings.show();
+    },
+  }));
+  return xtreamEntryView;
+}
+
+function showXtreamEntry() {
+  settings.hide();
+  getXtreamEntryView().show();
+}
 
 let currentIndex = 0;
 let channels;
@@ -405,6 +446,7 @@ function startPlayer() {
       ui.stopInactivityTimer();
       showPlayer();
     },
+    onXtreamRequested: showXtreamEntry,
     onClose: () => {
       settings.hide();
       ui.stopInactivityTimer();
@@ -572,6 +614,7 @@ function showFirstLaunch() {
         console.error('Failed to start player after fetch:', e);
       }
     },
+    onXtreamRequested: showXtreamEntry,
     onClose: () => {
       // BUG-018: backing out with no playlist must land on a working shell,
       // not a dead page — startPlayer() handles the empty case.
@@ -750,6 +793,10 @@ function handleRemoteAction(action, value) {
       default:
         break;
     }
+    return;
+  }
+
+  if (xtreamEntryView && routeXtreamEntryAction(xtreamEntryView, action)) {
     return;
   }
 

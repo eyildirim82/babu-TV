@@ -9,6 +9,7 @@ let container = null;
 let onPlaylistFetched = null;
 let onClose = null;
 let onRender = null;
+let onXtreamRequested = null;
 let editIndex = -1;
 let activeSection = 'source';
 let focusIdx = 0;
@@ -28,6 +29,7 @@ export function init(settingsContainer, callbacks) {
   onPlaylistFetched = callbacks.onPlaylistFetched;
   onClose = callbacks.onClose;
   onRender = callbacks.onRender;
+  onXtreamRequested = callbacks.onXtreamRequested || null;
 }
 
 export function show() {
@@ -168,6 +170,11 @@ export function selectFocused() {
 
   if (el.id === 'btn-back') {
     if (onClose) onClose();
+    return;
+  }
+
+  if (el.id === 'settings-xtream-btn') {
+    if (onXtreamRequested) onXtreamRequested();
     return;
   }
 
@@ -358,6 +365,8 @@ function buildFocusOrder() {
         const deleteBtn = document.getElementById('pl-delete-' + i);
         if (deleteBtn) focusOrder.push(deleteBtn);
       }
+      const xtreamBtn = document.getElementById('settings-xtream-btn');
+      if (xtreamBtn) focusOrder.push(xtreamBtn);
       const addBtn = document.getElementById('pl-add-btn');
       if (addBtn) focusOrder.push(addBtn);
       focusOrder.push(document.getElementById('settings-fetch-btn'));
@@ -467,6 +476,12 @@ function render() {
   });
 
   if (activeSection === 'source') {
+    const xtreamBtn = document.getElementById('settings-xtream-btn');
+    if (xtreamBtn) {
+      xtreamBtn.addEventListener('click', () => {
+        if (onXtreamRequested) onXtreamRequested();
+      });
+    }
     for (let i = 0; i < s.playlists.length; i++) {
       const entry = document.getElementById('playlist-entry-' + i);
       if (entry) {
@@ -651,6 +666,7 @@ function renderSourceCard(s, lastFetched) {
     }
     html += '</div>';
     html += '<div class="btn-group">';
+    html += '<button id="settings-xtream-btn" class="btn btn-secondary">' + UI_COPY.xtreamEntry.title + '</button>';
     if (s.playlists.length < 8) {
       html += '<button id="pl-add-btn" class="btn btn-secondary">+ Oynatma Listesi Ekle</button>';
     }
