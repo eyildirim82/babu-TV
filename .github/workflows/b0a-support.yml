@@ -1,0 +1,53 @@
+name: b0a-support
+
+on:
+  push:
+    branches:
+      - refactor/b0a-product-identity
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/b0a-product-identity
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Confirm first-stage scanner is RED before docs cleanup
+        shell: bash
+        run: |
+          set +e
+          npm run brand:check > /tmp/brand-check.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/brand-check.log
+          if [ "$status" -eq 0 ]; then
+            echo "brand scanner unexpectedly passed before cleanup"
+            exit 1
+          fi
+
+      - name: Regenerate lockfile from workspace manifests
+        run: npm install --package-lock-only
+
+      - name: Commit regenerated lockfile when changed
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json already synchronized"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore(b0): regenerate workspace lockfile"
+          git push origin HEAD:refactor/b0a-product-identity
