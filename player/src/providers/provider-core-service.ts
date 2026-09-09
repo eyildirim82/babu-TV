@@ -1,4 +1,4 @@
-import type { CredentialStore } from '../credentials/contracts.js';
+import type { CredentialStore, ProviderCredential } from '../credentials/contracts.js';
 import type {
   Category,
   Channel,
@@ -7,6 +7,7 @@ import type {
 } from '../domain/models.js';
 import type { CatalogRepository } from '../repository/catalog-repository.js';
 import type { ProviderRepository } from '../repository/provider-repository.js';
+import type { ProviderAdapterFactory, ProviderProfile } from './contracts.js';
 import { ProviderError } from './errors.js';
 import type { ProviderSyncReport } from './provider-sync-service.js';
 
@@ -29,13 +30,66 @@ function missingProvider(): ProviderError {
   return new ProviderError('NOT_FOUND', null, 'Provider configuration was not found.');
 }
 
+function duplicateProvider(): ProviderError {
+  return new ProviderError('MALFORMED', null, 'Provider configuration already exists.');
+}
+
+function invalidProviderConfiguration(): ProviderError {
+  return new ProviderError('MALFORMED', null, 'Provider configuration is invalid.');
+}
+
+function registrationUnavailable(): ProviderError {
+  return new ProviderError('UNAVAILABLE', null, 'Provider registration is unavailable.');
+}
+
+function persistenceUnavailable(): ProviderError {
+  return new ProviderError('UNAVAILABLE', null, 'Provider configuration could not be saved.');
+}
+
 export class ProviderCoreService {
   constructor(
     private readonly providers: ProviderRepository,
     private readonly catalog: CatalogRepository,
     private readonly credentials: CredentialStore,
     private readonly sync: ProviderSyncPort,
+    private readonly adapters: ProviderAdapterFactory | null = null,
   ) {}
+
+  async registerProvider(
+    provider: ProviderRecord,
+    credential: ProviderCredential,
+  ): Promise<ProviderProfile> {
+    if (await this.providers.getProvider(provider.id) !== null) throw duplicateProvider();
+    if (provider.kind !== credential.kind) throw invalidProviderConfiguration();
+    if (this.adapters === null) throw registrationUnavailable();
+
+    const adapter = this.adapters.create(provider, credential);
+    const profile = await adapter.getProfile();
+
+    try {
+      await this.credentials.save(provider.id, credential);
+    } catch {
+      try {
+        await this.credentials.remove(provider.id);
+      } catch {
+        // Best-effort cleanup only; never expose underlying credential-store errors.
+      }
+      throw persistenceUnavailable();
+    }
+
+    try {
+      await this.providers.saveProvider(provider);
+    } catch {
+      try {
+        await this.credentials.remove(provider.id);
+      } catch {
+        // Best-effort cleanup only; the public error remains sanitized.
+      }
+      throw persistenceUnavailable();
+    }
+
+    return profile;
+  }
 
   async loadCached(providerId: ProviderId): Promise<ProviderSnapshot> {
     const provider = await this.providers.getProvider(providerId);
