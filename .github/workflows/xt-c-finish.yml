@@ -1,0 +1,157 @@
+name: XT-C finish integration
+
+on:
+  push:
+    branches:
+      - feature/xt-c-xtream-entry-integration
+    paths:
+      - .github/workflows/xt-c-finish.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@v4
+        with:
+          ref: feature/xt-c-xtream-entry-integration
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply minimum XT-C wiring
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly 1 match, found {count}')
+              return text.replace(old, new, 1)
+
+          settings_path = Path('player/src/settings.js')
+          settings = settings_path.read_text()
+          settings = replace_once(
+              settings,
+              "let onRender = null;\nlet editIndex = -1;",
+              "let onRender = null;\nlet onXtreamRequested = null;\nlet editIndex = -1;",
+              'settings callback state',
+          )
+          settings = replace_once(
+              settings,
+              "  onClose = callbacks.onClose;\n  onRender = callbacks.onRender;\n}",
+              "  onClose = callbacks.onClose;\n  onRender = callbacks.onRender;\n  onXtreamRequested = callbacks.onXtreamRequested || null;\n}",
+              'settings init callback',
+          )
+          settings = replace_once(
+              settings,
+              "  if (el.id === 'btn-back') {\n    if (onClose) onClose();\n    return;\n  }\n\n  if (el.classList.contains('toggle')) {",
+              "  if (el.id === 'btn-back') {\n    if (onClose) onClose();\n    return;\n  }\n\n  if (el.id === 'settings-xtream-btn') {\n    if (onXtreamRequested) onXtreamRequested();\n    return;\n  }\n\n  if (el.classList.contains('toggle')) {",
+              'settings remote select',
+          )
+          settings = replace_once(
+              settings,
+              "      const addBtn = document.getElementById('pl-add-btn');\n      if (addBtn) focusOrder.push(addBtn);\n      focusOrder.push(document.getElementById('settings-fetch-btn'));",
+              "      const xtreamBtn = document.getElementById('settings-xtream-btn');\n      if (xtreamBtn) focusOrder.push(xtreamBtn);\n      const addBtn = document.getElementById('pl-add-btn');\n      if (addBtn) focusOrder.push(addBtn);\n      focusOrder.push(document.getElementById('settings-fetch-btn'));",
+              'settings focus order',
+          )
+          settings = replace_once(
+              settings,
+              "  if (activeSection === 'source') {\n    for (let i = 0; i < s.playlists.length; i++) {",
+              "  if (activeSection === 'source') {\n    const xtreamBtn = document.getElementById('settings-xtream-btn');\n    if (xtreamBtn) {\n      xtreamBtn.addEventListener('click', () => {\n        if (onXtreamRequested) onXtreamRequested();\n      });\n    }\n    for (let i = 0; i < s.playlists.length; i++) {",
+              'settings click action',
+          )
+          settings = replace_once(
+              settings,
+              "    html += '<div class=\"btn-group\">';\n    if (s.playlists.length < 8) {\n      html += '<button id=\"pl-add-btn\" class=\"btn btn-secondary\">+ Oynatma Listesi Ekle</button>';",
+              "    html += '<div class=\"btn-group\">';\n    html += '<button id=\"settings-xtream-btn\" class=\"btn btn-secondary\">' + UI_COPY.xtreamEntry.title + '</button>';\n    if (s.playlists.length < 8) {\n      html += '<button id=\"pl-add-btn\" class=\"btn btn-secondary\">+ Oynatma Listesi Ekle</button>';",
+              'settings source button',
+          )
+          settings_path.write_text(settings)
+
+          main_path = Path('player/src/main.js')
+          main = main_path.read_text()
+          main = replace_once(
+              main,
+              "import * as settings from './settings.js';\nimport { UI_COPY } from './ui/copy.js';",
+              "import * as settings from './settings.js';\nimport { XtreamEntryView } from './xtream-entry.ts';\nimport './ui/xtream-entry.css';\nimport { XtreamOnboardingService } from './providers/xtream-onboarding-service.ts';\nimport { createBrowserProviderRuntime } from './providers/create-browser-provider-runtime.ts';\nimport { createXtreamEntryCallbacks, routeXtreamEntryAction } from './xtream-entry-integration.ts';\nimport { UI_COPY } from './ui/copy.js';",
+              'main imports',
+          )
+          main = replace_once(
+              main,
+              "const platform = createPlatform(window);\nconst player = createPlaybackService(legacyPlayer);\n\nlet currentIndex = 0;",
+              "const platform = createPlatform(window);\nconst player = createPlaybackService(legacyPlayer);\nconst providerRuntime = createBrowserProviderRuntime({\n  indexedDb: window.indexedDB || null,\n  widgetData: window.webapis && window.webapis.widgetdata\n    ? window.webapis.widgetdata\n    : null,\n  fetchImpl: window.fetch.bind(window),\n});\nconst xtreamOnboarding = new XtreamOnboardingService({\n  core: providerRuntime.core,\n  sync: providerRuntime.sync,\n  createProviderId: createXtreamProviderId,\n  now: () => Date.now(),\n});\nlet xtreamEntryView = null;\n\nfunction createXtreamProviderId() {\n  return `xtream-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;\n}\n\nfunction getXtreamEntryView() {\n  if (xtreamEntryView) return xtreamEntryView;\n  xtreamEntryView = new XtreamEntryView(document, createXtreamEntryCallbacks({\n    onboarding: xtreamOnboarding,\n    reload: () => window.location.reload(),\n    onBack: () => {\n      xtreamEntryView.hide();\n      settings.show();\n    },\n  }));\n  return xtreamEntryView;\n}\n\nfunction showXtreamEntry() {\n  settings.hide();\n  getXtreamEntryView().show();\n}\n\nlet currentIndex = 0;",
+              'main onboarding runtime',
+          )
+          main = replace_once(
+              main,
+              "    onClose: () => {\n      // BUG-018: backing out with no playlist must land on a working shell,",
+              "    onXtreamRequested: showXtreamEntry,\n    onClose: () => {\n      // BUG-018: backing out with no playlist must land on a working shell,",
+              'first launch settings callback',
+          )
+          main = replace_once(
+              main,
+              "    onClose: () => {\n      settings.hide();\n      ui.stopInactivityTimer();\n      showPlayer();\n    },\n  });\n\n  ui.init(channels, handleChannelSelect);",
+              "    onXtreamRequested: showXtreamEntry,\n    onClose: () => {\n      settings.hide();\n      ui.stopInactivityTimer();\n      showPlayer();\n    },\n  });\n\n  ui.init(channels, handleChannelSelect);",
+              'player settings callback',
+          )
+          main = replace_once(
+              main,
+              "  if (settings.isVisible()) {\n    switch (action) {",
+              "  if (xtreamEntryView && routeXtreamEntryAction(xtreamEntryView, action)) {\n    return;\n  }\n\n  if (settings.isVisible()) {\n    switch (action) {",
+              'remote route priority',
+          )
+          main_path.write_text(main)
+
+      - name: Focused XT-C GREEN
+        run: node --import tsx --test player/test-ts/xtream-entry-integration.test.ts
+
+      - name: Full regression
+        run: npm test
+
+      - name: Brand check
+        run: npm run brand:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Production build
+        run: npm run build
+
+      - name: Tizen staging build
+        run: npm run tizen:build
+
+      - name: Credential surface audit
+        run: |
+          set +e
+          rg -n "xtream.*(password|username)|password.*xtream|username.*xtream" player/src player/index.html
+          code=$?
+          if [ "$code" -gt 1 ]; then exit "$code"; fi
+          exit 0
+
+      - name: Verify only planned production files changed
+        run: |
+          changed="$(git diff --name-only | sort)"
+          printf '%s\n' "$changed"
+          test "$changed" = $'player/src/main.js\nplayer/src/settings.js'
+
+      - name: Commit verified XT-C wiring and remove harness
+        run: |
+          rm .github/workflows/xt-c-finish.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "feat(provider): wire Xtream entry onboarding"
+          echo "VERIFIED_COMMIT=$(git rev-parse HEAD)"
+          git push origin HEAD:feature/xt-c-xtream-entry-integration
