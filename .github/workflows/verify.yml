@@ -31,6 +31,9 @@ jobs:
       - name: Run characterization tests
         run: npm test
 
+      - name: Run brand gate
+        run: npm run brand:check
+
       - name: Typecheck
         run: npm run typecheck
 
