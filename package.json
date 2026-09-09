@@ -1,13 +1,14 @@
 {
-  "name": "en-tvplayer",
+  "name": "babustv",
   "version": "1.10.1",
-  "description": "Samsung Tizen TV IPTV Player — install on any Tizen 5.0+ TV",
+  "description": "BabuşTV — Samsung Tizen TV player",
   "type": "module",
   "scripts": {
     "dev": "npm run dev -w player",
     "build": "npm run build -w player",
     "test": "node --test player/test/*.test.js && npm run test:ts -w player",
     "typecheck": "npm run typecheck -w player",
+    "brand:check": "node tools/check-legacy-brand.mjs",
     "tizen": "cd tizen && node package.mjs",
     "tizen:build": "node tizen/stage.mjs",
     "tizen:package": "node tizen/wgt.mjs",
@@ -25,6 +26,6 @@
     "tv",
     "player"
   ],
-  "author": "Nur-allhi",
+  "author": "BabuşTV",
   "license": "MIT"
 }

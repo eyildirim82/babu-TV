@@ -1,9 +1,14 @@
 // Signs tizen/build/ into a .wgt using the official Tizen CLI and the "dev"
 // security profile. Requires `npm run tizen:build` to have staged the app.
-import { existsSync, readdirSync, rmSync, statSync } from 'fs';
-import { join } from 'path';
+import { execFileSync } from 'child_process';
+import { existsSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { artifactName } from './product-identity.mjs';
 import { BUILD_DIR, tizen } from './tizen-env.mjs';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, '..');
 const PROFILE = process.env.TIZEN_PROFILE || 'dev';
 
 if (!existsSync(join(BUILD_DIR, 'index.html'))) {
@@ -11,7 +16,6 @@ if (!existsSync(join(BUILD_DIR, 'index.html'))) {
   process.exit(1);
 }
 
-// Drop any .wgt left over from an earlier run so the glob below stays unambiguous.
 for (const f of readdirSync(BUILD_DIR)) {
   if (f.endsWith('.wgt')) rmSync(join(BUILD_DIR, f), { force: true });
 }
@@ -23,10 +27,27 @@ if (res.status !== 0) {
   process.exit(res.status || 1);
 }
 
-const wgt = readdirSync(BUILD_DIR).find((f) => f.endsWith('.wgt'));
-if (!wgt) {
-  console.error('[wgt] tizen package reported success but produced no .wgt');
+const wgts = readdirSync(BUILD_DIR).filter((f) => f.endsWith('.wgt'));
+if (wgts.length !== 1) {
+  console.error(`[wgt] expected exactly one .wgt after packaging, found ${wgts.length}`);
   process.exit(1);
 }
-const size = (statSync(join(BUILD_DIR, wgt)).size / 1024).toFixed(1);
-console.log(`[wgt] ${wgt} (${size} KB)`);
+
+const version = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8')).version;
+const commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+  cwd: ROOT,
+  encoding: 'utf-8',
+}).trim();
+const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+  cwd: ROOT,
+  encoding: 'utf-8',
+}).trim();
+const channel = branch === 'main' ? 'stable' : 'beta';
+const name = artifactName({ version, commit, channel });
+
+const produced = join(BUILD_DIR, wgts[0]);
+const output = join(BUILD_DIR, name);
+if (produced !== output) renameSync(produced, output);
+
+const size = (statSync(output).size / 1024).toFixed(1);
+console.log(`[wgt] ${name} (${size} KB)`);

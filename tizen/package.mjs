@@ -1,25 +1,22 @@
 import { execSync } from 'child_process';
-import { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync, rmSync, renameSync } from 'fs';
+import { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { artifactName } from './product-identity.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const DIST = join(ROOT, 'player', 'dist');
 const TIZEN = __dirname;
 
-const PKG = 'IPTVPlayer'; // Must be EXACTLY 10 chars!
+const rootPkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'));
+const APP_VERSION = rootPkg.version;
 
-// Read app version from player package.json
-const playerPkg = JSON.parse(readFileSync(join(ROOT, 'player', 'package.json'), 'utf-8'));
-const APP_VERSION = playerPkg.version;
-
-// Get git info for build naming
 const commitHash = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
 const branch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim();
-const versionType = branch === 'main' ? 'stable' : 'beta';
-const WGT_NAME = `EN-IPTV_Player_v${APP_VERSION}_${commitHash}.wgt`;
-const OUTPUT_DIR = join(ROOT, versionType);
+const channel = branch === 'main' ? 'stable' : 'beta';
+const WGT_NAME = artifactName({ version: APP_VERSION, commit: commitHash, channel });
+const OUTPUT_DIR = join(ROOT, channel);
 if (!existsSync(OUTPUT_DIR)) mkdirSync(OUTPUT_DIR, { recursive: true });
 
 function findOpenSSL() {
@@ -57,8 +54,6 @@ function findSDB() {
   return null;
 }
 
-// ─── Step 1: Verify prerequisites ────────────────────────────────────────
-
 const OPENSSL = findOpenSSL();
 if (!OPENSSL) {
   console.log('\n OpenSSL not found.\n  winget install OpenSSL.OpenSSL\n');
@@ -73,14 +68,10 @@ if (!SDB) {
 console.log(` OpenSSL: ${OPENSSL}`);
 console.log(` SDB: ${SDB}`);
 
-// ─── Step 2: Ensure dist/ exists ─────────────────────────────────────────
-
 if (!existsSync(DIST)) {
   console.log('\n dist/ not found. Run: npm run build\n');
   process.exit(1);
 }
-
-// ─── Step 3: Certificates ────────────────────────────────────────────────
 
 const KEY_FILE = join(TIZEN, 'author-key.pem');
 const CERT_FILE = join(TIZEN, 'author-cert.pem');
@@ -90,14 +81,12 @@ if (!existsSync(KEY_FILE) || !existsSync(CERT_FILE)) {
   execSync(`${OPENSSL} genrsa -out "${KEY_FILE}" 2048`, { stdio: 'inherit' });
   execSync(
     `${OPENSSL} req -new -x509 -key "${KEY_FILE}" -out "${CERT_FILE}" ` +
-    `-days 36500 -subj "/CN=IPTVPlayer/O=Self/OU=Personal"`,
+    `-days 36500 -subj "/CN=BabusTVApp/O=BabusTV/OU=Development"`,
     { stdio: 'inherit' }
   );
 } else {
   console.log(' Certificate found');
 }
-
-// ─── Step 4: Build and sign the WGT ──────────────────────────────────────
 
 const TEMP = join(TIZEN, 'temp-wgt');
 const OUTPUT = join(OUTPUT_DIR, WGT_NAME);
@@ -108,49 +97,21 @@ for (const p of [TEMP, OUTPUT]) {
 }
 
 console.log('\n Building .wgt...');
-
-// Create temp dir with package structure
 mkdirSync(TEMP, { recursive: true });
 
-// Config with 10-char package name
-const configXml = `<?xml version="1.0" encoding="UTF-8"?>
-<widget xmlns:tizen="http://tizen.org/ns/widgets"
-        xmlns="http://www.w3.org/ns/widgets"
-        id="https://iptvplayer"
-        version="${APP_VERSION}"
-        viewmodes="maximized">
-  <access origin="*" subdomains="true"/>
-  <tizen:application id="${PKG}.IPTV" package="${PKG}" required_version="5.0"/>
-  <author href="http://iptvplayer">EN-IPTV Player</author>
-  <content src="index.html"/>
-  <feature name="http://tizen.org/feature/screen.size.all"/>
-  <icon src="icon.png"/>
-  <name>EN-IPTV Player v${APP_VERSION}</name>
-  <tizen:privilege name="http://tizen.org/privilege/internet"/>
-  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
-  <tizen:profile name="tv-samsung"/>
-  <tizen:setting screen-orientation="landscape"
-                 context-menu="enable"
-                 background-support="disable"
-                 encryption="disable"
-                 install-location="auto"
-                 hwkey-event="enable"/>
-</widget>`;
+const configXml = readFileSync(join(TIZEN, 'config.xml'), 'utf-8')
+  .replace(/(<widget\b[\s\S]*?\bversion=")[^"]*(")/, `$1${APP_VERSION}$2`);
 writeFileSync(join(TEMP, 'config.xml'), configXml);
 
-// Copy app files
 cpSync(DIST, TEMP, { recursive: true });
 
-// Fix paths: strip /enplayer/ base prefix (WGT serves from root)
 const htmlPath = join(TEMP, 'index.html');
 let html = readFileSync(htmlPath, 'utf-8');
-html = html.replace(/\/enplayer\//g, '/');
+html = html.replace(/\/babustv\//g, '/');
 writeFileSync(htmlPath, html);
 
-// Copy app icon
 cpSync(join(TIZEN, 'icons', 'icon_128.png'), join(TEMP, 'icon.png'));
 
-// Create unsigned ZIP via Python helper
 const ZIP_HELPER = join(TIZEN, 'ziphelper.py');
 execSync(`python "${ZIP_HELPER}" unsigned "${TEMP}" "${UNSIGNED}"`, { stdio: 'inherit' });
 
@@ -159,7 +120,6 @@ if (!existsSync(UNSIGNED)) {
   process.exit(1);
 }
 
-// Sign
 console.log(' Signing...');
 const SIG_FILE = join(TEMP, 'signature.xml');
 execSync(
@@ -168,7 +128,6 @@ execSync(
   { stdio: 'inherit' }
 );
 
-// Create signed ZIP with signature.xml LAST
 execSync(`python "${ZIP_HELPER}" signed "${TEMP}" "${OUTPUT}" "${SIG_FILE}"`, { stdio: 'inherit' });
 
 rmSync(TEMP, { recursive: true, force: true });
