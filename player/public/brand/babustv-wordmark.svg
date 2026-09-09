@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="180" viewBox="0 0 720 180" role="img" aria-labelledby="title desc" data-brand="BabuşTV">
+  <title>BabuşTV wordmark</title>
+  <desc>Premium BabuşTV wordmark with a compact calico cat symbol and violet accent.</desc>
+  <g transform="translate(20 26) scale(.98)">
+    <rect width="128" height="128" rx="28" fill="#0B0B0F"/>
+    <rect x="5" y="5" width="118" height="118" rx="24" fill="#14141A" stroke="#8B5CF6" stroke-width="2"/>
+    <path d="M34 47 43 25 57 39c5-2 10-3 15-3s10 1 15 3l14-14 9 22v25c0 23-16 38-38 38S34 95 34 72Z" fill="#F2E8D5"/>
+    <path d="M43 25 57 39c-6 3-11 7-14 12Z" fill="#C87B46"/>
+    <path d="M101 25 87 39c6 3 11 7 14 12Z" fill="#242331"/>
+    <path d="M54 41c8-5 16-6 23-4-1 11-7 18-18 21-5-4-7-9-5-17Z" fill="#C87B46"/>
+    <path d="M79 58c8-4 17-3 24 2 1 8-2 14-8 18-8 0-14-4-17-11 0-3 0-6 1-9Z" fill="#242331"/>
+    <ellipse cx="56" cy="70" rx="5" ry="7" fill="#8B5CF6"/>
+    <ellipse cx="88" cy="70" rx="5" ry="7" fill="#8B5CF6"/>
+    <path d="M68 81c3-2 5-2 8 0-1 4-3 6-4 6s-3-2-4-6Z" fill="#A78BFA"/>
+  </g>
+  <text x="178" y="116" fill="#F5F3F7" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="700" letter-spacing="-2">Babuş</text>
+  <text x="395" y="116" fill="#A78BFA" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="700" letter-spacing="-2">TV</text>
+  <rect x="180" y="136" width="252" height="4" rx="2" fill="#8B5CF6" opacity=".72"/>
+</svg>
