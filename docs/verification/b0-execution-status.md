@@ -2,7 +2,7 @@
 
 Date: 2026-09-09
 Owner: REVIEW / Integration Controller only
-Status: FIRST-WAVE ACTIVE — B0A+B0B MERGED; B0F MERGE-ELIGIBLE; B0C EVIDENCE BLOCKED
+Status: FIRST-WAVE ACTIVE — B0A+B0B+B0F MERGED + POST-MERGE GREEN; B0C EVIDENCE BLOCKED
 
 ## Purpose
 
@@ -30,13 +30,13 @@ If this status file conflicts with the approved spec or implementation plan, the
 | First-wave GREEN base SHA | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
 | B0 docs merge | MERGED via PR #17 -> `0af80caf24eab206f303f67c177a5d716fb38a6d` |
 | Baseline suite | GitHub `verify` run `34286003705` SUCCESS on exact first-wave base |
-| Last merged B0 slice | B0A via PR #18 |
-| B0A worker head | `9b5380b7123a43c2606e3cc826a311d1522e8ef6` |
-| B0A resulting main | `3c772eebfd2c950d5c2957055b4d3b184154238e` |
-| B0A post-merge verify | run `34326136408` SUCCESS |
-| Previously merged B0 slice | B0B via PR #19; resulting main `2f90b6fda5ef1da572104fada2467fa56905789a`; post-merge run `34325656261` SUCCESS |
-| Current integration state | FIRST-WAVE DEVELOPMENT ACTIVE; two slices merged |
-| Next eligible merge | B0F PR #21 after explicit user approval |
+| Last merged B0 slice | B0F via PR #21 |
+| B0F worker head | `c95396d904f7350922c5f7288af736a26f9eb756` |
+| B0F resulting main | `9cd58b9f15190cd36feed3dd36550e685fc49d3b` |
+| B0F post-merge verify | run `34328178010` SUCCESS |
+| Previously merged B0 slices | B0A via PR #18 -> `3c772eebfd2c950d5c2957055b4d3b184154238e`, run `34326136408` SUCCESS; B0B via PR #19 -> `2f90b6fda5ef1da572104fada2467fa56905789a`, run `34325656261` SUCCESS |
+| Current integration state | FIRST-WAVE DEVELOPMENT ACTIVE; three slices merged; B0C evidence-blocked |
+| Next eligible merge | NONE — B0C PR #20 must close the real Tizen staging evidence gap first |
 
 The exact first-wave base above remains authoritative for B0A/B0B/B0C/B0F even though review-owned status commits and approved merges advance `main` afterward.
 
@@ -93,7 +93,7 @@ The exact first-wave base above remains authoritative for B0A/B0B/B0C/B0F even t
 | Scope/license review | PASS: seven asset/test changes only; project-authored SVGs; no external font/stock dependency; inherited public logo removed |
 | Asset identity review | PASS: charcoal/violet calico family; no inherited EN/ENTV/EN-IPTV product text or TV/play mark in new SVGs |
 | Raster review | PASS: favicon and Tizen icon resolve to the same Git blob `cb096c2f92df51c8d70e6366de4ea9e119ef50d8` |
-| Conflict review | PASS: GitHub reports mergeable/clean against current integration state |
+| Conflict review | PASS at controller review checkpoint: GitHub reported mergeable/clean against the then-current integration state; re-check after evidence update before Ready |
 | Merge readiness | NOT READY |
 | Important blocker | Plan-required `npm run tizen:build` was not actually executed on the B0C asset head, so staged `tizen/build/icon.png` has not been verified through the real staging command. Manual/direct-copy reasoning is not a substitute for the required command evidence. |
 
@@ -105,18 +105,19 @@ Worker correction: run the real Tizen staging command in an environment with dep
 | --- | --- |
 | Branch | `feature/b0f-settings-copy-cleanup` |
 | Base / merge-base | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
-| Head | `c95396d904f7350922c5f7288af736a26f9eb756` |
-| PR | #21 DRAFT |
-| Status | CONTROLLER REVIEW PASS — AWAITING EXPLICIT MERGE APPROVAL |
+| Worker head | `c95396d904f7350922c5f7288af736a26f9eb756` |
+| PR | #21 MERGED |
+| Status | MERGED + POST-MERGE GREEN |
 | RED evidence | `ca82b7050232ce6bbe38270a202791639f1ddfe9`, run `34323934654` |
 | Exact-head CI | run `34324645805` SUCCESS: checkout/tests/typecheck/build/clean-diff |
 | Contract review | PASS: exact frozen `UI_COPY` and exact matching `copy.d.ts` shape |
 | Scope review | PASS: only runtime/settings copy plus one localized test expectation; no `index.html`, layout CSS, Tizen/package metadata, provider/remote/timer/storage-schema files |
 | Behavior review | PASS: `main.js`/`player.js` changes preserve playback/retry/timer/exit control flow; changes are imports and user-visible text/error presentation only |
 | Security review | PASS: no credential/provider/transient stream URL or secret material introduced |
-| Conflict review | PASS: GitHub reports mergeable/clean against current integration state |
-| Merge readiness | ELIGIBLE AFTER EXPLICIT USER APPROVAL |
-| Blockers | Explicit user merge approval only |
+| Resulting main | `9cd58b9f15190cd36feed3dd36550e685fc49d3b` |
+| Post-merge CI | run `34328178010` SUCCESS |
+| Merge readiness | COMPLETE FOR B0F |
+| Blockers | None for B0F |
 
 ### M3G — Tizen-sensitive Runtime Verification
 
@@ -140,13 +141,12 @@ Worker correction: run the real Tizen staging command in an environment with dep
 
 Current queue:
 
-1. B0F PR #21 is the only first-wave implementation merge candidate currently eligible; obtain explicit user approval before merging.
-2. B0C PR #20 remains blocked until real `npm run tizen:build` staging evidence plus icon equality evidence is published.
-3. After each approved merge, require post-merge `main` GREEN before advancing.
+1. B0C PR #20 is the only remaining first-wave implementation slice and remains blocked until real `npm run tizen:build` staging evidence plus icon equality evidence is published.
+2. When B0C evidence arrives, re-check exact head, current mergeability/divergence, changed-file discipline, tests/build status, staging output, and icon equality before presenting a merge checkpoint.
+3. Do not start B0D until B0A+B0B+B0C+B0F are all merged and current `main` is GREEN.
 4. Monitor M3G independently; do not convert unavailable Tizen/physical-TV checks into PASS.
-5. Start B0D only after B0A+B0B+B0C+B0F are all merged and `main` is GREEN.
-6. Start B0E only after B0D merge + GREEN.
-7. Start B0G only after all B0 implementation slices merge + GREEN.
+5. Start B0E only after B0D merge + GREEN.
+6. Start B0G only after all B0 implementation slices merge + GREEN.
 
 ---
 
@@ -156,6 +156,7 @@ Current queue:
 | ---: | --- | --- | --- | --- | --- |
 | 1 | B0B | #19 | `a460c331ac830833a2f23dd020b7c2626473cd7c` | `2f90b6fda5ef1da572104fada2467fa56905789a` | `34325656261` SUCCESS |
 | 2 | B0A | #18 | `9b5380b7123a43c2606e3cc826a311d1522e8ef6` | `3c772eebfd2c950d5c2957055b4d3b184154238e` | `34326136408` SUCCESS |
+| 3 | B0F | #21 | `c95396d904f7350922c5f7288af736a26f9eb756` | `9cd58b9f15190cd36feed3dd36550e685fc49d3b` | `34328178010` SUCCESS |
 
 ---
 
