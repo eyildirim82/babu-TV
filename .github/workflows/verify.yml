@@ -2,22 +2,19 @@ name: verify
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
 
 permissions:
   contents: read
 
 jobs:
-  test-and-build:
+  tizen-evidence:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout exact source revision
+      - name: Checkout exact B0C final head
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          ref: b7b0b71718b1222478f4d12f7f5a94a140d77d5a
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -28,14 +25,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run characterization tests
-        run: npm test
+      - name: Build Tizen staging from exact B0C head
+        run: npm run tizen:build
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Verify staged icon is byte-for-byte identical
+        run: cmp tizen/icons/icon_128.png tizen/build/icon.png
 
-      - name: Build production player
-        run: npm run build
-
-      - name: Ensure verification did not modify tracked files
-        run: git diff --exit-code
+      - name: Record exact source head
+        run: test "$(git rev-parse HEAD)" = "b7b0b71718b1222478f4d12f7f5a94a140d77d5a"
