@@ -2,7 +2,7 @@
 
 Date: 2026-09-09
 Owner: REVIEW / Integration Controller only
-Status: FIRST-WAVE ACTIVE — B0A+B0B MERGED + POST-MERGE GREEN
+Status: FIRST-WAVE ACTIVE — B0A+B0B MERGED; B0F MERGE-ELIGIBLE; B0C EVIDENCE BLOCKED
 
 ## Purpose
 
@@ -36,7 +36,7 @@ If this status file conflicts with the approved spec or implementation plan, the
 | B0A post-merge verify | run `34326136408` SUCCESS |
 | Previously merged B0 slice | B0B via PR #19; resulting main `2f90b6fda5ef1da572104fada2467fa56905789a`; post-merge run `34325656261` SUCCESS |
 | Current integration state | FIRST-WAVE DEVELOPMENT ACTIVE; two slices merged |
-| Next eligible merge | NONE YET — B0C/B0F final controller review pending |
+| Next eligible merge | B0F PR #21 after explicit user approval |
 
 The exact first-wave base above remains authoritative for B0A/B0B/B0C/B0F even though review-owned status commits and approved merges advance `main` afterward.
 
@@ -62,10 +62,6 @@ The exact first-wave base above remains authoritative for B0A/B0B/B0C/B0F even t
 | Merge readiness | COMPLETE FOR B0A |
 | Blockers | None for B0A |
 
-Owned scope: package metadata, `package-lock.json`, Vite base identity, Tizen identity/packaging, identity scanner, active build docs.
-
-Must not own: `player/index.html`, presentation CSS, settings-copy cleanup, Live TV renderer behavior.
-
 ### B0B — Design System
 
 | Field | Value |
@@ -83,10 +79,6 @@ Must not own: `player/index.html`, presentation CSS, settings-copy cleanup, Live
 | Merge readiness | COMPLETE FOR B0B |
 | Blockers | None for B0B |
 
-Owned scope: `player/src/ui/tokens.css`, `theme.css`, `primitives.css`, design-system contract tests.
-
-Must not own: shell integration, runtime copy, package metadata, Tizen packaging.
-
 ### B0C — Brand Assets
 
 | Field | Value |
@@ -95,16 +87,17 @@ Must not own: shell integration, runtime copy, package metadata, Tizen packaging
 | Base / merge-base | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
 | Head | `b7b0b71718b1222478f4d12f7f5a94a140d77d5a` |
 | PR | #20 DRAFT |
-| Status | WORKER GREEN — CONTROLLER FINAL REVIEW PENDING |
+| Status | IMPORTANT EVIDENCE GAP — TIZEN STAGING COMMAND NOT EXECUTED |
 | RED evidence | `b221bb509f3ddb01864d4ab4af7bcaa61963e45d`; inherited-artwork RED `77b7efb944a87270526255a434989fe51d1d8979` |
-| Exact-head CI | verify #218 SUCCESS |
-| Worker evidence | 204/204 PASS; typecheck/build/clean-diff PASS; focused asset tests 4/4 PASS; deterministic Tizen icon staging copy checked |
-| Merge readiness | NOT YET APPROVED |
-| Blockers | Controller final asset/license/staging/scope review + explicit user merge approval; hosted CI did not run full `tizen:build` |
+| Exact-head CI | run `34324774884` SUCCESS for tests/typecheck/Vite build/clean-diff |
+| Scope/license review | PASS: seven asset/test changes only; project-authored SVGs; no external font/stock dependency; inherited public logo removed |
+| Asset identity review | PASS: charcoal/violet calico family; no inherited EN/ENTV/EN-IPTV product text or TV/play mark in new SVGs |
+| Raster review | PASS: favicon and Tizen icon resolve to the same Git blob `cb096c2f92df51c8d70e6366de4ea9e119ef50d8` |
+| Conflict review | PASS: GitHub reports mergeable/clean against current integration state |
+| Merge readiness | NOT READY |
+| Important blocker | Plan-required `npm run tizen:build` was not actually executed on the B0C asset head, so staged `tizen/build/icon.png` has not been verified through the real staging command. Manual/direct-copy reasoning is not a substitute for the required command evidence. |
 
-Owned scope: BabuşTV mark/wordmark/boot/favicon/Tizen icon assets and asset acceptance checks.
-
-Must not own: application logic, presentation layout, package identity, localization.
+Worker correction: run the real Tizen staging command in an environment with dependencies installed, then compare `tizen/icons/icon_128.png` and `tizen/build/icon.png` byte-for-byte/hash. Do not change production logic or broaden scope. Publish exact command/output evidence in PR #20; if no source change is required, do not create a speculative production commit.
 
 ### B0F — Runtime Copy Cleanup
 
@@ -114,16 +107,16 @@ Must not own: application logic, presentation layout, package identity, localiza
 | Base / merge-base | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
 | Head | `c95396d904f7350922c5f7288af736a26f9eb756` |
 | PR | #21 DRAFT |
-| Status | WORKER GREEN — CONTROLLER FINAL REVIEW PENDING |
+| Status | CONTROLLER REVIEW PASS — AWAITING EXPLICIT MERGE APPROVAL |
 | RED evidence | `ca82b7050232ce6bbe38270a202791639f1ddfe9`, run `34323934654` |
-| Exact-head CI | run `34324645805` SUCCESS |
-| Worker evidence | tests/typecheck/build/clean-diff SUCCESS |
-| Merge readiness | NOT YET APPROVED |
-| Blockers | Controller must confirm `player.js`/`main.js` changes are user-visible strings only and no playback/startup/provider/remote/timer/storage semantics changed; explicit user merge approval required |
-
-Owned scope: shared runtime copy contract and user-visible runtime/settings/action/status strings.
-
-Must not own: `player/index.html`, layout CSS, Tizen packaging, playback/provider behavior.
+| Exact-head CI | run `34324645805` SUCCESS: checkout/tests/typecheck/build/clean-diff |
+| Contract review | PASS: exact frozen `UI_COPY` and exact matching `copy.d.ts` shape |
+| Scope review | PASS: only runtime/settings copy plus one localized test expectation; no `index.html`, layout CSS, Tizen/package metadata, provider/remote/timer/storage-schema files |
+| Behavior review | PASS: `main.js`/`player.js` changes preserve playback/retry/timer/exit control flow; changes are imports and user-visible text/error presentation only |
+| Security review | PASS: no credential/provider/transient stream URL or secret material introduced |
+| Conflict review | PASS: GitHub reports mergeable/clean against current integration state |
+| Merge readiness | ELIGIBLE AFTER EXPLICIT USER APPROVAL |
+| Blockers | Explicit user merge approval only |
 
 ### M3G — Tizen-sensitive Runtime Verification
 
@@ -141,19 +134,15 @@ Must not own: `player/index.html`, layout CSS, Tizen packaging, playback/provide
 | Merge readiness | NOT READY FOR “M3 COMPLETE” CLAIM; docs merge checkpoint requires separate controller review/approval |
 | Blockers | Real Emulator and/or RTL execution remains open for applicable runtime smoke |
 
-Primary output: `docs/verification/m3-live-tv-runtime.md`.
-
-Code fixes are not allowed on this docs branch. A reproduced runtime defect requiring code must use a separate `feature/m3g-tizen-hardening` branch with root cause -> RED -> minimum fix -> GREEN.
-
 ---
 
 ## Review / Integration Queue
 
 Current queue:
 
-1. Re-review B0C/B0F individually against the now-advanced `main`, including correct first-wave merge-base, current ahead/behind, conflict/divergence, changed-file discipline, TDD, exact-head evidence, secret leakage, ENTV identity reduction, and behavior-regression boundaries.
-2. Present exactly one eligible first-wave merge checkpoint at a time and obtain explicit user approval before merging.
-3. After each approved merge, require post-merge `main` GREEN before advancing to the next merge checkpoint.
+1. B0F PR #21 is the only first-wave implementation merge candidate currently eligible; obtain explicit user approval before merging.
+2. B0C PR #20 remains blocked until real `npm run tizen:build` staging evidence plus icon equality evidence is published.
+3. After each approved merge, require post-merge `main` GREEN before advancing.
 4. Monitor M3G independently; do not convert unavailable Tizen/physical-TV checks into PASS.
 5. Start B0D only after B0A+B0B+B0C+B0F are all merged and `main` is GREEN.
 6. Start B0E only after B0D merge + GREEN.
@@ -178,12 +167,12 @@ Current queue:
 
 ### Important
 
-- B0C and B0F have worker-reported/exact-head GREEN evidence but have not yet completed the controller's final merge review against the current integration state.
+- B0C PR #20 is blocked on missing execution evidence for the plan-required real `npm run tizen:build` staging path and staged-icon equality check.
 - M3G exact-head automated CI is GREEN, but all real Tizen smoke observations remain unavailable; M2 WidgetData remains pending and physical-TV acceptance deferred.
 
 ### Minor
 
-- B0C full `tizen:build` was not available in the worker's local environment; deterministic icon staging was checked separately and normal production build is GREEN. Treat as an evidence gap to inspect during final B0C review, not an automatic blocker by itself.
+- None currently promoted to merge blocker. B0C visual wording/asset micro-cleanup, if any, must not substitute for the missing staging evidence.
 
 ---
 
