@@ -11,6 +11,8 @@ Session 2 (2026-09-09, later) reached a real retail Samsung set. Packaging, sign
 
 Session 2 then ended without UI results. The set became unreachable before pairing was accepted: `sdb devices` lists nothing and `sdb connect` returns `error: failed to connect to remote target`. No smoke was observed, so no smoke result changed.
 
+Session 3 (2026-09-09, later still) moved to the Samsung TV emulator instead. The emulator boots and attaches, but the app cannot be installed on it yet, so the matrix is still untouched. Details below.
+
 ## Scope and evidence rules
 
 This document records the M3G verification state for the exact M3/B0-integrated code candidate at `0af80caf24eab206f303f67c177a5d716fb38a6d`.
@@ -122,6 +124,29 @@ java.lang.NullPointerException: null
 ```
 
 `tizen install -s <serial>` and `tizen run -s <serial>` both crash in the CLI target lookup while `sdb devices` lists the set correctly. This is a Tizen Studio CLI defect, not an M3 runtime defect, so no production change was made here. Install and launch were completed through the TV's own `vd_appinstall` / `was_execute` commands over `sdb`. A repository-side fallback for this already exists as an unpushed local commit (`c68b519` on `chore/tizen-real-tv-deploy`); promoting it is packaging/tooling scope, not M3G scope.
+
+## Session 3 — emulator attempt
+
+The Samsung TV emulator image `tv-samsung-10.0-x86_64`, VM `tv-emu`, template HD1080 TV at 1920x1080, is installed on the verification host and hardware acceleration is available. The VM boots, attaches as `emulator-26101`, and its guest shell answers about 80 seconds after launch.
+
+| Step | Result | Evidence |
+| --- | --- | --- |
+| Emulator launch | PASS | `em-cli launch -n tv-emu`, guest shell responds |
+| Push package to emulator | PASS | 315.8 KB transferred |
+| Install on emulator | FAIL | `install failed[118, -12], reason: Check certificate error : :Invalid format of certificate in signature.:<-2>` |
+| Emulator device log | NOT-AVAILABLE | `dlog -d` returns nothing on this image, same as the retail set |
+
+The install failure is expected and is not an app defect. The available signed artifact carries the Samsung retail distributor certificate, which is bound to the physical set and which the emulator refuses. An emulator run needs a Tizen developer profile instead.
+
+Building that profile is blocked on this host by three separate Tizen Studio defects, on top of the CLI target-lookup crash already recorded:
+
+1. `tizen security-profiles list` and `add` throw `NullPointerException` in `SigningProfile.readProfileItem` whenever a profile entry uses the developer certificate shape, so profiles cannot be listed or registered while such an entry exists.
+2. `tizen certificate` reports its parameters and exits without writing any keystore file.
+3. The pre-existing `dev` profile entry, restored from the host's own backup, reproduces defect 1 and had to be removed again.
+
+A replacement author certificate signed by the SDK's bundled Tizen Developers CA was generated successfully with OpenSSL and is held outside the repository. Registering it still requires writing a security profile entry, which this session did not do. The host's `profiles.xml` was returned to its original single-profile state and verified to load cleanly.
+
+Emulator results, once they exist, must be labelled `EMULATOR-PASS` rather than `PASS`. The image is Tizen 10.0 while the retail set is Tizen 9.0, and emulator AVPlay and Shaka behaviour is not equivalent to a real set.
 
 ## Runtime environment
 
