@@ -2,7 +2,7 @@
 
 Date: 2026-09-09
 Owner: REVIEW / Integration Controller only
-Status: FIRST-WAVE ACTIVE — B0A+B0B+B0F MERGED + POST-MERGE GREEN; B0C EVIDENCE BLOCKED
+Status: FIRST-WAVE COMPLETE — B0A+B0B+B0C+B0F MERGED + POST-MERGE GREEN
 
 ## Purpose
 
@@ -30,13 +30,13 @@ If this status file conflicts with the approved spec or implementation plan, the
 | First-wave GREEN base SHA | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
 | B0 docs merge | MERGED via PR #17 -> `0af80caf24eab206f303f67c177a5d716fb38a6d` |
 | Baseline suite | GitHub `verify` run `34286003705` SUCCESS on exact first-wave base |
-| Last merged B0 slice | B0F via PR #21 |
-| B0F worker head | `c95396d904f7350922c5f7288af736a26f9eb756` |
-| B0F resulting main | `9cd58b9f15190cd36feed3dd36550e685fc49d3b` |
-| B0F post-merge verify | run `34328178010` SUCCESS |
-| Previously merged B0 slices | B0A via PR #18 -> `3c772eebfd2c950d5c2957055b4d3b184154238e`, run `34326136408` SUCCESS; B0B via PR #19 -> `2f90b6fda5ef1da572104fada2467fa56905789a`, run `34325656261` SUCCESS |
-| Current integration state | FIRST-WAVE DEVELOPMENT ACTIVE; three slices merged; B0C evidence-blocked |
-| Next eligible merge | NONE — B0C PR #20 must close the real Tizen staging evidence gap first |
+| Last merged B0 slice | B0C via PR #20 |
+| B0C worker head | `b7b0b71718b1222478f4d12f7f5a94a140d77d5a` |
+| B0C resulting main | `e6a4489616360404c7ae959e4b57912a4fe33779` |
+| B0C post-merge verify | run `34329200636` SUCCESS |
+| Previously merged B0 slices | B0F via PR #21 -> `9cd58b9f15190cd36feed3dd36550e685fc49d3b`, run `34328178010` SUCCESS; B0A via PR #18 -> `3c772eebfd2c950d5c2957055b4d3b184154238e`, run `34326136408` SUCCESS; B0B via PR #19 -> `2f90b6fda5ef1da572104fada2467fa56905789a`, run `34325656261` SUCCESS |
+| Current integration state | FIRST-WAVE COMPLETE; B0A+B0B+B0C+B0F all merged + post-merge GREEN |
+| Next eligible phase | B0D — may start from current GREEN `main` after this review-owned status checkpoint also verifies GREEN |
 
 The exact first-wave base above remains authoritative for B0A/B0B/B0C/B0F even though review-owned status commits and approved merges advance `main` afterward.
 
@@ -85,19 +85,20 @@ The exact first-wave base above remains authoritative for B0A/B0B/B0C/B0F even t
 | --- | --- |
 | Branch | `feature/b0c-brand-assets` |
 | Base / merge-base | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
-| Head | `b7b0b71718b1222478f4d12f7f5a94a140d77d5a` |
-| PR | #20 DRAFT |
-| Status | IMPORTANT EVIDENCE GAP — TIZEN STAGING COMMAND NOT EXECUTED |
+| Worker head | `b7b0b71718b1222478f4d12f7f5a94a140d77d5a` |
+| PR | #20 MERGED |
+| Status | MERGED + POST-MERGE GREEN |
 | RED evidence | `b221bb509f3ddb01864d4ab4af7bcaa61963e45d`; inherited-artwork RED `77b7efb944a87270526255a434989fe51d1d8979` |
 | Exact-head CI | run `34324774884` SUCCESS for tests/typecheck/Vite build/clean-diff |
+| Tizen staging evidence | run `34328372665`, job `tizen-evidence`: exact `b7b0b717...` checkout; `npm run tizen:build` SUCCESS; staged icon `cmp` SUCCESS; exact-head assertion SUCCESS |
 | Scope/license review | PASS: seven asset/test changes only; project-authored SVGs; no external font/stock dependency; inherited public logo removed |
 | Asset identity review | PASS: charcoal/violet calico family; no inherited EN/ENTV/EN-IPTV product text or TV/play mark in new SVGs |
-| Raster review | PASS: favicon and Tizen icon resolve to the same Git blob `cb096c2f92df51c8d70e6366de4ea9e119ef50d8` |
-| Conflict review | PASS at controller review checkpoint: GitHub reported mergeable/clean against the then-current integration state; re-check after evidence update before Ready |
-| Merge readiness | NOT READY |
-| Important blocker | Plan-required `npm run tizen:build` was not actually executed on the B0C asset head, so staged `tizen/build/icon.png` has not been verified through the real staging command. Manual/direct-copy reasoning is not a substitute for the required command evidence. |
-
-Worker correction: run the real Tizen staging command in an environment with dependencies installed, then compare `tizen/icons/icon_128.png` and `tizen/build/icon.png` byte-for-byte/hash. Do not change production logic or broaden scope. Publish exact command/output evidence in PR #20; if no source change is required, do not create a speculative production commit.
+| Raster/staging review | PASS: source and staged Tizen icons verified byte-for-byte identical through the real staging command |
+| Conflict review | PASS before merge: GitHub reported mergeable/clean against then-current integration state |
+| Resulting main | `e6a4489616360404c7ae959e4b57912a4fe33779` |
+| Post-merge CI | run `34329200636` SUCCESS |
+| Merge readiness | COMPLETE FOR B0C |
+| Blockers | None for B0C |
 
 ### B0F — Runtime Copy Cleanup
 
@@ -141,12 +142,11 @@ Worker correction: run the real Tizen staging command in an environment with dep
 
 Current queue:
 
-1. B0C PR #20 is the only remaining first-wave implementation slice and remains blocked until real `npm run tizen:build` staging evidence plus icon equality evidence is published.
-2. When B0C evidence arrives, re-check exact head, current mergeability/divergence, changed-file discipline, tests/build status, staging output, and icon equality before presenting a merge checkpoint.
-3. Do not start B0D until B0A+B0B+B0C+B0F are all merged and current `main` is GREEN.
-4. Monitor M3G independently; do not convert unavailable Tizen/physical-TV checks into PASS.
-5. Start B0E only after B0D merge + GREEN.
-6. Start B0G only after all B0 implementation slices merge + GREEN.
+1. First-wave B0A+B0B+B0C+B0F is complete and post-merge GREEN. B0D becomes the next implementation phase once this status-board checkpoint is also GREEN.
+2. B0D must start from the then-current GREEN `main`; do not reuse the first-wave bootstrap SHA as its implementation base.
+3. Do not start B0E until B0D is merged and post-merge `main` is GREEN.
+4. Start B0G only after all B0 implementation slices are merged and GREEN.
+5. Monitor M3G independently; do not convert unavailable Tizen/physical-TV checks into PASS.
 
 ---
 
@@ -157,6 +157,7 @@ Current queue:
 | 1 | B0B | #19 | `a460c331ac830833a2f23dd020b7c2626473cd7c` | `2f90b6fda5ef1da572104fada2467fa56905789a` | `34325656261` SUCCESS |
 | 2 | B0A | #18 | `9b5380b7123a43c2606e3cc826a311d1522e8ef6` | `3c772eebfd2c950d5c2957055b4d3b184154238e` | `34326136408` SUCCESS |
 | 3 | B0F | #21 | `c95396d904f7350922c5f7288af736a26f9eb756` | `9cd58b9f15190cd36feed3dd36550e685fc49d3b` | `34328178010` SUCCESS |
+| 4 | B0C | #20 | `b7b0b71718b1222478f4d12f7f5a94a140d77d5a` | `e6a4489616360404c7ae959e4b57912a4fe33779` | `34329200636` SUCCESS |
 
 ---
 
@@ -168,12 +169,11 @@ Current queue:
 
 ### Important
 
-- B0C PR #20 is blocked on missing execution evidence for the plan-required real `npm run tizen:build` staging path and staged-icon equality check.
 - M3G exact-head automated CI is GREEN, but all real Tizen smoke observations remain unavailable; M2 WidgetData remains pending and physical-TV acceptance deferred.
 
 ### Minor
 
-- None currently promoted to merge blocker. B0C visual wording/asset micro-cleanup, if any, must not substitute for the missing staging evidence.
+- None currently promoted to merge blocker.
 
 ---
 
