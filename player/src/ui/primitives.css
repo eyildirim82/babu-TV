@@ -1,0 +1,55 @@
+.babu-surface {
+  background: var(--babu-surface);
+  color: var(--babu-text-primary);
+  border-radius: var(--babu-radius-md);
+}
+
+.babu-surface-raised {
+  background: var(--babu-surface-raised);
+  color: var(--babu-text-primary);
+  border-radius: var(--babu-radius-lg);
+}
+
+.babu-focus-ring {
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: var(--babu-focus-offset);
+  box-shadow: var(--babu-focus-shadow);
+  background-color: var(--babu-surface-focus);
+}
+
+.babu-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--babu-space-md);
+  border-radius: 999px;
+  background: var(--babu-surface-raised);
+  color: var(--babu-text-secondary);
+  font-size: var(--babu-font-size-sm);
+  font-weight: var(--babu-font-weight-medium);
+}
+
+.babu-muted {
+  color: var(--babu-text-muted);
+}
+
+.babu-surface,
+.babu-surface-raised,
+.babu-focus-ring,
+.babu-pill {
+  transition:
+    background-color var(--babu-motion-fast) ease,
+    color var(--babu-motion-fast) ease,
+    outline-color var(--babu-motion-fast) ease,
+    box-shadow var(--babu-motion-base) ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .babu-surface,
+  .babu-surface-raised,
+  .babu-focus-ring,
+  .babu-pill {
+    transition: none;
+    animation: none;
+  }
+}
