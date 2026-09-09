@@ -9,18 +9,6 @@ import { ProviderError } from '../src/providers/errors.js';
 import type { CatalogRepository } from '../src/repository/catalog-repository.js';
 import type { ProviderRepository } from '../src/repository/provider-repository.js';
 
-type RegistrationPort = {
-  registerProvider(provider: ProviderRecord, credential: ProviderCredential): Promise<ProviderProfile>;
-};
-
-const RegistrationService = ProviderCoreService as unknown as new (
-  providers: ProviderRepository,
-  catalog: CatalogRepository,
-  credentials: CredentialStore,
-  sync: ProviderSyncPort,
-  adapters: ProviderAdapterFactory,
-) => ProviderCoreService & RegistrationPort;
-
 const xtreamProvider: ProviderRecord = {
   id: 'provider-x',
   kind: 'xtream',
@@ -139,7 +127,7 @@ function setup(profileResult: ProviderProfile | Error = profile) {
     assert.equal(providers.records.size, 0, 'metadata must not persist before validation');
     assert.equal(credentials.records.size, 0, 'credential must not persist before validation');
   }));
-  const service = new RegistrationService(providers, catalog, credentials, sync, adapters);
+  const service = new ProviderCoreService(providers, catalog, credentials, sync, adapters);
   return { service, providers, credentials, sync, adapters };
 }
 
