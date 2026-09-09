@@ -10,7 +10,7 @@
   <content src="index.html"/>
   <feature name="http://tizen.org/feature/screen.size.all"/>
   <icon src="icon.png"/>
-  <name>BABUS TV</name>
+  <name>BABUŞ TV</name>
   <tizen:privilege name="http://tizen.org/privilege/internet"/>
   <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
   <tizen:privilege name="http://developer.samsung.com/privilege/widgetdata"/>

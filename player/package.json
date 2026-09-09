@@ -1,8 +1,8 @@
 {
-  "name": "@en-iptv/player",
+  "name": "@babustv/player",
   "version": "1.10.1",
   "type": "module",
-  "description": "EN IPTV — Shaka-powered player SPA",
+  "description": "BabuşTV player SPA",
   "scripts": {
     "dev": "vite --port 5173 --host",
     "build": "vite build",

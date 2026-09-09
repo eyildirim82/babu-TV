@@ -1,123 +1,125 @@
-# 📺 EN TV Player
+# 📺 BabuşTV
 
-**The IPTV player for Samsung Tizen TVs** — plays DRM-protected channels other players can't, with no server required.
+**Samsung Tizen TV için uzaktan kumanda odaklı IPTV oynatıcı** — HLS/DASH akışlarını, ClearKey ve PlayReady korumalı kanalları destekleyen Vite tabanlı TV uygulaması.
 
-[![Downloads](https://img.shields.io/github/downloads/Nur-allhi/en-tvplayer/total)](https://github.com/Nur-allhi/en-tvplayer/releases)
-[![Latest release](https://img.shields.io/github/v/release/Nur-allhi/en-tvplayer)](https://github.com/Nur-allhi/en-tvplayer/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tizen](https://img.shields.io/badge/Tizen-5.0+-red?logo=samsung)]()
 
-> **Current version: v1.10.1** — [see what's new](CHANGELOG.md) · [download](https://github.com/Nur-allhi/en-tvplayer/releases/latest)
+> **Current version: v1.10.1** — [CHANGELOG](CHANGELOG.md)
 
 ---
 
-## Why EN TV Player?
+## BabuşTV neden var?
 
-Most IPTV players fail on Samsung Tizen TVs when channels are **DRM-protected**. EN TV Player was built to solve exactly that.
+Samsung Tizen TV'lerde bazı canlı yayınlar, özellikle DRM korumalı akışlar, genel amaçlı oynatıcılarda güvenilir çalışmayabilir. BabuşTV; TV kumandası, kanal listeleri ve Tizen playback yetenekleri etrafında tasarlanır.
 
-- 🔓 **DRM that works** — ClearKey and PlayReady channels play where other players show black screens
-- 📡 **No server needed** — paste your M3U/M3U8 playlist URL and watch
-- 📺 **Built for the 10-foot experience** — full remote support, big readable UI, channel groups
-- 🔄 **Stays current** — optional in-app update checker tells you when a new version drops
-- 🔒 **Private by default** — everything stays on your TV; usage stats are strictly opt-in
-- 🆓 **Free and open source (MIT)**
+- 🔓 **DRM desteği** — ClearKey ve PlayReady akışları
+- 📡 **Sunucusuz kullanım** — M3U/M3U8 playlist URL'si doğrudan eklenebilir
+- 📺 **TV odaklı arayüz** — kumanda navigasyonu, kanal grupları ve sayı ile kanal seçimi
+- 🎚️ **Kanal bazlı proxy seçeneği** — gerektiğinde belirli akışlar için
+- 🔒 **Yerel veri** — ayarlar ve kanal verileri cihazda tutulur
+- 🆓 **MIT lisanslı açık kaynak**
 
 ---
 
-## 🚀 Install
+## Geliştirme
 
-### Option 1: Apps2Samsung (recommended)
-
-1. Download [Apps2Samsung](https://github.com/Apps2Samsung/Apps2Samsung/releases)
-2. Enable Developer Mode on your TV (press `1-2-3-4-5` in the Apps menu)
-3. Enter your TV's IP in Apps2Samsung
-4. Pick **EN TV Player** from the community catalog (or your downloaded `.wgt`) and click Install
-5. Re-run the installer whenever the app tells you an update is available
-
-### Option 2: Tizen Studio CLI
+Gereksinimler: güncel Node.js ve npm.
 
 ```bash
-tizen install -n EN-IPTV_Player.wgt -s <TV_IP>
+npm ci
+npm run dev
 ```
 
-> Updates must be signed with the same key — reinstalling never touches your channels or settings.
+Tarayıcı geliştirme adresi:
+
+```text
+http://localhost:5173/babustv/
+```
+
+Üretim build'i:
+
+```bash
+npm run build
+```
+
+Doğrulama:
+
+```bash
+npm test
+npm run typecheck
+npm run brand:check
+```
 
 ---
 
-## ✨ Features
+## Tizen build ve packaging
+
+BabuşTV'nin canonical Tizen kimliği:
+
+- package: `BabusTVApp`
+- application: `BabusTVApp.BabusTV`
+- display name: `BABUŞ TV`
+
+İki paketleme hattı da aynı kimliği ve artifact adlandırmasını kullanır.
+
+### Custom packaging
+
+```bash
+npm run build
+npm run tizen
+```
+
+Feature branch çıktısı:
+
+```text
+beta/babustv_beta_v<version>_<commit>.wgt
+```
+
+`main` çıktısı:
+
+```text
+stable/babustv_stable_v<version>_<commit>.wgt
+```
+
+### Tizen Studio CLI
+
+```bash
+npm run tizen:build
+npm run tizen:package
+```
+
+Paket `tizen/build/` altında aynı canonical adlandırmayla bırakılır. Ayrıntılar için [tizen/README.md](tizen/README.md) ve Windows geliştirme ortamı notları için [SETUP.md](SETUP.md) dosyasına bakın.
+
+> Paket/uygulama kimliği değişiklikleri cihaz storage origin'ini etkileyebilir. Desteklenen kurulu bir ürün kimliğinden başka kimliğe otomatik veri taşıma bu repoda yapılmaz; böyle bir upgrade hedefi ayrı, açıkça onaylanmış migration tasarımı gerektirir.
+
+---
+
+## Özellikler
 
 | | |
 |---|---|
-| 🔓 DRM playback | ClearKey + PlayReady protected channels |
-| 📃 Playlists | M3U/M3U8, multiple saved playlists, auto-refresh on launch |
-| 🗂️ Organization | Channel groups, alphabetical sorting, fast number jump |
-| 🎚️ Per-channel proxy | Toggle proxy per channel for stubborn streams |
-| 📶 Smart playback | Auto quality, stream-format auto-detection, live-token retry |
-| 🔔 Update checker | Opt-in notice when a new version is available |
-| 🎮 Remote-first | Full Samsung remote support incl. color keys & channel up/down |
+| 🔓 DRM playback | ClearKey + PlayReady |
+| 📃 Playlists | M3U/M3U8, birden fazla kayıtlı playlist |
+| 🗂️ Organizasyon | Kanal grupları, sıralama, hızlı sayı ile seçim |
+| 🎚️ Proxy | Kanal bazlı proxy seçimi |
+| 📶 Playback | Akış formatı algılama ve recovery mekanizmaları |
+| 🎮 Remote-first | Samsung kumanda tuşları ve kanal geçişleri |
 
 ---
 
-## 🎮 Remote Control
+## İlk çalıştırma
 
-| Key | Action |
-|-----|--------|
-| ↑ / ↓ | Navigate channel list |
-| ← / → | Open/close sidebar |
-| Enter | Select channel |
-| Back | Close menu / exit |
-| Volume ↑/↓ | Adjust volume |
-| Red / Green / Yellow / Blue | Shortcuts (menu, groups, proxy, settings) |
-| Channel Up/Down | Previous / next channel |
-| Numbers | Jump to channel |
+1. Uygulamayı kurup açın.
+2. Ayarlardan M3U/M3U8 playlist URL'sini ekleyin.
+3. Playlist'i yükleyip kanal seçin.
 
 ---
 
-## 📖 First Run
+## Hata raporu ve katkı
 
-1. Install the app and open it from "My Apps"
-2. The Settings page opens automatically
-3. Paste your M3U/M3U8 playlist URL → Fetch
-4. Start watching! The app can auto-refresh your playlist on every launch (Settings → Playback)
-
----
-
-## 🛟 Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| Channel won't play | Try enabling **Proxy** for that channel from the menu |
-| "Update available" badge | Reinstall via Apps2Samsung — settings are kept |
-| Channel list empty | Re-paste your M3U URL in Settings → Channel Source |
-| App missing from My Apps | Restart the TV, verify Developer Mode is still on |
-
----
-
-## 💬 Contact
-
-Questions, broken channels, or just want to say hi? Message me directly on Telegram: **[@nureallhiii](https://t.me/nureallhiii)**
-
----
-
-## 🐛 Bugs & 💡 Feature Requests
-
-Prefer GitHub? Open a ticket on [GitHub Issues](https://github.com/Nur-allhi/en-tvplayer/issues).
-
-**Rules:** search first · one issue per ticket · be specific (TV model, Tizen version, app version, steps to reproduce) · stay respectful.
-
----
-
-## 🔗 Links
-
-- [Releases](https://github.com/Nur-allhi/en-tvplayer/releases) — download the WGT
-- [Changelog](CHANGELOG.md) — what changed in each version
-- [Apps2Samsung](https://github.com/Apps2Samsung/Apps2Samsung) — easy installer
-- [Tizen Community Packages](https://github.com/Apps2Samsung/tizen-community-packages)
-
----
+Issue açarken TV modeli, Tizen sürümü, uygulama sürümü ve tekrar üretme adımlarını ekleyin. Mevcut issue'ları önce kontrol edin ve her issue'da tek problemi ele alın.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
-⭐ If EN TV Player is useful to you, a star on GitHub helps others find it. Thank you! 🙏
+MIT — see [LICENSE](LICENSE). Mevcut lisans ve repository geçmişi proje provenance'ını korur.

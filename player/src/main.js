@@ -6,6 +6,7 @@ import { createBrowserLiveTvRuntime } from './live-tv/create-live-tv-runtime.ts'
 import * as ui from './ui.js';
 import * as remote from './remote.js';
 import * as settings from './settings.js';
+import { UI_COPY } from './ui/copy.js';
 import { checkForUpdate, sendUsagePing, consentAsked, hasConsented, setConsented } from './update.js';
 import { processStreamUrl, parseM3u, fetchPlaylist as fetchFromPlaylistUrl } from './utils.js';
 import {
@@ -105,7 +106,7 @@ function getDisplayChannels() {
   return channels.filter(ch => (ch.group || 'Ungrouped') === selectedGroup);
 }
 
-const BOOT_TAGLINE = 'Smart IPTV Player for Samsung Tizen';
+const BOOT_TAGLINE = 'Samsung Tizen için BabuşTV';
 let bootTypewriterTimer = null;
 let bootShownAt = 0;
 const BOOT_MIN_MS = 1500; // logo stays at least this long on every launch
@@ -173,60 +174,60 @@ const CHANGELOG = [
   {
     version: '1.10.1',
     sections: [
-      { type: 'fixed', items: ['Empty fresh install no longer strands you on a dead page', 'Resolution badge always shows the true quality', 'Interlaced channels play via native fallback', 'Flaky relays recover instead of dying (fresh-token retries)'] },
-      { type: 'changed', items: ['Staged loading: spinner, first frame, then buffering', 'Channel + buffering toasts with wait hints', 'Boot logo flies toward you on launch'] },
+      { type: 'fixed', items: ['Boş yeni kurulum artık sizi işlevsiz bir sayfada bırakmıyor', 'Çözünürlük rozeti her zaman gerçek kaliteyi gösteriyor', 'Geçmeli taramalı kanallar yerel oynatmayla açılıyor', 'Kararsız aktarımlar yeni bağlantıyla yeniden denenerek toparlanıyor'] },
+      { type: 'changed', items: ['Aşamalı yükleme: gösterge, ilk kare, ardından arabelleğe alma', 'Bekleme ipuçlarıyla kanal ve arabelleğe alma bildirimleri', 'Açılışta logo size doğru yakınlaşıyor'] },
     ],
   },
   {
     version: '1.10.0',
     sections: [
-      { type: 'added', items: ['Optional update checker — opt in once, get notified of new versions', 'Contact and download stats refreshed'] },
+      { type: 'added', items: ['İsteğe bağlı güncelleme denetimi — bir kez izin verin, yeni sürümlerden haberdar olun', 'İletişim ve indirme istatistikleri yenilendi'] },
     ],
   },
   {
     version: '1.9.0',
     sections: [
-      { type: 'fixed', items: ['Tokenized live playlists now play without dropping after the first frame', 'Access-denied channels retry with a fresh link before giving up', 'Clearer messages when a live stream breaks up'] },
+      { type: 'fixed', items: ['Belirteçli canlı oynatma listeleri artık ilk kareden sonra düşmeden oynuyor', 'Erişimi reddedilen kanallar vazgeçmeden önce yeni bağlantıyla yeniden deneniyor', 'Canlı yayın kesintılarında daha anlaşılır mesajlar gösteriliyor'] },
     ],
   },
   {
     version: '1.8.0',
     sections: [
-      { type: 'fixed', items: ['Settings changes via remote now save — playlist edits and toggles stick', 'Enter inside Settings text boxes now saves on TV', 'Crashing channels retry automatically in compatibility mode', 'Unrecognized channel links are now identified and retried correctly', 'Channel error messages are now accurate (including access-denied detection)'] },
-      { type: 'changed', items: ['Proxy hint position fixed to bottom center', 'Settings back button spacing fixed'] },
+      { type: 'fixed', items: ['Kumandayla yapılan Ayarlar değişiklikleri artık kaydediliyor', 'Ayarlar metin alanında Enter artık TV’de kaydediyor', 'Çöken kanallar uyumluluk modunda otomatik yeniden deneniyor', 'Tanınmayan kanal bağlantıları artık belirlenip doğru şekilde yeniden deneniyor', 'Kanal hata mesajları artık daha doğru'] },
+      { type: 'changed', items: ['Proxy ipucu alt orta konuma düzeltildi', 'Ayarlar geri düğmesi aralığı düzeltildi'] },
     ],
   },
   {
     version: '1.7.0',
     sections: [
-      { type: 'fixed', items: ['Black screen on some IPTV channels — now detects stream format automatically', 'HLS streams that need date-time sync now work correctly', 'Raw TS/MP4 stream URLs now play correctly on Samsung Tizen', 'Video errors from the TV are now caught and shown to you', 'Streams that will never work now fail in 15 seconds instead of 30'] },
-      { type: 'changed', items: ['All error messages are now in plain English — no more technical jargon', 'Better error hints (try Proxy, check internet, channel may be offline)'] },
+      { type: 'fixed', items: ['Bazı kanallardaki siyah ekran için yayın biçimi artık otomatik belirleniyor', 'Tarih-saat eşitlemesi gereken HLS yayınları artık doğru çalışıyor', 'Ham TS/MP4 yayın bağlantıları Samsung Tizen’da doğru oynuyor', 'TV kaynaklı video hataları yakalanıp kullanıcıya gösteriliyor', 'Çalışmayacak yayınlar artık daha hızlı sonuçlanıyor'] },
+      { type: 'changed', items: ['Hata mesajları daha sade ve anlaşılır hale getirildi', 'Proxy, internet ve çevrimdışı kanal durumları için daha iyi ipuçları eklendi'] },
     ],
   },
   {
     version: '1.6.0',
     sections: [
-      { type: 'added', items: ['Boot splash with logo animation, typewriter tagline, and spinner', 'App version displayed on splash screen', 'What\u2019s New modal shown once after each update', 'Auto-refresh playlist on app launch — toggle in Settings → Playback'] },
-      { type: 'fixed', items: ['Fetch Active intermittent error during stream playback', 'Relay fallback now shows meaningful error messages', 'Fetch Active button disables during loading'] },
+      { type: 'added', items: ['Logo animasyonu, yazı efekti ve gösterge içeren açılış ekranı', 'Açılış ekranında uygulama sürümü', 'Her güncellemeden sonra bir kez gösterilen Yenilikler penceresi', 'Uygulama açılışında oynatma listesini otomatik yenileme seçeneği'] },
+      { type: 'fixed', items: ['Yayın sırasında kanal listesini yenilemedeki aralıklı hata giderildi', 'Aktarım yedeği artık anlamlı hata mesajları gösteriyor', 'Yenileme düğmesi yükleme sırasında devre dışı kalıyor'] },
     ],
   },
   {
     version: '1.5.0',
     sections: [
-      { type: 'changed', items: ['Updated app logo with new design'] },
+      { type: 'changed', items: ['Uygulama logosu yeni tasarımla güncellendi'] },
     ],
   },
   {
     version: '1.4.0',
     sections: [
-      { type: 'added', items: ['Channel name auto-scroll for long names'] },
-      { type: 'fixed', items: ['Sidebar navigation and channel switching improvements'] },
+      { type: 'added', items: ['Uzun kanal adları için otomatik kaydırma'] },
+      { type: 'fixed', items: ['Kenar çubuğu gezinmesi ve kanal değiştirme iyileştirmeleri'] },
     ],
   },
   {
     version: '1.3.0',
     sections: [
-      { type: 'added', items: ['Responsive TV scaling for all screen sizes'] },
+      { type: 'added', items: ['Tüm ekran boyutları için uyarlanabilir TV ölçekleme'] },
     ],
   },
 ];
@@ -255,8 +256,8 @@ function showWhatsNew() {
   let html = '';
   if (pendingUpdate) {
     html += '<div class="wn-section">';
-    html += '<div class="wn-section-title">Update available: v' + pendingUpdate.latest + '</div>';
-    html += '<div class="wn-item"><span class="wn-icon added">\u2192</span><span>Reinstall via Apps2Samsung to update.</span></div>';
+    html += '<div class="wn-section-title">Yeni sürüm: v' + pendingUpdate.latest + '</div>';
+    html += '<div class="wn-item"><span class="wn-icon added">\u2192</span><span>Güncellemek için Apps2Samsung üzerinden yeniden kurun.</span></div>';
     html += '</div>';
   }
   for (const entry of CHANGELOG) {
@@ -309,8 +310,8 @@ async function init() {
   if (!await player.initPlayer(videoEl)) {
     document.body.innerHTML =
       '<div style="text-align:center;padding:40px;color:#fff;">' +
-      '<h2>App cannot start</h2>' +
-      '<p>Your device does not support the video playback needed for this app. Please try restarting the app or updating your TV software.</p>' +
+      '<h2>Uygulama başlatılamadı</h2>' +
+      '<p>Cihazınız bu uygulamanın ihtiyaç duyduğu video oynatmayı desteklemiyor. Uygulamayı yeniden başlatmayı veya TV yazılımını güncellemeyi deneyin.</p>' +
       '</div>';
     return;
   }
@@ -343,11 +344,11 @@ async function init() {
       // Cached channels available — show instantly, refresh in background.
       channels = s.channels;
       startPlayer();
-      showBootSplash('Updating playlist...');
+      showBootSplash('Kanallar yenileniyor…');
       refreshChannelsInBackground().then(() => hideBootSplashAndMaybeWhatsNew());
     } else {
       // No cached channels — show splash while fetching.
-      showBootSplash('Downloading playlist...');
+      showBootSplash(UI_COPY.preparing);
       try {
         const newChannels = await fetchFromPlaylistUrl(activePlaylist.url);
         applyProxyOverrides(newChannels);
@@ -366,11 +367,11 @@ async function init() {
     // still flash the logo intro so every launch feels the same.
     channels = s.channels;
     startPlayer();
-    showBootSplash('Loading...');
+    showBootSplash(UI_COPY.loading);
     hideBootSplashAndMaybeWhatsNew();
   } else if (activePlaylist && activePlaylist.url) {
     // No cached channels but has playlist URL — fetch once to bootstrap.
-    showBootSplash('Loading playlist...');
+    showBootSplash('Oynatma listesi yükleniyor…');
     try {
       const newChannels = await fetchFromPlaylistUrl(activePlaylist.url);
       applyProxyOverrides(newChannels);
@@ -462,14 +463,14 @@ function startPlayer() {
   let refreshStreamBtn = document.getElementById('refresh-stream-btn');
   if (refreshStreamBtn) {
     addCleanupListener(refreshStreamBtn, 'click', () => {
-      showProgress('Reloading');
+      showProgress(UI_COPY.reloadStream);
       player.reloadChannel();
     });
   }
   let refreshChannelsBtn = document.getElementById('refresh-channels-btn');
   if (refreshChannelsBtn) {
     addCleanupListener(refreshChannelsBtn, 'click', async () => {
-      showProgress('Refreshing');
+      showProgress(UI_COPY.refreshChannels);
       await refreshChannels();
       hideProgress();
     });
@@ -549,9 +550,9 @@ function startPlayer() {
 function showEmptyState() {
   showPlayer();
   const nameEl = document.getElementById('channel-name');
-  if (nameEl) nameEl.textContent = 'No channels';
+  if (nameEl) nameEl.textContent = UI_COPY.noChannel;
   const infoEl = document.getElementById('channel-info');
-  if (infoEl) infoEl.textContent = 'Open Settings to add a playlist';
+  if (infoEl) infoEl.textContent = 'Oynatma listesi eklemek için ' + UI_COPY.settings + ' bölümünü açın';
 }
 
 let pendingUpdate = null;
@@ -570,7 +571,7 @@ function runUpdateCheck() {
 function scheduleUpdateCheck() {
   setTimeout(() => {
     if (!consentAsked()) {
-      ui.showConfirmDialog('Check for app updates on launch? Anonymous version check only — no personal data.', (ok) => {
+      ui.showConfirmDialog('Uygulama açılırken güncellemeler denetlensin mi? Yalnızca anonim sürüm kontrolü yapılır; kişisel veri gönderilmez.', (ok) => {
         setConsented(ok === true);
         if (ok === true) runUpdateCheck();
       });
@@ -676,7 +677,7 @@ const labelMap = [
 ];
 
 function getResolutionLabel(height) {
-  if (!height) return 'Auto';
+  if (!height) return 'Otomatik';
   for (const [max, label] of labelMap) {
     if (height <= max) return label;
   }
@@ -712,7 +713,7 @@ function updateProgressPercent(percent) {
   if (!progressActive) return;
   const el = document.getElementById('progress-text');
   if (el && typeof percent === 'number') {
-    el.textContent = 'Reloading ' + percent + '%';
+    el.textContent = UI_COPY.recovering + ' ' + percent + '%';
   }
 }
 
@@ -943,7 +944,7 @@ function handleRemoteAction(action, value) {
       ui.toggleSidebar();
       break;
     case 'back':
-      ui.showConfirmDialog('Exit the app?', (confirmed) => {
+      ui.showConfirmDialog('Uygulamadan çıkılsın mı?', (confirmed) => {
         if (confirmed) {
           platform.exitApp();
         }
