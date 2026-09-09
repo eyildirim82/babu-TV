@@ -9,6 +9,8 @@ Status: RUNTIME EVIDENCE INCOMPLETE — do not claim M3 fully complete
 
 Session 2 (2026-09-09, later) reached a real retail Samsung set. Packaging, signing, install and launch are now PASS on real hardware. The 13-item UI smoke matrix is still open because the remote-control channel is unpaired and no screen observation has been recorded.
 
+Session 2 then ended without UI results. The set became unreachable before pairing was accepted: `sdb devices` lists nothing and `sdb connect` returns `error: failed to connect to remote target`. No smoke was observed, so no smoke result changed.
+
 ## Scope and evidence rules
 
 This document records the M3G verification state for the exact M3/B0-integrated code candidate at `0af80caf24eab206f303f67c177a5d716fb38a6d`.
@@ -201,6 +203,15 @@ Additional M3G gates:
 - Execution of the applicable M3 smoke matrix remains required before criterion 18 can close. Session 2 removes the hardware obstacle; what remains is an accepted remote-control pairing plus a human observer for the screen.
 - Retail-set logging is unavailable, so every UI smoke result must come from direct screen observation and must name the observer and the exact head.
 - A synthetic playlist reachable from the set is required before the playback, zap, failure-rollback and refresh smokes can run at all.
+
+A third session needs all of the following before the matrix can move:
+
+1. The set powered on, in developer mode, and answering `sdb connect` on port 26101.
+2. Device Connect Manager access granted, so the remote-control WebSocket returns a token instead of `ms.channel.unauthorized`.
+3. A named human observer at the screen, since the set gives neither logs nor screen capture.
+4. A synthetic playlist served on the local network and entered in the app.
+
+The installed build is already the correct candidate, so a third session can start at the smoke matrix rather than repeating the packaging chain, as long as the head under test is still `cb36a4f` or is re-recorded.
 
 Do not call M2 fully complete while its WidgetData probe is pending.
 
