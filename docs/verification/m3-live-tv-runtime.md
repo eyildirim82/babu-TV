@@ -148,6 +148,21 @@ A replacement author certificate signed by the SDK's bundled Tizen Developers CA
 
 Closing the emulator path therefore needs one human step: create a Tizen developer security profile through Certificate Manager, or supply an already-working one. Everything after that is automatable, and the emulator itself is proven to boot and accept transfers.
 
+### Signing profile resolved, install still refused
+
+The profile blocker was cleared. The crash is caused only by the password-as-file-path form; a profile whose passwords are stored inline in the SDK's own encrypted form loads and signs correctly. A Tizen developer profile was registered that way, using an author certificate issued from the SDK's bundled developer CA and the SDK's public distributor signer. Packaging with it succeeds.
+
+The emulator still refuses to install:
+
+```
+install failed[118, -12], reason: Check certificate error :
+:Invalid certificate chain with certificate in signature.:<-3>
+```
+
+This is a different rejection from the retail Samsung artifact, which the emulator rejects earlier as `Invalid format of certificate in signature.:<-2>`. Neither chain is accepted. The following were tried and did not change the result: the old and the new SDK distributor signer pairs, explicit CA and root CA paths on both profile items, a certificate lifetime that ends inside the issuing CA's own validity window, and standard end-entity X509 extensions.
+
+The remaining hypothesis is that this Samsung TV image does not trust the Tizen Association developer root at all and wants a Samsung-issued author certificate, exactly as the retail set does. The emulator reports a DUID, so such a certificate can be issued for it through Certificate Manager with a Samsung account.
+
 Two operational notes for a later session. The emulator shuts itself down after a few idle minutes, twice in this session, so a run should install and drive the app promptly after boot. And Certificate Manager was tried here: the profile it writes uses the password-as-file-path form plus an empty third distributor entry, which is exactly the shape the CLI cannot read, and it rewrote the previously working Samsung entry into the same broken shape. A backup of the working file was kept alongside it.
 
 Emulator results, once they exist, must be labelled `EMULATOR-PASS` rather than `PASS`. The image is Tizen 10.0 while the retail set is Tizen 9.0, and emulator AVPlay and Shaka behaviour is not equivalent to a real set.
