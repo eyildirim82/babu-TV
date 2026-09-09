@@ -2,7 +2,7 @@
 
 Date: 2026-09-09
 Owner: REVIEW / Integration Controller only
-Status: PRE-EXECUTION — B0 docs merge pending
+Status: FIRST-WAVE ACTIVE — RED checkpoints under review
 
 ## Purpose
 
@@ -27,28 +27,16 @@ If this status file conflicts with the approved spec or implementation plan, the
 
 | Field | Value |
 | --- | --- |
-| Current `main` | `b35483d0da85e4d73e335387592874759232d304` |
+| Current `main` at first-wave start | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
 | B0 docs branch | `docs/b0-babustv-brand-separation` |
-| B0 docs merge | PENDING |
-| First-wave GREEN base SHA | NOT SET |
-| Baseline suite | NOT RUN on post-docs-merge main |
-| Current integration state | PRE-EXECUTION |
+| B0 docs merge | MERGED via PR #17 -> `0af80caf24eab206f303f67c177a5d716fb38a6d` |
+| First-wave GREEN base SHA | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
+| Baseline suite | GREEN base accepted by bootstrap authority; GitHub `verify` run `34286003705` SUCCESS on exact SHA (tests/typecheck/build/clean-diff) |
+| Current integration state | FIRST-WAVE DEVELOPMENT ACTIVE |
 | Last merged B0 slice | NONE |
-| Next eligible merge | NONE — docs must merge first |
+| Next eligible merge | NONE YET — wait for an individual first-wave PR to reach exact-head GREEN + review |
 
-### Baseline gate before first-wave branches
-
-After the docs branch is merged, REVIEW must refresh `main`, record the exact SHA, and require:
-
-```bash
-npm ci
-npm test
-npm run typecheck
-npm run build
-npm run tizen:build
-```
-
-Only after all are GREEN may REVIEW set `First-wave GREEN base SHA` and allow B0A/B0B/B0C/B0F branches to start from that exact SHA.
+The exact first-wave base above is authoritative for B0A/B0B/B0C/B0F even if this review-owned status document advances `main` afterward.
 
 ---
 
@@ -59,14 +47,14 @@ Only after all are GREEN may REVIEW set `First-wave GREEN base SHA` and allow B0
 | Field | Value |
 | --- | --- |
 | Branch | `refactor/b0a-product-identity` |
-| Base | NOT SET |
-| Head | NOT STARTED |
-| PR | NONE |
-| Status | BLOCKED ON DOCS MERGE + GREEN BASE |
-| CI | NOT RUN |
-| Scope review | NOT RUN |
+| Base | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
+| Head | `2903141b348938055d23181d06d4c6bdf6136754` |
+| PR | #18 DRAFT |
+| Status | RED CHECKPOINT — implementation pending |
+| CI | `verify` run `34323764569` FAILURE at tests as expected for RED; typecheck/build skipped |
+| Scope review | PASS for current checkpoint: only `player/test/brand-identity.test.js` changed |
 | Merge readiness | NOT READY |
-| Blockers | Docs branch not merged; first-wave GREEN base not established |
+| Blockers | Minimum implementation, GREEN evidence, exact-head full verification, final scope/security/regression review |
 
 Owned scope: package metadata, `package-lock.json`, Vite base identity, Tizen identity/packaging, identity scanner, active build docs.
 
@@ -77,14 +65,14 @@ Must not own: `player/index.html`, presentation CSS, settings-copy cleanup, Live
 | Field | Value |
 | --- | --- |
 | Branch | `feature/b0b-design-system` |
-| Base | NOT SET |
-| Head | NOT STARTED |
-| PR | NONE |
-| Status | BLOCKED ON DOCS MERGE + GREEN BASE |
-| CI | NOT RUN |
-| Scope review | NOT RUN |
+| Base | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
+| Head | `ddcce4031c09d643c82c9b35a0b54f80dab9c31f` |
+| PR | #19 DRAFT |
+| Status | RED CHECKPOINT — implementation pending |
+| CI | `verify` run `34323808070` FAILURE at tests as expected for RED; typecheck/build skipped |
+| Scope review | PASS for current checkpoint: only `player/test/babustv-design-system.test.js` changed |
 | Merge readiness | NOT READY |
-| Blockers | Docs branch not merged; first-wave GREEN base not established |
+| Blockers | Minimum CSS implementation, GREEN evidence, exact-head full verification, final visual/scope review |
 
 Owned scope: `player/src/ui/tokens.css`, `theme.css`, `primitives.css`, design-system contract tests.
 
@@ -95,14 +83,14 @@ Must not own: shell integration, runtime copy, package metadata, Tizen packaging
 | Field | Value |
 | --- | --- |
 | Branch | `feature/b0c-brand-assets` |
-| Base | NOT SET |
-| Head | NOT STARTED |
+| Base | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
+| Head | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
 | PR | NONE |
-| Status | BLOCKED ON DOCS MERGE + GREEN BASE |
+| Status | NOT STARTED / NO COMMITS YET |
 | CI | NOT RUN |
-| Scope review | NOT RUN |
+| Scope review | NO DIFF |
 | Merge readiness | NOT READY |
-| Blockers | Docs branch not merged; first-wave GREEN base not established |
+| Blockers | Worker implementation and evidence not yet published |
 
 Owned scope: BabuşTV mark/wordmark/boot/favicon/Tizen icon assets and asset acceptance checks.
 
@@ -113,14 +101,14 @@ Must not own: application logic, presentation layout, package identity, localiza
 | Field | Value |
 | --- | --- |
 | Branch | `feature/b0f-settings-copy-cleanup` |
-| Base | NOT SET |
-| Head | NOT STARTED |
+| Base | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
+| Head | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
 | PR | NONE |
-| Status | BLOCKED ON DOCS MERGE + GREEN BASE |
+| Status | NOT STARTED / NO COMMITS YET |
 | CI | NOT RUN |
-| Scope review | NOT RUN |
+| Scope review | NO DIFF |
 | Merge readiness | NOT READY |
-| Blockers | Docs branch not merged; first-wave GREEN base not established |
+| Blockers | Worker implementation and evidence not yet published |
 
 Owned scope: shared runtime copy contract and user-visible runtime/settings/action/status strings.
 
@@ -131,18 +119,18 @@ Must not own: `player/index.html`, layout CSS, Tizen packaging, playback/provide
 | Field | Value |
 | --- | --- |
 | Branch | `docs/m3-live-tv-verification` |
-| Base | Fresh GREEN main at start |
-| Head | NOT STARTED |
+| Base | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
+| Head | `0af80caf24eab206f303f67c177a5d716fb38a6d` |
 | PR | NONE |
-| Status | WAITING FOR EXECUTION START |
+| Status | NOT STARTED / NO EVIDENCE COMMIT YET |
 | CI | NOT RUN |
-| Runtime evidence | NOT RUN |
+| Runtime evidence | NOT RUN / NOT PUBLISHED |
 | Merge readiness | NOT READY |
-| Blockers | Emulator environment may require restart/fix before runtime evidence |
+| Blockers | Emulator/Tizen evidence not yet published; physical-TV-only checks must remain NOT-AVAILABLE or DEFERRED |
 
 Primary output: `docs/verification/m3-live-tv-runtime.md`.
 
-Code fixes are not allowed on this docs branch. A reproduced runtime defect requiring code must use a separate `feature/m3g-tizen-hardening` branch with root cause → RED → minimum fix → GREEN.
+Code fixes are not allowed on this docs branch. A reproduced runtime defect requiring code must use a separate `feature/m3g-tizen-hardening` branch with root cause -> RED -> minimum fix -> GREEN.
 
 ---
 
@@ -150,17 +138,14 @@ Code fixes are not allowed on this docs branch. A reproduced runtime defect requ
 
 Current queue:
 
-1. Review B0 docs branch content and merge checkpoint.
-2. After user approval, merge docs branch.
-3. Verify post-merge `main` baseline.
-4. Record exact first-wave GREEN base SHA.
-5. Allow B0A/B0B/B0C/B0F to start from the same SHA.
-6. Monitor M3G independently from fresh GREEN `main`.
-7. Review worker PRs individually as they become ready.
-8. Merge first-wave PRs one at a time only after explicit user approval and post-merge main GREEN.
-9. Start B0D only after B0A+B0B+B0C+B0F are all merged and main is GREEN.
-10. Start B0E only after B0D merge + GREEN.
-11. Start B0G only after all B0 implementation slices merge + GREEN.
+1. Monitor B0A/B0B/B0C/B0F in parallel from exact base `0af80caf24eab206f303f67c177a5d716fb38a6d`.
+2. Monitor M3G independently; do not convert unavailable Tizen/physical-TV checks into PASS.
+3. Re-review each worker PR when its GREEN implementation/evidence lands: correct base, ahead/behind, scope/file ownership, TDD RED/GREEN, exact-head CI/test/typecheck/build, secret leakage, playback/provider/domain/focus/recovery regressions, ENTV identity reduction, conflicts/divergence, and changed-file discipline.
+4. Present exactly one eligible first-wave merge checkpoint at a time and obtain explicit user approval before merging.
+5. After each approved merge, require post-merge `main` GREEN before advancing to the next merge checkpoint.
+6. Start B0D only after B0A+B0B+B0C+B0F are all merged and `main` is GREEN.
+7. Start B0E only after B0D merge + GREEN.
+8. Start B0G only after all B0 implementation slices merge + GREEN.
 
 ---
 
@@ -176,15 +161,16 @@ Current queue:
 
 ### Critical
 
-- None recorded yet.
+- None recorded at this checkpoint.
 
 ### Important
 
-- Current `main@b35483d` has not been treated as a verified GREEN execution base; post-docs-merge baseline verification is mandatory before first-wave branch creation.
+- PR #18 and PR #19 are intentional RED-only checkpoints. They are not merge candidates until minimum implementation plus exact-head GREEN evidence lands.
+- B0C, B0F, and M3G have no commits/evidence yet.
 
 ### Minor
 
-- None recorded yet.
+- None recorded at this checkpoint.
 
 ---
 
