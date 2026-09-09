@@ -107,7 +107,6 @@ function getDisplayChannels() {
 }
 
 const BOOT_TAGLINE = 'Samsung Tizen için BabuşTV';
-let bootTypewriterTimer = null;
 let bootShownAt = 0;
 const BOOT_MIN_MS = 1500; // logo stays at least this long on every launch
 const BOOT_ZOOM_MS = 700; // fly-into-the-logo exit
@@ -121,34 +120,15 @@ function showBootSplash(statusText) {
   if (!el) return;
   if (statusEl && statusText) statusEl.textContent = statusText;
   if (verEl) verEl.textContent = 'v' + APP_VERSION;
-  // Reset animation state
-  if (typeEl) { typeEl.textContent = ''; typeEl.classList.remove('done'); }
+  if (typeEl) typeEl.textContent = BOOT_TAGLINE;
   if (loadingEl) { loadingEl.style.animation = 'none'; loadingEl.offsetHeight; loadingEl.style.animation = ''; }
   const logo = document.getElementById('boot-logo');
   if (logo) logo.classList.remove('zoom-in');
   el.classList.remove('hidden', 'fade-out', 'zooming');
   bootShownAt = Date.now();
-  // Start typewriter after logo animation
-  clearTimeout(bootTypewriterTimer);
-  startTypewriter(typeEl, BOOT_TAGLINE, 40, 800);
-}
-
-function startTypewriter(el, text, charDelay, startDelay) {
-  if (!el) return;
-  let i = 0;
-  bootTypewriterTimer = setTimeout(function tick() {
-    if (i < text.length) {
-      el.textContent = text.slice(0, i + 1);
-      i++;
-      bootTypewriterTimer = setTimeout(tick, charDelay);
-    } else {
-      el.classList.add('done');
-    }
-  }, startDelay);
 }
 
 function hideBootSplash() {
-  clearTimeout(bootTypewriterTimer);
   const el = document.getElementById('boot-splash');
   if (!el || el.classList.contains('hidden')) return;
   // Hold the logo for a beat, then fly into it before fading the overlay.
