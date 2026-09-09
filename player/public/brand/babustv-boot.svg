@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="title desc" data-brand="BabuşTV">
+  <title>BabuşTV boot brand lockup</title>
+  <desc>Restrained dark boot composition for BabuşTV with calico mark and violet wordmark accent.</desc>
+  <rect width="1920" height="1080" fill="#0B0B0F"/>
+  <circle cx="960" cy="500" r="230" fill="#14141A"/>
+  <circle cx="960" cy="500" r="229" fill="none" stroke="#242331" stroke-width="2"/>
+  <g transform="translate(896 330)">
+    <rect width="128" height="128" rx="28" fill="#0B0B0F"/>
+    <rect x="5" y="5" width="118" height="118" rx="24" fill="#14141A" stroke="#8B5CF6" stroke-width="2"/>
+    <path d="M34 47 43 25 57 39c5-2 10-3 15-3s10 1 15 3l14-14 9 22v25c0 23-16 38-38 38S34 95 34 72Z" fill="#F2E8D5"/>
+    <path d="M43 25 57 39c-6 3-11 7-14 12Z" fill="#C87B46"/>
+    <path d="M101 25 87 39c6 3 11 7 14 12Z" fill="#242331"/>
+    <path d="M54 41c8-5 16-6 23-4-1 11-7 18-18 21-5-4-7-9-5-17Z" fill="#C87B46"/>
+    <path d="M79 58c8-4 17-3 24 2 1 8-2 14-8 18-8 0-14-4-17-11 0-3 0-6 1-9Z" fill="#242331"/>
+    <ellipse cx="56" cy="70" rx="5" ry="7" fill="#8B5CF6"/>
+    <ellipse cx="88" cy="70" rx="5" ry="7" fill="#8B5CF6"/>
+    <path d="M68 81c3-2 5-2 8 0-1 4-3 6-4 6s-3-2-4-6Z" fill="#A78BFA"/>
+  </g>
+  <text x="960" y="575" fill="#F5F3F7" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="84" font-weight="700" letter-spacing="-2">Babuş<tspan fill="#A78BFA">TV</tspan></text>
+  <rect x="875" y="610" width="170" height="4" rx="2" fill="#8B5CF6" opacity=".7"/>
+  <text x="960" y="660" fill="#777381" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="400" letter-spacing="5">PREMIUM TV</text>
+</svg>
