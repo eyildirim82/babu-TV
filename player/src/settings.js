@@ -3,6 +3,7 @@ import { processStreamUrl, parseM3u, fetchPlaylist, escapeHtml } from './utils.j
 import { setConsented } from './update.js';
 import * as player from './player.js';
 import * as ui from './ui.js';
+import { UI_COPY } from './ui/copy.js';
 
 let container = null;
 let onPlaylistFetched = null;
@@ -16,10 +17,10 @@ let addMode = false;
 let editMode = false;
 
 const NAV_ITEMS = [
-  { id: 'source', icon: '\u{1F4E1}', label: 'Channel Source' },
-  { id: 'connection', icon: '\u{1F517}', label: 'Connection' },
-  { id: 'playback', icon: '\u25B6', label: 'Playback' },
-  { id: 'about', icon: '\u2139', label: 'About' },
+  { id: 'source', icon: '\u{1F4E1}', label: 'Kanal Kaynağı' },
+  { id: 'connection', icon: '\u{1F517}', label: 'Bağlantı' },
+  { id: 'playback', icon: '\u25B6', label: 'Oynatma' },
+  { id: 'about', icon: '\u2139', label: 'Hakkında' },
 ];
 
 export function init(settingsContainer, callbacks) {
@@ -220,8 +221,8 @@ export function selectFocused() {
   if (el.id && /^pl-delete-\d+$/.test(el.id)) {
     const idx = parseInt(el.id.split('-')[2], 10);
     const p = getSettings().playlists[idx];
-    const name = p ? p.name : 'this playlist';
-    ui.showConfirmDialog(`Delete "${name}"?`, (confirmed) => {
+    const name = p ? p.name : 'bu oynatma listesi';
+    ui.showConfirmDialog(`"${name}" silinsin mi?`, (confirmed) => {
       if (!confirmed) return;
       const playlists = getSettings().playlists.filter((_, j) => j !== idx);
       let active = getSettings().activePlaylistIndex;
@@ -297,7 +298,7 @@ function saveAddPlaylist() {
   const url = urlEl ? urlEl.value.trim() : '';
   if (!url) return;
   const playlists = getSettings().playlists;
-  playlists.push({ name: name || 'Unnamed', url });
+  playlists.push({ name: name || 'Adsız', url });
   saveSettings({ playlists, activePlaylistIndex: playlists.length - 1 });
   addMode = false;
   render();
@@ -317,7 +318,7 @@ function saveEditPlaylist() {
   const url = urlEl ? urlEl.value.trim() : '';
   if (!url || editIndex < 0) return;
   const playlists = getSettings().playlists;
-  playlists[editIndex] = { name: name || 'Unnamed', url };
+  playlists[editIndex] = { name: name || 'Adsız', url };
   saveSettings({ playlists });
   editMode = false;
   editIndex = -1;
@@ -397,7 +398,7 @@ function applyFocus() {
 
 function render() {
   const s = getSettings();
-  const lastFetched = s.channelsFetched ? timeAgo(s.channelsFetched) : 'Never';
+  const lastFetched = s.channelsFetched ? timeAgo(s.channelsFetched) : 'Hiç';
 
   const navHtml = NAV_ITEMS.map(item =>
     '<div class="nav-item' + (activeSection === item.id ? ' active' : '') + '" data-section="' + item.id + '">' +
@@ -408,7 +409,7 @@ function render() {
   let mainHtml = '';
   mainHtml += '<div class="page-title">';
   mainHtml += '<button class="back-btn" id="btn-back">\u2039</button>';
-  mainHtml += 'Settings';
+  mainHtml += UI_COPY.settings;
   mainHtml += '</div>';
 
   if (activeSection === 'source') {
@@ -422,7 +423,7 @@ function render() {
   }
 
   mainHtml += '<div class="settings-footer">';
-  mainHtml += '<span class="footer-info">All settings are saved automatically</span>';
+  mainHtml += '<span class="footer-info">Tüm ayarlar otomatik kaydedilir</span>';
   mainHtml += '<span class="footer-version">' + APP_VERSION + '</span>';
   mainHtml += '</div>';
 
@@ -432,20 +433,20 @@ function render() {
       '<nav class="settings-nav">' +
         '<div class="nav-header">' +
           '<div class="nav-logo">' +
-            '<div class="icon">EN</div>' +
-            '<div class="text">EN <span>IPTV</span></div>' +
+            '<div class="icon">B</div>' +
+            '<div class="text">Babuş<span>TV</span></div>' +
           '</div>' +
-          '<div class="nav-sub">Settings</div>' +
+          '<div class="nav-sub">' + UI_COPY.settings + '</div>' +
         '</div>' +
         '<div class="nav-items">' + navHtml + '</div>' +
       '</nav>' +
       '<main class="settings-main">' + mainHtml + '</main>' +
     '</div>' +
     '<div id="remote-hints">' +
-      '<div class="hint-group"><kbd>&#9650;</kbd> <kbd>&#9660;</kbd> <span class="sep">|</span> Navigate</div>' +
-      '<div class="hint-group"><kbd>Enter</kbd> <span class="sep">|</span> Select / Toggle</div>' +
-      '<div class="hint-group"><kbd>&#9664;</kbd> <span class="sep">|</span> Back</div>' +
-      '<div class="hint-group"><kbd>Back</kbd> <span class="sep">|</span> Close</div>' +
+      '<div class="hint-group"><kbd>&#9650;</kbd> <kbd>&#9660;</kbd> <span class="sep">|</span> Gezin</div>' +
+      '<div class="hint-group"><kbd>Enter</kbd> <span class="sep">|</span> Seç / Değiştir</div>' +
+      '<div class="hint-group"><kbd>&#9664;</kbd> <span class="sep">|</span> Geri</div>' +
+      '<div class="hint-group"><kbd>Back</kbd> <span class="sep">|</span> ' + UI_COPY.close + '</div>' +
     '</div>';
 
   buildFocusOrder();
@@ -490,8 +491,8 @@ function render() {
         deleteBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           const p = getSettings().playlists[i];
-          const name = p ? p.name : 'this playlist';
-          ui.showConfirmDialog(`Delete "${name}"?`, (confirmed) => {
+          const name = p ? p.name : 'bu oynatma listesi';
+          ui.showConfirmDialog(`"${name}" silinsin mi?`, (confirmed) => {
             if (!confirmed) return;
             const playlists = getSettings().playlists.filter((_, j) => j !== i);
             let active = getSettings().activePlaylistIndex;
@@ -521,7 +522,7 @@ function render() {
         const url = urlEl ? urlEl.value.trim() : '';
         if (url) {
           const playlists = getSettings().playlists;
-          playlists.push({ name: name || 'Unnamed', url });
+          playlists.push({ name: name || 'Adsız', url });
           saveSettings({ playlists, activePlaylistIndex: playlists.length - 1 });
           addMode = false;
           render();
@@ -546,7 +547,7 @@ function render() {
         const url = urlEl ? urlEl.value.trim() : '';
         if (url && editIndex >= 0) {
           const playlists = getSettings().playlists;
-          playlists[editIndex] = { name: name || 'Unnamed', url };
+          playlists[editIndex] = { name: name || 'Adsız', url };
           saveSettings({ playlists });
           editMode = false;
           editIndex = -1;
@@ -595,21 +596,21 @@ function render() {
 function renderSourceCard(s, lastFetched) {
   let html = '';
   html += '<div class="setting-card">';
-  html += '<div class="card-header"><h3><span class="card-icon">\u{1F4E1}</span> Channel Source</h3></div>';
+  html += '<div class="card-header"><h3><span class="card-icon">\u{1F4E1}</span> Kanal Kaynağı</h3></div>';
   html += '<div class="card-body">';
-  html += '<p class="hint" style="margin-bottom:32px;">Saved playlists (' + s.playlists.length + '/8). Select one, then click Fetch.</p>';
+  html += '<p class="hint" style="margin-bottom:32px;">Kayıtlı oynatma listeleri (' + s.playlists.length + '/8). Birini seçip kanalları yenileyin.</p>';
   if (addMode) {
     html += '<div class="input-group">';
-    html += '<label for="pl-add-name">Playlist Name</label>';
-    html += '<input id="pl-add-name" class="input-field" type="text" placeholder="My Playlist" />';
+    html += '<label for="pl-add-name">Oynatma Listesi Adı</label>';
+    html += '<input id="pl-add-name" class="input-field" type="text" placeholder="Oynatma listem" />';
     html += '</div>';
     html += '<div class="input-group">';
-    html += '<label for="pl-add-url">Playlist URL</label>';
+    html += '<label for="pl-add-url">Oynatma Listesi URL\'si</label>';
     html += '<input id="pl-add-url" class="input-field" type="text" placeholder="https://..." />';
     html += '</div>';
     html += '<div class="btn-group">';
-    html += '<button id="pl-add-save" class="btn btn-primary">Save</button>';
-    html += '<button id="pl-add-cancel" class="btn btn-secondary">Cancel</button>';
+    html += '<button id="pl-add-save" class="btn btn-primary">Kaydet</button>';
+    html += '<button id="pl-add-cancel" class="btn btn-secondary">' + UI_COPY.cancel + '</button>';
     html += '</div>';
   } else {
     html += '<div class="playlist-list">';
@@ -619,31 +620,31 @@ function renderSourceCard(s, lastFetched) {
       if (editMode && editIndex === i) {
         html += '<div id="playlist-entry-' + i + '" class="playlist-entry active">';
         html += '<div class="input-group">';
-        html += '<label for="pl-edit-name">Playlist Name</label>';
-        html += '<input id="pl-edit-name" class="input-field" type="text" value="' + escapeHtml(p.name || '') + '" placeholder="My Playlist" />';
+        html += '<label for="pl-edit-name">Oynatma Listesi Adı</label>';
+        html += '<input id="pl-edit-name" class="input-field" type="text" value="' + escapeHtml(p.name || '') + '" placeholder="Oynatma listem" />';
         html += '</div>';
         html += '<div class="input-group">';
-        html += '<label for="pl-edit-url">Playlist URL</label>';
+        html += '<label for="pl-edit-url">Oynatma Listesi URL\'si</label>';
         html += '<input id="pl-edit-url" class="input-field" type="text" value="' + escapeHtml(p.url || '') + '" placeholder="https://..." />';
         html += '</div>';
         html += '<div class="btn-group">';
-        html += '<button id="pl-edit-save" class="btn btn-primary">Save</button>';
-        html += '<button id="pl-edit-cancel" class="btn btn-secondary">Cancel</button>';
+        html += '<button id="pl-edit-save" class="btn btn-primary">Kaydet</button>';
+        html += '<button id="pl-edit-cancel" class="btn btn-secondary">' + UI_COPY.cancel + '</button>';
         html += '</div>';
         html += '</div>';
       } else {
         html += '<div id="playlist-entry-' + i + '" class="playlist-entry' + (isActive ? ' active' : '') + '">';
         html += '<div class="playlist-header">';
         html += '<span class="playlist-indicator">' + (isActive ? '\u25B6' : '\u25CB') + '</span>';
-        html += '<span class="playlist-name">' + escapeHtml(p.name || 'Unnamed') + '</span>';
+        html += '<span class="playlist-name">' + escapeHtml(p.name || 'Adsız') + '</span>';
         if (isActive) {
-          html += '<span class="selected-badge">\u2713 Selected</span>';
+          html += '<span class="selected-badge">\u2713 Seçili</span>';
         }
         html += '</div>';
         html += '<span class="playlist-url">' + escapeHtml(p.url || '') + '</span>';
         html += '<div class="btn-group">';
-        html += '<button id="pl-edit-' + i + '" class="btn btn-secondary">Edit</button>';
-        html += '<button id="pl-delete-' + i + '" class="btn btn-secondary">Delete</button>';
+        html += '<button id="pl-edit-' + i + '" class="btn btn-secondary">Düzenle</button>';
+        html += '<button id="pl-delete-' + i + '" class="btn btn-secondary">Sil</button>';
         html += '</div>';
         html += '</div>';
       }
@@ -651,12 +652,12 @@ function renderSourceCard(s, lastFetched) {
     html += '</div>';
     html += '<div class="btn-group">';
     if (s.playlists.length < 8) {
-      html += '<button id="pl-add-btn" class="btn btn-secondary">+ Add Playlist</button>';
+      html += '<button id="pl-add-btn" class="btn btn-secondary">+ Oynatma Listesi Ekle</button>';
     }
-    html += '<button id="settings-fetch-btn" class="btn btn-primary">Fetch Active</button>';
+    html += '<button id="settings-fetch-btn" class="btn btn-primary">' + UI_COPY.refreshChannels + '</button>';
     html += '</div>';
     html += '<div id="settings-fetch-status" class="status-info hidden" style="margin-top:24px;"></div>';
-    html += '<p class="hint" style="margin-top:32px;">Last fetched: ' + lastFetched + '</p>';
+    html += '<p class="hint" style="margin-top:32px;">Son yenileme: ' + lastFetched + '</p>';
   }
   html += '</div></div>';
   return html;
@@ -665,17 +666,17 @@ function renderSourceCard(s, lastFetched) {
 function renderConnectionCard(s) {
   let html = '';
   html += '<div class="setting-card">';
-  html += '<div class="card-header"><h3><span class="card-icon">\u{1F517}</span> Connection</h3><span class="status-dot connected"></span></div>';
+  html += '<div class="card-header"><h3><span class="card-icon">\u{1F517}</span> Bağlantı</h3><span class="status-dot connected"></span></div>';
   html += '<div class="card-body">';
   html += '<div class="status-row">';
   html += '<span class="status-dot connected"></span>';
-  html += '<div><div class="status-info">Proxy Server</div><div class="status-label">Configure proxy for channels that need it</div></div>';
+  html += '<div><div class="status-info">Proxy Sunucusu</div><div class="status-label">Gereken kanallar için proxy ayarlayın</div></div>';
   html += '</div>';
   html += '<div class="input-group">';
-  html += '<label for="settings-proxy-url">Proxy URL</label>';
+  html += '<label for="settings-proxy-url">Proxy URL\'si</label>';
   html += '<div class="input-row">';
   html += '<input id="settings-proxy-url" class="input-field" type="text" placeholder="http://localhost:5000/proxy/" value="' + escapeHtml(s.proxyUrl || '') + '" />';
-  html += '<button id="settings-proxy-save-btn" class="btn btn-primary">Save</button>';
+  html += '<button id="settings-proxy-save-btn" class="btn btn-primary">Kaydet</button>';
   html += '</div>';
   html += '<div id="settings-proxy-status" class="status-info hidden" style="margin-top:8px;"></div>';
   html += '</div>';
@@ -690,18 +691,18 @@ function renderPlaybackCard() {
   const updateCheck = s.updateCheck === true;
   let html = '';
   html += '<div class="setting-card">';
-  html += '<div class="card-header"><h3><span class="card-icon">&#x25B6;</span> Playback</h3></div>';
+  html += '<div class="card-header"><h3><span class="card-icon">&#x25B6;</span> Oynatma</h3></div>';
   html += '<div class="card-body">';
   html += '<div class="toggle-row">';
-  html += '<div><div class="toggle-label">Auto quality</div><div class="toggle-desc">Automatically adjust resolution based on bandwidth</div></div>';
+  html += '<div><div class="toggle-label">Otomatik kalite</div><div class="toggle-desc">Bant genişliğine göre çözünürlüğü otomatik ayarla</div></div>';
   html += '<div class="toggle' + (autoQ ? ' on' : '') + '" id="toggle-autoq"><div class="knob"></div></div>';
   html += '</div>';
   html += '<div class="toggle-row">';
-  html += '<div><div class="toggle-label">Auto refresh playlist</div><div class="toggle-desc">Download and update playlist from source on app launch</div></div>';
+  html += '<div><div class="toggle-label">Oynatma listesini otomatik yenile</div><div class="toggle-desc">Uygulama açılışında kaynaktan indirip güncelle</div></div>';
   html += '<div class="toggle' + (autoRefresh ? ' on' : '') + '" id="toggle-auto-refresh"><div class="knob"></div></div>';
   html += '</div>';
   html += '<div class="toggle-row">';
-  html += '<div><div class="toggle-label">Check for updates</div><div class="toggle-desc">Notify when a new version is available (anonymous)</div></div>';
+  html += '<div><div class="toggle-label">Güncellemeleri denetle</div><div class="toggle-desc">Yeni sürüm olduğunda anonim olarak bildir</div></div>';
   html += '<div class="toggle' + (updateCheck ? ' on' : '') + '" id="toggle-update-check"><div class="knob"></div></div>';
   html += '</div>';
   html += '</div></div>';
@@ -711,14 +712,14 @@ function renderPlaybackCard() {
 function renderAboutCard() {
   let html = '';
   html += '<div class="setting-card">';
-  html += '<div class="card-header"><h3><span class="card-icon">\u2139</span> About</h3></div>';
+  html += '<div class="card-header"><h3><span class="card-icon">\u2139</span> Hakkında</h3></div>';
   html += '<div class="card-body">';
   html += '<div class="input-group">';
-  html += '<label>EN IPTV Player</label>';
-  html += '<div class="hint" style="margin-top:4px;">Tizen TV App &middot; Version ' + APP_VERSION + '</div>';
-  html += '<div class="hint" style="margin-top:2px;">Open-source IPTV player for Samsung Tizen TVs and desktop browsers.</div>';
-  html += '<div class="hint" style="margin-top:2px;">Powered by Shaka Player with a local CORS proxy.</div>';
-  html += '<div class="hint" style="margin-top:2px;">Native playback: ' + (player.isNativeAvailable() ? 'available' : 'not available') + '</div>';
+  html += '<label>BabuşTV</label>';
+  html += '<div class="hint" style="margin-top:4px;">Tizen TV Uygulaması &middot; Sürüm ' + APP_VERSION + '</div>';
+  html += '<div class="hint" style="margin-top:2px;">Samsung Tizen TV\'ler ve masaüstü tarayıcılar için açık kaynak TV oynatıcısı.</div>';
+  html += '<div class="hint" style="margin-top:2px;">Shaka Player ve yerel CORS proxy ile çalışır.</div>';
+  html += '<div class="hint" style="margin-top:2px;">Yerel oynatma: ' + (player.isNativeAvailable() ? 'kullanılabilir' : 'kullanılamıyor') + '</div>';
   html += '</div>';
   html += '</div></div>';
   return html;
@@ -731,22 +732,22 @@ async function handleFetch() {
   const active = getActivePlaylist();
   if (!active || !active.url) {
     statusEl.className = 'status-info';
-    statusEl.textContent = 'Select or add a playlist with a URL first';
+    statusEl.textContent = 'Önce URL içeren bir oynatma listesi seçin veya ekleyin';
     statusEl.classList.remove('hidden');
     return;
   }
   // Disable button to prevent double-click during fetch
   if (fetchBtn) fetchBtn.disabled = true;
   statusEl.className = 'status-info';
-  statusEl.textContent = 'Fetching...';
+  statusEl.textContent = 'Kanallar yenileniyor…';
   statusEl.classList.remove('hidden');
   try {
     const channels = await fetchPlaylist(active.url);
     saveSettings({ channels, channelsFetched: new Date().toISOString() });
-    statusEl.textContent = 'Fetched ' + channels.length + ' channels';
+    statusEl.textContent = channels.length + ' kanal yenilendi';
     if (onPlaylistFetched) onPlaylistFetched(channels);
   } catch (e) {
-    statusEl.textContent = 'Could not load playlist: ' + e.message;
+    statusEl.textContent = 'Oynatma listesi yüklenemedi';
   } finally {
     if (fetchBtn) fetchBtn.disabled = false;
   }
@@ -759,22 +760,21 @@ function handleProxySave() {
   const url = proxyInput.value.trim();
   saveSettings({ proxyUrl: url });
   statusEl.className = 'status-info';
-  statusEl.textContent = 'Proxy URL saved';
+  statusEl.textContent = 'Proxy URL\'si kaydedildi';
   statusEl.classList.remove('hidden');
   setTimeout(() => statusEl.classList.add('hidden'), 2000);
 }
 
 function timeAgo(isoString) {
-  if (!isoString) return 'Never';
+  if (!isoString) return 'Hiç';
   const diff = Date.now() - new Date(isoString).getTime();
   const seconds = Math.floor(diff / 1000);
-  if (seconds < 10) return 'Just now';
-  if (seconds < 60) return seconds + 's ago';
+  if (seconds < 10) return 'Az önce';
+  if (seconds < 60) return seconds + ' sn önce';
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return minutes + 'm ago';
+  if (minutes < 60) return minutes + ' dk önce';
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return hours + 'h ago';
+  if (hours < 24) return hours + ' sa önce';
   return new Date(isoString).toLocaleDateString();
 }
-
 
