@@ -1,0 +1,227 @@
+name: B0D Controller Evidence
+
+on:
+  push:
+    branches:
+      - verify/b0d-controller-e840cb0
+
+permissions:
+  contents: read
+
+jobs:
+  step7:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repaired exact head
+        uses: actions/checkout@v4
+        with:
+          ref: e840cb0becc9083aeb80f96b458cfcf5fad6cccf
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Confirm exact head
+        run: |
+          test "$(git rev-parse HEAD)" = "e840cb0becc9083aeb80f96b458cfcf5fad6cccf"
+          echo "EXACT_HEAD=e840cb0becc9083aeb80f96b458cfcf5fad6cccf"
+      - name: Step 7 - focused shell acceptance
+        run: node --test player/test/babustv-shell.test.js
+      - name: Step 7 - brand check
+        run: npm run brand:check
+      - name: Step 7 - full tests
+        run: npm test
+      - name: Step 7 - typecheck
+        run: npm run typecheck
+      - name: Step 7 - production build
+        run: npm run build
+      - name: Step 7 - Tizen staging build
+        run: npm run tizen:build
+
+  browser-smoke:
+    needs: step7
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repaired exact head
+        uses: actions/checkout@v4
+        with:
+          ref: e840cb0becc9083aeb80f96b458cfcf5fad6cccf
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install app dependencies
+        run: npm ci
+      - name: Confirm exact head
+        run: |
+          test "$(git rev-parse HEAD)" = "e840cb0becc9083aeb80f96b458cfcf5fad6cccf"
+          echo "EXACT_HEAD=e840cb0becc9083aeb80f96b458cfcf5fad6cccf"
+      - name: Install browser smoke dependency
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+      - name: Start player dev server
+        run: |
+          npm run dev -w player -- --host 127.0.0.1 --port 4173 > /tmp/b0d-vite.log 2>&1 &
+          echo $! > /tmp/b0d-vite.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/b0d-vite.log
+          exit 1
+      - name: Step 8 - 1920x1080 synthetic browser smoke
+        run: |
+          cat > .b0d-smoke.mjs <<'EOF'
+          import assert from 'node:assert/strict';
+          import { chromium } from 'playwright';
+          import { mkdir } from 'node:fs/promises';
+
+          const out = '/tmp/b0d-smoke';
+          await mkdir(out, { recursive: true });
+          const browser = await chromium.launch({ headless: true });
+          const context = await browser.newContext({
+            viewport: { width: 1920, height: 1080 },
+            deviceScaleFactor: 1,
+          });
+
+          async function newSmokePage({ showWhatsNew = false } = {}) {
+            const page = await context.newPage();
+            await page.route('**/*', async (route) => {
+              const requestUrl = new URL(route.request().url());
+              if (requestUrl.hostname === '127.0.0.1' || requestUrl.protocol === 'data:' || requestUrl.protocol === 'blob:') {
+                await route.continue();
+              } else {
+                await route.abort();
+              }
+            });
+            await page.addInitScript(({ showWhatsNew }) => {
+              const settings = {
+                playlists: [],
+                activePlaylistIndex: -1,
+                channels: [
+                  {
+                    name: 'Sentetik Haber',
+                    url: 'http://127.0.0.1:4173/synthetic-test.m3u8',
+                    group: 'Sentetik',
+                    number: 101,
+                    useProxy: false,
+                  },
+                ],
+                channelsFetched: null,
+                autoQuality: true,
+                autoRefreshPlaylist: false,
+                updateCheck: false,
+              };
+              localStorage.setItem('en_settings', JSON.stringify(settings));
+              localStorage.setItem('en_update_consent', '0');
+              if (showWhatsNew) localStorage.removeItem('en_last_seen_version');
+              else localStorage.setItem('en_last_seen_version', '1.10.1');
+            }, { showWhatsNew });
+            return page;
+          }
+
+          async function assertVisibleInside(page, selector, label) {
+            const locator = page.locator(selector);
+            await locator.waitFor({ state: 'visible', timeout: 5000 });
+            const box = await locator.boundingBox();
+            assert.ok(box, `${label} must have a box`);
+            assert.ok(box.x >= -1 && box.y >= -1, `${label} starts outside viewport`);
+            assert.ok(box.x + box.width <= 1921, `${label} clips horizontally`);
+            assert.ok(box.y + box.height <= 1081, `${label} clips vertically`);
+            return box;
+          }
+
+          const page = await newSmokePage();
+          const started = Date.now();
+          await page.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded' });
+          await page.locator('#boot-splash:not(.hidden)').waitFor({ state: 'visible', timeout: 5000 });
+          assert.equal(await page.title(), 'BabuşTV');
+          assert.match(await page.locator('.brand-wordmark').getAttribute('src'), /\/brand\/babustv-wordmark\.svg$/);
+          assert.match(await page.locator('.boot-brand-art').getAttribute('src'), /\/brand\/babustv-boot\.svg$/);
+          await page.screenshot({ path: `${out}/01-boot.png`, fullPage: false });
+
+          await page.locator('#boot-splash').waitFor({ state: 'hidden', timeout: 5000 });
+          const bootElapsed = Date.now() - started;
+          assert.ok(bootElapsed < 2400, `boot exit retained dead decorative delay: ${bootElapsed}ms`);
+          assert.ok(bootElapsed >= 1200, `boot minimum beat unexpectedly disappeared: ${bootElapsed}ms`);
+
+          const theme = await page.evaluate(() => {
+            const style = getComputedStyle(document.documentElement);
+            return {
+              bg: style.getPropertyValue('--babu-bg').trim(),
+              accent: style.getPropertyValue('--babu-accent').trim(),
+              title: document.title,
+              svgCount: document.querySelectorAll('svg').length,
+              legacyText: /EN IPTV|IPTV Player/.test(document.body.innerText),
+              player: !!document.getElementById('player-container'),
+              video: !!document.getElementById('video'),
+              avplayer: !!document.getElementById('avplayer'),
+              m3Status: !!document.getElementById('live-tv-status'),
+              m3Numeric: !!document.getElementById('numeric-zap'),
+            };
+          });
+          assert.ok(theme.bg, 'charcoal background token must resolve');
+          assert.ok(theme.accent, 'violet accent token must resolve');
+          assert.equal(theme.svgCount, 0, 'legacy inline TV/play SVG must be absent');
+          assert.equal(theme.legacyText, false, 'legacy IPTV product identity must be absent');
+          assert.equal(theme.player && theme.video && theme.avplayer && theme.m3Status && theme.m3Numeric, true, 'player/M3 DOM surfaces must remain present');
+
+          await assertVisibleInside(page, '#sidebar:not(.closed)', 'left sidebar');
+          const focused = page.locator('.focused, [data-focused="true"]').first();
+          await focused.waitFor({ state: 'visible', timeout: 5000 });
+          const focusStyle = await focused.evaluate((el) => {
+            const s = getComputedStyle(el);
+            return { outline: s.outline, boxShadow: s.boxShadow, background: s.backgroundColor };
+          });
+          assert.ok(focusStyle.outline !== 'none' || focusStyle.boxShadow !== 'none', 'remote-first focus must be visibly styled');
+          await page.screenshot({ path: `${out}/02-sidebar-focus.png`, fullPage: false });
+
+          await page.keyboard.press('ArrowRight');
+          await assertVisibleInside(page, '#right-sidebar:not(.closed)', 'right sidebar');
+          await page.screenshot({ path: `${out}/03-right-sidebar.png`, fullPage: false });
+
+          await page.locator('#settings-btn').click();
+          await assertVisibleInside(page, '#settings-page:not(.hidden)', 'settings page');
+          await page.screenshot({ path: `${out}/04-settings.png`, fullPage: false });
+          await page.close();
+
+          const confirmPage = await newSmokePage();
+          await confirmPage.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded' });
+          await confirmPage.locator('#boot-splash').waitFor({ state: 'hidden', timeout: 5000 });
+          await confirmPage.keyboard.press('Escape');
+          await confirmPage.locator('#sidebar.closed').waitFor({ state: 'attached', timeout: 3000 });
+          await confirmPage.keyboard.press('Escape');
+          await assertVisibleInside(confirmPage, '#confirm-dialog:not(.hidden)', 'confirm dialog');
+          await confirmPage.screenshot({ path: `${out}/05-confirm.png`, fullPage: false });
+          await confirmPage.close();
+
+          const whatsNewPage = await newSmokePage({ showWhatsNew: true });
+          await whatsNewPage.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded' });
+          await whatsNewPage.locator('#boot-splash').waitFor({ state: 'hidden', timeout: 5000 });
+          await assertVisibleInside(whatsNewPage, '#whats-new-modal:not(.hidden)', 'Yenilikler modal');
+          const currentCopy = await whatsNewPage.locator('#whats-new-body').innerText();
+          assert.ok(currentCopy.includes('Açılış ekranı daha sade ve hızlı kapanıyor'), 'current-version Yenilikler copy must match restrained boot behavior');
+          await whatsNewPage.screenshot({ path: `${out}/06-whats-new.png`, fullPage: false });
+          await whatsNewPage.close();
+
+          console.log(`[SMOKE] viewport=1920x1080 title=${theme.title}`);
+          console.log(`[SMOKE] boot_exit_ms=${bootElapsed} dead_zoom_delay=false`);
+          console.log(`[SMOKE] tokens bg=${theme.bg} accent=${theme.accent}`);
+          console.log(`[SMOKE] surfaces=sidebar,right-sidebar,settings,confirm,Yenilikler PASS`);
+          console.log(`[SMOKE] remote_focus=visible player_m3_dom=present legacy_tv_play_identity=absent`);
+          console.log('[SMOKE] data=synthetic-only external-network=blocked');
+
+          await browser.close();
+          EOF
+          node .b0d-smoke.mjs
+      - name: Upload smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b0d-1920x1080-smoke
+          path: /tmp/b0d-smoke
+          if-no-files-found: error
