@@ -1,0 +1,246 @@
+name: XT-C exact-head evidence
+
+on:
+  push:
+    branches:
+      - evidence/xt-c-95a2313
+    paths:
+      - .github/workflows/xt-c-exact-evidence.yml
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact XT-C production head
+        uses: actions/checkout@v4
+        with:
+          ref: 95a23139a206f923f1d8ee1badccaee6ff784231
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "95a23139a206f923f1d8ee1badccaee6ff784231"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Focused XT-C integration
+        run: node --import tsx --test player/test-ts/xtream-entry-integration.test.ts
+
+      - name: Full regression
+        run: npm test
+
+      - name: Brand check
+        run: npm run brand:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Production build
+        run: npm run build
+
+      - name: Tizen staging build
+        run: npm run tizen:build
+
+      - name: Credential surface audit
+        run: |
+          set +e
+          grep -REni "xtream.*(password|username)|password.*xtream|username.*xtream" player/src player/index.html | tee /tmp/xtc-security-hits.txt
+          code=${PIPESTATUS[0]}
+          if [ "$code" -gt 1 ]; then exit "$code"; fi
+          exit 0
+
+      - name: Prepare browser smoke harness
+        run: |
+          cat > player/xt-c-smoke.html <<'EOF'
+          <!doctype html>
+          <html lang="tr">
+          <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>XT-C synthetic smoke</title>
+            <script type="module">
+              import './src/ui/tokens.css';
+              import './src/ui/theme.css';
+              import './src/ui/primitives.css';
+              import './src/styles.css';
+              import './src/ui/xtream-entry.css';
+              import * as settings from './src/settings.js';
+              import { XtreamEntryView } from './src/xtream-entry.ts';
+              import { createXtreamEntryCallbacks } from './src/xtream-entry-integration.ts';
+              import { ProviderError } from './src/providers/errors.ts';
+              import { UI_COPY } from './src/ui/copy.js';
+
+              window.__reloadCount = 0;
+              window.__authCopy = UI_COPY.xtreamEntry.auth;
+              window.__requiredCopy = UI_COPY.xtreamEntry.required;
+
+              let view;
+              const onboarding = {
+                async connect() {
+                  throw new ProviderError('AUTH', 401, 'synthetic auth rejection');
+                },
+              };
+
+              function showXtream() {
+                settings.hide();
+                view.show();
+              }
+
+              view = new XtreamEntryView(document, createXtreamEntryCallbacks({
+                onboarding,
+                reload: () => { window.__reloadCount += 1; },
+                onBack: () => {
+                  view.hide();
+                  settings.show();
+                },
+              }));
+              window.__xtreamView = view;
+
+              settings.init(document.getElementById('settings-page'), {
+                onPlaylistFetched: () => {},
+                onClose: () => {},
+                onRender: () => {},
+                onXtreamRequested: showXtream,
+              });
+              settings.show();
+              window.__smokeReady = true;
+            </script>
+          </head>
+          <body>
+            <div id="settings-page" class="hidden"></div>
+          </body>
+          </html>
+          EOF
+
+          CHROME="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --prefix /tmp/xtc-playwright playwright-core@1.55.0
+
+      - name: Run 1920x1080 synthetic browser smoke
+        run: |
+          npm run dev -w player > /tmp/xtc-vite.log 2>&1 &
+          VITE_PID=$!
+          trap 'kill $VITE_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:5173/xt-c-smoke.html >/dev/null; then break; fi
+            sleep 0.25
+          done
+          curl -fsS http://127.0.0.1:5173/xt-c-smoke.html >/dev/null
+
+          cat > /tmp/xtc-smoke.mjs <<'EOF'
+          import fs from 'node:fs';
+          import { createRequire } from 'node:module';
+          const require = createRequire(import.meta.url);
+          const { chromium } = require('/tmp/xtc-playwright/node_modules/playwright-core');
+
+          const out = '/tmp/xtc-smoke';
+          fs.mkdirSync(out, { recursive: true });
+          const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME, args: ['--no-sandbox'] });
+          const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+          await page.goto('http://127.0.0.1:5173/xt-c-smoke.html', { waitUntil: 'networkidle' });
+          await page.waitForFunction(() => window.__smokeReady === true);
+
+          const settingsButton = page.locator('#settings-xtream-btn');
+          await settingsButton.waitFor({ state: 'visible' });
+          const settingsLabel = await settingsButton.textContent();
+          if (settingsLabel?.trim() !== 'Xtream Codes ile Bağlan') throw new Error(`unexpected Settings label: ${settingsLabel}`);
+          await page.screenshot({ path: `${out}/01-settings.png`, fullPage: true });
+
+          await settingsButton.click();
+          await page.locator('#xtream-entry-page').waitFor({ state: 'visible' });
+          if (await page.locator('#settings-page').isVisible()) throw new Error('Settings remained visible under Xtream entry');
+          if (await page.locator('#xtream-password').getAttribute('type') !== 'password') throw new Error('password input is not masked');
+
+          const activeId = () => page.evaluate(() => document.activeElement?.id || '');
+          const route = (action) => page.evaluate((a) => window.__xtreamView.handleAction(a), action);
+          const focusSequence = [await activeId()];
+          for (const action of ['down', 'down', 'down', 'down']) {
+            await route(action);
+            focusSequence.push(await activeId());
+          }
+          const expectedFocus = ['xtream-server-url','xtream-username','xtream-password','xtream-connect','xtream-back'];
+          if (JSON.stringify(focusSequence) !== JSON.stringify(expectedFocus)) throw new Error(`focus sequence mismatch: ${JSON.stringify(focusSequence)}`);
+
+          await page.locator('#xtream-server-url').focus();
+          const focusCss = await page.locator('#xtream-server-url').evaluate((el) => {
+            const s = getComputedStyle(el);
+            return { color: s.outlineColor, width: s.outlineWidth, offset: s.outlineOffset };
+          });
+          if (focusCss.color !== 'rgb(167, 139, 250)' || focusCss.width !== '3px') throw new Error(`unexpected focus CSS ${JSON.stringify(focusCss)}`);
+          await page.screenshot({ path: `${out}/02-entry.png`, fullPage: true });
+
+          await route('down');
+          await route('down');
+          await route('down');
+          await route('select');
+          await page.waitForFunction(() => document.getElementById('xtream-status')?.textContent === window.__requiredCopy);
+          if (await activeId() !== 'xtream-connect') throw new Error('empty submit did not return focus to connect');
+
+          await page.locator('#xtream-server-url').fill('https://example.invalid');
+          await page.locator('#xtream-username').fill('demo-user');
+          await page.locator('#xtream-password').fill('demo-pass');
+          await route('select');
+          await page.waitForFunction(() => document.getElementById('xtream-status')?.textContent === window.__authCopy);
+          const values = await page.evaluate(() => ({
+            server: document.getElementById('xtream-server-url').value,
+            username: document.getElementById('xtream-username').value,
+            password: document.getElementById('xtream-password').value,
+            reloads: window.__reloadCount,
+            active: document.activeElement?.id || '',
+          }));
+          if (values.server !== 'https://example.invalid' || values.username !== 'demo-user' || values.password !== 'demo-pass') throw new Error('AUTH failure did not preserve form values');
+          if (values.reloads !== 0) throw new Error('failed onboarding triggered reload');
+          if (values.active !== 'xtream-connect') throw new Error(`AUTH failure focus mismatch: ${values.active}`);
+          await page.screenshot({ path: `${out}/03-auth-error.png`, fullPage: true });
+
+          await route('down');
+          await route('select');
+          await page.locator('#xtream-entry-page').waitFor({ state: 'detached' });
+          await settingsButton.waitFor({ state: 'visible' });
+          await page.screenshot({ path: `${out}/04-back-settings.png`, fullPage: true });
+
+          const report = {
+            head: '95a23139a206f923f1d8ee1badccaee6ff784231',
+            viewport: '1920x1080',
+            settingsLabel: settingsLabel?.trim(),
+            focusSequence,
+            focusCss,
+            passwordMasked: true,
+            requiredMessage: true,
+            authFailurePreservedFields: true,
+            failedSubmitReloadCount: values.reloads,
+            backRestoredSettings: true,
+          };
+          fs.writeFileSync(`${out}/smoke-report.json`, JSON.stringify(report, null, 2));
+          console.log(JSON.stringify(report));
+          await browser.close();
+          EOF
+
+          CHROME="$CHROME" node /tmp/xtc-smoke.mjs
+
+      - name: Verify clean exact-head checkout
+        run: |
+          rm -f player/xt-c-smoke.html
+          git diff --exit-code
+          git status --short
+          test -z "$(git status --porcelain)"
+
+      - name: Upload XT-C smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xt-c-smoke-95a2313
+          path: |
+            /tmp/xtc-smoke
+            /tmp/xtc-security-hits.txt
+            /tmp/xtc-vite.log
+          if-no-files-found: warn
