@@ -56,3 +56,36 @@ test('FAV-D reconciliation reports missing favorites without deleting them', asy
   assert.deepEqual(result.missing.map((item) => item.channelId), ['missing']);
   assert.equal(await service.isFavorite('p1', 'missing'), true);
 });
+
+test('FAV-D reconciliation uses stable channel IDs rather than catalog order', async () => {
+  const repo = new MemoryFavoriteRepository();
+  let now = 10;
+  const service = new FavoriteService(repo, () => now++);
+  await service.add('p1', 'first-added');
+  await service.add('p1', 'second-added');
+
+  const result = await service.reconcile(
+    'p1',
+    new Set(['second-added', 'first-added']),
+  );
+
+  assert.deepEqual(
+    result.available.map((item) => item.channelId),
+    ['first-added', 'second-added'],
+  );
+  assert.deepEqual(result.missing, []);
+});
+
+test('FAV-D deleteProvider removes only the selected provider favorites', async () => {
+  const repo = new MemoryFavoriteRepository();
+  const service = new FavoriteService(repo, () => 10);
+  await service.add('p1', 'c1');
+  await service.add('p2', 'c1');
+
+  await service.deleteProvider('p1');
+
+  assert.deepEqual(await service.list('p1'), []);
+  assert.deepEqual(await service.list('p2'), [
+    { providerId: 'p2', channelId: 'c1', addedAtMs: 10 },
+  ]);
+});
