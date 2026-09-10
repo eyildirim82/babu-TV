@@ -193,6 +193,17 @@ test('M3U-C rolls back and preserves the channel-stage error code when sync cann
   assert.deepEqual(events, ['createId', 'register', 'sync', 'delete']);
 });
 
+test('M3U-C allows category failure when channel sync and cache validation succeed', async () => {
+  const { service, events } = createHarness({
+    report: successReport({ categories: { status: 'failed', code: 'SERVER' } }),
+  });
+
+  const result = await service.connect(input);
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(events, ['createId', 'register', 'sync', 'loadCached', 'activate']);
+});
+
 test('M3U-C rejects and rolls back an empty persisted channel cache before activation', async () => {
   const { service, events } = createHarness({
     report: successReport({ channels: { status: 'success', count: 0 } }),
