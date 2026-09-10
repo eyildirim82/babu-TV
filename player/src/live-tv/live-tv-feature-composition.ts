@@ -137,6 +137,7 @@ export function createLiveTvFeatureComposition(
   let currentState: LiveTvFeatureState | null = null;
   let searchLookup = new Map<string, LiveTvSearchActivation>();
   let programInfoReturnLayer: LiveTvFeatureLayer = 'none';
+  let refreshGeneration = 0;
 
   function current(): LiveTvFeatureState {
     if (currentState === null) {
@@ -197,6 +198,7 @@ export function createLiveTvFeatureComposition(
   }
 
   async function refresh(input: LiveTvFeatureRefreshInput): Promise<LiveTvFeatureState> {
+    const generation = ++refreshGeneration;
     const channels = providerChannels(input);
     const visibleChannels = providerVisibleChannels(input);
     const availableChannelIds = new Set(channels.map((channel) => channel.id));
@@ -232,6 +234,23 @@ export function createLiveTvFeatureComposition(
       }
     }
 
+    const fallbackState: LiveTvFeatureState = {
+      layer: 'none',
+      epg,
+      selectedFavorite,
+      favorites: buildFavoritesViewModel({
+        providerId: input.providerId,
+        channels,
+        reconciliation,
+      }),
+      search: idleSearch(),
+      actions: null,
+      programInfo: null,
+    };
+    if (generation !== refreshGeneration) {
+      return currentState ?? fallbackState;
+    }
+
     const previous = currentState;
     const search = previous === null
       ? idleSearch()
@@ -257,11 +276,7 @@ export function createLiveTvFeatureComposition(
       layer,
       epg,
       selectedFavorite,
-      favorites: buildFavoritesViewModel({
-        providerId: input.providerId,
-        channels,
-        reconciliation,
-      }),
+      favorites: fallbackState.favorites,
       search,
       actions,
       programInfo: layer === 'program-info' ? selectedDetail : null,
