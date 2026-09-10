@@ -59,3 +59,22 @@ test('EPG-XML skips malformed siblings and accepts single quotes with negative o
     description: null,
   }]);
 });
+
+test('EPG-XML parses 5000 synthetic programmes without quadratic slowdown', () => {
+  const xml = `<tv>${Array.from({ length: 5000 }, (_, index) => `
+    <programme start="20260910150000 +0300" stop="20260910153000 +0300" channel="channel-${index}">
+      <title>Program ${index}</title>
+      <desc>Desc ${index}</desc>
+    </programme>`).join('')}</tv>`;
+  const started = performance.now();
+  const programs = parseXmltvPrograms(xml);
+  const elapsedMs = performance.now() - started;
+
+  assert.equal(programs.length, 5000);
+  assert.equal(programs[0]?.title, 'Program 0');
+  assert.equal(programs[4999]?.title, 'Program 4999');
+  assert.ok(
+    elapsedMs < 2000,
+    `Expected XMLTV parse under 2000 ms, got ${elapsedMs.toFixed(1)} ms`,
+  );
+});
