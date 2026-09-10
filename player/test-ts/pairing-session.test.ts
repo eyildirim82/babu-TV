@@ -92,7 +92,7 @@ test('PAIR-S rejects invalid TTL and non-finite creation time', () => {
   assert.throws(() => invalidClock.create('opaque-value'));
 });
 
-test('PAIR-S rejects generated ID collisions instead of overwriting an existing session', () => {
+test('PAIR-S rejects generated ID collisions without overwriting the first session', () => {
   const manager = new PairingSessionManager<string>({
     nowMs: () => 1000,
     makeSessionId: () => 'duplicate-id',
@@ -100,4 +100,73 @@ test('PAIR-S rejects generated ID collisions instead of overwriting an existing 
 
   manager.create('first-value');
   assert.throws(() => manager.create('second-value'));
+  assert.deepEqual(manager.consume('duplicate-id'), { status: 'ok', value: 'first-value' });
+});
+
+test('PAIR-S consumes once, rejects replay, and expires at the exact boundary', () => {
+  let now = 1000;
+  let id = 0;
+  const manager = new PairingSessionManager<string>({
+    nowMs: () => now,
+    makeSessionId: () => `session-${++id}`,
+  });
+
+  const first = manager.create('secret-handle', 100);
+  assert.deepEqual(manager.consume(first.sessionId), { status: 'ok', value: 'secret-handle' });
+  assert.deepEqual(manager.consume(first.sessionId), { status: 'consumed' });
+
+  now = first.expiresAtMs - 1;
+  assert.deepEqual(manager.consume(first.sessionId), { status: 'consumed' });
+  now = first.expiresAtMs;
+  assert.deepEqual(manager.consume(first.sessionId), { status: 'expired' });
+  assert.deepEqual(manager.consume('missing'), { status: 'missing' });
+});
+
+test('PAIR-S isolates sessions and honors a custom positive TTL', () => {
+  let now = 5000;
+  let id = 0;
+  const manager = new PairingSessionManager<{ handle: string }>({
+    nowMs: () => now,
+    makeSessionId: () => `session-${++id}`,
+  });
+
+  const firstValue = { handle: 'first' };
+  const secondValue = { handle: 'second' };
+  const first = manager.create(firstValue, 25);
+  const second = manager.create(secondValue, 50);
+
+  assert.equal(first.expiresAtMs, 5025);
+  assert.equal(second.expiresAtMs, 5050);
+  assert.deepEqual(manager.consume(first.sessionId), { status: 'ok', value: firstValue });
+  assert.deepEqual(manager.consume(second.sessionId), { status: 'ok', value: secondValue });
+
+  now = 5025;
+  assert.deepEqual(manager.consume(first.sessionId), { status: 'expired' });
+  assert.deepEqual(manager.consume(second.sessionId), { status: 'consumed' });
+});
+
+test('PAIR-S purgeExpired removes only expired entries and returns no session values', () => {
+  let now = 1000;
+  let id = 0;
+  const manager = new PairingSessionManager<string>({
+    nowMs: () => now,
+    makeSessionId: () => `session-${++id}`,
+  });
+
+  const consumed = manager.create('consumed-value', 100);
+  const live = manager.create('live-value', 200);
+  assert.deepEqual(manager.consume(consumed.sessionId), { status: 'ok', value: 'consumed-value' });
+
+  now = consumed.expiresAtMs - 1;
+  assert.equal(manager.purgeExpired(), 0);
+  assert.deepEqual(manager.consume(consumed.sessionId), { status: 'consumed' });
+
+  now = consumed.expiresAtMs;
+  assert.equal(manager.purgeExpired(), 1);
+  assert.deepEqual(manager.consume(consumed.sessionId), { status: 'missing' });
+  assert.deepEqual(manager.consume(live.sessionId), { status: 'ok', value: 'live-value' });
+
+  now = live.expiresAtMs;
+  assert.equal(manager.purgeExpired(), 1);
+  assert.deepEqual(manager.consume(live.sessionId), { status: 'missing' });
 });
