@@ -74,6 +74,16 @@ export function searchCatalog(input: {
 
   if (query.length === 0 || limit === null) return [];
 
+  if (/^\d+$/.test(query)) {
+    const number = Number(query);
+    if (!Number.isSafeInteger(number)) return [];
+
+    const matches = input.channels.filter((channel) => channel.number !== null && channel.number === number);
+    if (matches.length !== 1) return [];
+
+    return [{ channel: matches[0], matchedBy: 'number', rank: 0 }];
+  }
+
   const categoryNames = new Map<string, string>();
   for (const category of input.categories) {
     categoryNames.set(categoryKey(category.providerId, category.id), normalizeSearchText(category.name));

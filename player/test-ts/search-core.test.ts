@@ -49,3 +49,42 @@ test('SRCH-C ranks name matches before category matches and preserves inputs', (
   assert.deepEqual(searchCatalog({ channels, categories, query: 'haber', limit: Number.NaN }), []);
   assert.equal(searchCatalog({ channels, categories, query: 'haber', limit: 2 }).length, 2);
 });
+
+test('SRCH-C promotes an exact channel number only when unambiguous', () => {
+  const base = { providerId: 'p1', categoryId: null, logoUrl: null };
+  const unique = [
+    { ...base, id: 'c7', name: 'Yedi', number: 7 },
+    { ...base, id: 'c8', name: 'Sekiz', number: 8 },
+  ];
+
+  assert.deepEqual(searchCatalog({ channels: unique, categories: [], query: '7' }).map((x) => x.channel.id), ['c7']);
+  assert.deepEqual(searchCatalog({ channels: unique, categories: [], query: '007' }).map((x) => x.channel.id), ['c7']);
+
+  const ambiguous = [...unique, { ...base, id: 'other7', name: 'Başka', number: 7 }];
+  assert.deepEqual(searchCatalog({ channels: ambiguous, categories: [], query: '7' }), []);
+  assert.deepEqual(searchCatalog({ channels: unique, categories: [], query: '999999999999999999999999999999' }), []);
+});
+
+test('SRCH-C has provider-agnostic stable ordering and category lookup by channel categoryId', () => {
+  const categories = [
+    { providerId: 'p1', id: 'sports', name: 'Spor' },
+    { providerId: 'p1', id: 'news', name: 'Haber' },
+    { providerId: 'p2', id: 'news', name: 'Belgesel' },
+  ];
+  const channels = [
+    { providerId: 'p1', id: 'c-null', name: 'Haber Z', categoryId: null, logoUrl: null, number: null },
+    { providerId: 'p1', id: 'c20b', name: 'Haber B', categoryId: 'sports', logoUrl: null, number: 20 },
+    { providerId: 'p1', id: 'c10', name: 'Haber C', categoryId: 'news', logoUrl: null, number: 10 },
+    { providerId: 'p1', id: 'c20a', name: 'Haber A', categoryId: 'sports', logoUrl: null, number: 20 },
+  ];
+
+  const forward = searchCatalog({ channels, categories, query: 'haber' }).map((x) => x.channel.id);
+  const reverse = searchCatalog({ channels: [...channels].reverse(), categories: [...categories].reverse(), query: 'haber' }).map((x) => x.channel.id);
+
+  assert.deepEqual(forward, ['c10', 'c20a', 'c20b', 'c-null']);
+  assert.deepEqual(reverse, forward);
+
+  const categoryOnly = [{ providerId: 'p1', id: 'cat-channel', name: 'Kanal', categoryId: 'news', logoUrl: null, number: 1 }];
+  assert.deepEqual(searchCatalog({ channels: categoryOnly, categories: [...categories].reverse(), query: 'haber' }).map((x) => x.channel.id), ['cat-channel']);
+  assert.deepEqual(searchCatalog({ channels: [{ ...categoryOnly[0], providerId: 'p2' }], categories, query: 'haber' }), []);
+});
