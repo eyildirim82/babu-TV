@@ -25,6 +25,11 @@ export type HomeActionIntent =
       readonly providerId: ProviderId;
       readonly channelId: ChannelId;
     }
+  | {
+      readonly type: 'PLAY_CHANNEL';
+      readonly providerId: ProviderId;
+      readonly channelId: ChannelId;
+    }
   | { readonly type: 'OPEN_SETTINGS' };
 
 export interface HomeProviderOption {
@@ -50,9 +55,10 @@ export interface HomeChannelCard {
   readonly intent: Extract<HomeActionIntent, { type: 'OPEN_LIVE_TV_CHANNEL' }>;
 }
 
-export interface HomeLastWatchedCard extends HomeChannelCard {
+export type HomeLastWatchedCard = Omit<HomeChannelCard, 'intent'> & {
   readonly lastPlayedAtMs: number;
-}
+  readonly intent: Extract<HomeActionIntent, { type: 'PLAY_CHANNEL' }>;
+};
 
 export interface HomeLiveTvState {
   readonly available: boolean;
@@ -182,9 +188,20 @@ export function createHomeViewModel(input: HomeProjectionInput): HomeViewModel {
   if (input.lastWatched?.providerId === providerId) {
     const channel = channelsById.get(input.lastWatched.channelId);
     if (channel !== undefined) {
+      const projected = channelCard(input, providerId, channel);
       lastWatched = {
-        ...channelCard(input, providerId, channel),
+        providerId: projected.providerId,
+        channelId: projected.channelId,
+        name: projected.name,
+        logoUrl: projected.logoUrl,
+        number: projected.number,
+        currentProgram: projected.currentProgram,
         lastPlayedAtMs: input.lastWatched.lastPlayedAtMs,
+        intent: {
+          type: 'PLAY_CHANNEL',
+          providerId,
+          channelId: channel.id,
+        },
       };
     }
   }
