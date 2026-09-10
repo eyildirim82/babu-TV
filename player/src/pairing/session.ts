@@ -13,6 +13,12 @@ export interface PairingSessionDependencies {
   makeSessionId?: () => string;
 }
 
+export type PairingConsumeResult<T> =
+  | { status: 'ok'; value: T }
+  | { status: 'missing' }
+  | { status: 'expired' }
+  | { status: 'consumed' };
+
 interface PairingSessionEntry<T> {
   descriptor: PairingSessionDescriptor;
   value: T;
@@ -86,5 +92,37 @@ export class PairingSessionManager<T> {
     };
     this.entries.set(sessionId, { descriptor, value, consumed: false });
     return descriptor;
+  }
+
+  consume(sessionId: string): PairingConsumeResult<T> {
+    const entry = this.entries.get(sessionId);
+    if (!entry) {
+      return { status: 'missing' };
+    }
+
+    if (this.nowMs() >= entry.descriptor.expiresAtMs) {
+      return { status: 'expired' };
+    }
+
+    if (entry.consumed) {
+      return { status: 'consumed' };
+    }
+
+    entry.consumed = true;
+    return { status: 'ok', value: entry.value };
+  }
+
+  purgeExpired(): number {
+    const nowMs = this.nowMs();
+    let removed = 0;
+
+    for (const [sessionId, entry] of this.entries) {
+      if (entry.descriptor.expiresAtMs <= nowMs) {
+        this.entries.delete(sessionId);
+        removed += 1;
+      }
+    }
+
+    return removed;
   }
 }
