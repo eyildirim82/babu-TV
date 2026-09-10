@@ -63,6 +63,7 @@ export class ChannelIntentCoordinator {
     this.emitEvent({ type: 'PREPARING', intent });
     const result = await this.session.switchTo({
       intentId: intent.id,
+      providerId: input.providerId,
       targetChannelId: intent.channelId,
       previousChannelId: intent.previousChannelId,
       initialRequest,

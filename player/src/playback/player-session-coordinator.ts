@@ -46,6 +46,16 @@ function isFallbackError(error: PlaybackErrorCode): boolean {
   return error === 'ENGINE_FAILURE' || error === 'UNSUPPORTED_CODEC';
 }
 
+function notifyObservation(callback: (() => void) | undefined): void {
+  if (callback === undefined) return;
+  try {
+    callback();
+  } catch {
+    // Playback observation is explicitly non-owning. A consumer failure must
+    // never alter handoff, retry, fallback, rollback, or last-intent-wins.
+  }
+}
+
 /**
  * Owns the M3 playback session below ChannelIntentCoordinator.
  *
@@ -98,7 +108,10 @@ export class PlayerSessionCoordinator implements PlayerSessionPort {
     if (!isCurrent()) return failed('UNKNOWN');
 
     // ChannelIntentCoordinator calls us only after target resolution succeeds,
-    // so this is the first allowed disruptive handoff point.
+    // so this is the first allowed disruptive handoff point. Observation is
+    // notified immediately before the already-existing handoff and cannot
+    // influence whether that handoff occurs.
+    notifyObservation(request.onHandoffStarted);
     await this.stopActiveEngine();
     if (!isCurrent()) return failed('UNKNOWN');
 
@@ -142,6 +155,11 @@ export class PlayerSessionCoordinator implements PlayerSessionPort {
     );
     if (!isCurrent()) return failed(targetError);
 
+    if (rollback.ok) {
+      notifyObservation(request.onRollbackRestored === undefined
+        ? undefined
+        : () => request.onRollbackRestored?.(rollback.engine));
+    }
     return failed(targetError, rollback.ok ? 'restored' : 'failed');
   }
 

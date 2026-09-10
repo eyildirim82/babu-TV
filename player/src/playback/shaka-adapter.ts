@@ -12,6 +12,10 @@ export type BufferingCallback = (buffering: boolean, percent?: number) => void;
 export type TrackChangeCallback = (track: { height?: number; bandwidth?: number }) => void;
 export type ChannelAdvanceCallback = () => void;
 export type ProxySuggestionCallback = (channel: unknown) => void;
+export type PlaybackTerminalCallback = (event: {
+  token: number;
+  reason: 'ended' | 'error';
+}) => void;
 
 export interface LegacyPlayerPort {
   initPlayer(videoEl: unknown): boolean | Promise<boolean>;
@@ -34,6 +38,20 @@ export interface LegacyPlayerPort {
   setAutoQuality?(enabled: boolean): void;
   isNativeAvailable?(): boolean;
   getVideoElement?(): unknown;
+}
+
+interface ObservableEventTarget {
+  addEventListener(type: string, listener: (event: unknown) => void): void;
+  removeEventListener(type: string, listener: (event: unknown) => void): void;
+}
+
+function asObservableEventTarget(value: unknown): ObservableEventTarget | null {
+  if (value === null || typeof value !== 'object') return null;
+  const candidate = value as Partial<ObservableEventTarget>;
+  return typeof candidate.addEventListener === 'function'
+    && typeof candidate.removeEventListener === 'function'
+    ? candidate as ObservableEventTarget
+    : null;
 }
 
 function requestToLegacyChannel(request: StreamRequest): Record<string, unknown> {
@@ -62,12 +80,19 @@ function requestToLegacyChannel(request: StreamRequest): Record<string, unknown>
  */
 export class ShakaAdapter implements PlaybackEnginePort {
   readonly name = 'shaka' as const;
+  private playbackToken = 0;
+  private terminalCallback: PlaybackTerminalCallback | null = null;
+  private terminalUnsubscribers: Array<() => void> = [];
 
   constructor(private readonly legacy: LegacyPlayerPort) {}
 
   async open(request: StreamRequest): Promise<PlaybackResult> {
+    const token = ++this.playbackToken;
     const result = await this.legacy.playShakaAttempt(requestToLegacyChannel(request));
-    if (result.ok) return { ok: true, engine: 'shaka', error: null };
+    if (result.ok) {
+      this.bindTerminalEvents(token);
+      return { ok: true, engine: 'shaka', error: null };
+    }
     return {
       ok: false,
       engine: null,
@@ -97,6 +122,7 @@ export class ShakaAdapter implements PlaybackEnginePort {
   }
 
   stop(): void {
+    this.clearTerminalListeners();
     this.legacy.stop();
   }
 
@@ -122,6 +148,14 @@ export class ShakaAdapter implements PlaybackEnginePort {
 
   onProxySuggestion(callback: ProxySuggestionCallback): void {
     this.legacy.onProxySuggestion(callback);
+  }
+
+  onPlaybackTerminal(callback: PlaybackTerminalCallback): void {
+    this.terminalCallback = callback;
+  }
+
+  getPlaybackToken(): number | null {
+    return this.playbackToken > 0 ? this.playbackToken : null;
   }
 
   getActiveHeight(): number | null {
@@ -158,5 +192,45 @@ export class ShakaAdapter implements PlaybackEnginePort {
 
   getVideoElement(): unknown {
     return this.legacy.getVideoElement?.() ?? null;
+  }
+
+  private bindTerminalEvents(token: number): void {
+    try {
+      this.clearTerminalListeners();
+      this.attachTerminalEvent(this.legacy.getVideoElement?.() ?? null, 'ended', token, 'ended');
+      this.attachTerminalEvent(this.legacy.getVideoElement?.() ?? null, 'error', token, 'error');
+      this.attachTerminalEvent(this.legacy.getPlayer(), 'error', token, 'error');
+    } catch {
+      // Terminal observation is optional and must never change open success.
+    }
+  }
+
+  private attachTerminalEvent(
+    value: unknown,
+    eventName: string,
+    token: number,
+    reason: 'ended' | 'error',
+  ): void {
+    const target = asObservableEventTarget(value);
+    if (target === null) return;
+    const listener = () => {
+      try {
+        this.terminalCallback?.({ token, reason });
+      } catch {
+        // Consumer failures are contained at this read-only observation seam.
+      }
+    };
+    target.addEventListener(eventName, listener);
+    this.terminalUnsubscribers.push(() => target.removeEventListener(eventName, listener));
+  }
+
+  private clearTerminalListeners(): void {
+    for (const unsubscribe of this.terminalUnsubscribers.splice(0)) {
+      try {
+        unsubscribe();
+      } catch {
+        // Cleanup failure cannot alter playback teardown.
+      }
+    }
   }
 }
