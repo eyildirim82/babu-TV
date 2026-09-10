@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-10  
 **Owner:** REVIEW / Integration Controller  
-**Status:** RC ROADMAP OPEN — MAXIMUM PARALLEL DESIGN APPROVED; IMPLEMENTATION NOT STARTED  
+**Status:** RC ROADMAP ACTIVE — RC-F0 CLOSED GREEN; WAVE 1 PLANNING  
 **Starting baseline:** `main@f3061cbad574b507b1f80cf23e19b8af179e90b0`  
 **Baseline verify:** `34414698392` SUCCESS
 
@@ -46,8 +46,10 @@ Approved product spec: `docs/superpowers/specs/2026-09-07-babustv-v1-product-and
 | Xtream remote-first entry UI | `CLOSED GREEN` | PR #30 merged |
 | Xtream application integration | `CLOSED GREEN` | PR #31 merged; post-merge product baseline `640e503...` GREEN |
 | Docs closeout baseline | `CLOSED GREEN` | `main@f3061cb...`; verify `34414698392` SUCCESS |
-| Maximum-parallel execution design | `PLANNED` | approved design on docs branch; no production started |
-| Open implementation blocker at roadmap start | none | production waits only for docs integration + RC-F0 bounded plan |
+| Maximum-parallel execution design | `CLOSED GREEN` | design and RC-F0 bounded plan integrated before production start |
+| RC-F0 shared contracts | `CLOSED GREEN` | PR #37 squash-merged; resulting `main@aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`; post-merge verify `34487321835` SUCCESS |
+| Wave 1 implementation base | `CLOSED GREEN` | common exact base frozen at `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` |
+| Open implementation blocker | bounded role plans | Wave 1 roles are not OPEN until their individual plans are approved |
 
 ## RC product implementation queue
 
@@ -55,7 +57,7 @@ This table remains product-level. The actual worker decomposition is tracked sep
 
 | Order | Work package | Status | TV required to implement? | Exit condition |
 | ---: | --- | --- | --- | --- |
-| 0 | RC-F0 shared contracts | `PLANNED` | No | common EPG/user-state/capability seams frozen without feature behavior |
+| 0 | RC-F0 shared contracts | `CLOSED GREEN` | No | common EPG/user-state/capability seams frozen without feature behavior |
 | 1 | M4 EPG core/integration | `PLANNED` | No | normalized current/next/detail + bounded cache/query + malformed/large-data tests |
 | 2 | M4 Live TV EPG presentation | `PLANNED` | No | remote-first EPG UI + missing-EPG degradation + 1920×1080 evidence |
 | 3 | M4 Favorites | `PLANNED` | No | provider-scoped stable-ID durable favorites + virtual Favorites scope |
@@ -74,7 +76,13 @@ This table remains product-level. The actual worker decomposition is tracked sep
 
 ## Parallel execution overlay
 
-After RC-F0 merges and post-merge `main` is GREEN, the product queue above fans out into independent bounded roles.
+RC-F0 is merged and its post-merge `main` is GREEN. The common Wave 1 implementation base is now frozen at:
+
+```text
+aac531b15bad85f6e7ae42c6ff1a6b71eed289d1
+```
+
+Post-merge verification: `34487321835` SUCCESS.
 
 First-wave target roles:
 
@@ -86,7 +94,7 @@ PAIR-C PAIR-S PAIR-R PAIR-WEB
 
 Architectural capacity is roughly 13–14 simultaneous first-wave branches. Recommended active concurrency is 8–12 workers so controller review and CI remain effective.
 
-Shared runtime/storage hot-zone changes are deliberately deferred to named persistence/integration/composition roles. Core workers must not independently modify central IndexedDB schema, `main.js`, or shared Live TV composition unless their bounded plan explicitly grants ownership.
+The core lanes are currently waiting for their own bounded implementation plans. `PAIR-WEB` also remains blocked on the required pairing interfaces. Shared runtime/storage hot-zone changes are deliberately deferred to named persistence/integration/composition roles. Core workers must not independently modify central IndexedDB schema, `main.js`, or shared Live TV composition unless their bounded plan explicitly grants ownership.
 
 ## Required per-package workflow
 
@@ -197,12 +205,15 @@ Synthetic/fake provider data only in public CI and screenshots.
 
 ## Controller state
 
-At creation of this parallel design:
+Current controller state:
 
-- repository product baseline is GREEN;
-- no production implementation for the RC roadmap has started;
-- the next production package is `RC-F0`, only after docs merge + post-merge GREEN `main` + bounded RC-F0 plan approval;
-- after RC-F0 post-merge GREEN, controller records a common exact Wave 1 base and may activate independent roles according to `v1-parallel-execution.md`;
+- RC roadmap documentation and maximum-parallel design are integrated;
+- RC-F0 plan was implemented on `foundation/v1-rc-contracts`, final worker head `8a216600b8244c58e7fabb8069f2320b906b21b4`;
+- RC-F0 plan-required exact-head gates are GREEN, including `brand:check` and `tizen:build` evidence from verification run `34486768193`;
+- PR #37 was squash-merged to `main@aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`;
+- post-merge `main` verify `34487321835` is SUCCESS;
+- `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` is the common exact Wave 1 implementation base;
+- Wave 1 production roles remain closed until their bounded plans are approved; `PAIR-WEB` additionally waits for pairing interface freeze;
 - old B0/M3G/Xtream worker branches are historical evidence, not implementation bases;
 - merge authority remains Controller / explicit user instruction.
 
