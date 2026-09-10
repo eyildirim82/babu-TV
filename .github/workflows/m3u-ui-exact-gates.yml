@@ -49,15 +49,25 @@ jobs:
       - name: Tizen package
         run: npm run tizen
 
-      - name: Verify bounded scope and clean patch
+      - name: Diff check
+        run: git diff --check 7b9b61cc099907535f570fb46f30997581a06995...HEAD
+
+      - name: Verify bounded file scope
         shell: bash
         run: |
-          git diff --check 7b9b61cc099907535f570fb46f30997581a06995...HEAD
+          git diff --name-only 7b9b61cc099907535f570fb46f30997581a06995...HEAD | sort
           actual="$(git diff --name-only 7b9b61cc099907535f570fb46f30997581a06995...HEAD | sort)"
           expected="$(printf '%s\n' \
             player/src/m3u-entry.ts \
             player/src/ui/m3u-entry.css \
             player/test-ts/m3u-entry.test.ts | sort)"
           test "$actual" = "$expected"
-          git diff --exit-code
-          test -z "$(git status --porcelain)"
+
+      - name: Verify tracked tree unchanged by gates
+        run: git diff --exit-code
+
+      - name: Verify clean worktree
+        shell: bash
+        run: |
+          git status --porcelain --untracked-files=all
+          test -z "$(git status --porcelain --untracked-files=all)"
