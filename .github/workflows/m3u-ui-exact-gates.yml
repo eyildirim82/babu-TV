@@ -66,6 +66,9 @@ jobs:
       - name: Verify tracked tree unchanged by gates
         run: git diff --exit-code
 
+      - name: Remove known packaging-only null device artifact
+        run: rm -f tizen/nul
+
       - name: Verify clean worktree
         shell: bash
         run: |
