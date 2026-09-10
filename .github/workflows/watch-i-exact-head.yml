@@ -1,0 +1,62 @@
+name: WATCH-I exact-head verification
+
+on:
+  push:
+    branches:
+      - verification/watch-i-exact-head
+
+jobs:
+  exact-head:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact production head
+        uses: actions/checkout@v4
+        with:
+          ref: bfd9b09cb6e1a95dd49349ef7ba3d3a093a49f76
+          fetch-depth: 0
+
+      - name: Assert exact head and merge-base
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "bfd9b09cb6e1a95dd49349ef7ba3d3a093a49f76"
+          test "$(git merge-base 79d9ff13da28b13ce2f5a6dfed2e56313eb472ac HEAD)" = "79d9ff13da28b13ce2f5a6dfed2e56313eb472ac"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run exact-head gates
+        shell: bash
+        run: |
+          npm test
+          npm run typecheck
+          npm run brand:check
+          npm run build
+          npm run tizen:build
+          git diff --exit-code
+          git diff --check 79d9ff13da28b13ce2f5a6dfed2e56313eb472ac...HEAD
+
+      - name: Assert exact changed-file set
+        shell: bash
+        run: |
+          cat > /tmp/watch-i-expected.txt <<'EOF'
+          player/src/avplay.js
+          player/src/live-tv/channel-intent-coordinator.ts
+          player/src/live-tv/contracts.ts
+          player/src/live-tv/create-live-tv-runtime.ts
+          player/src/playback/avplay-adapter.ts
+          player/src/playback/player-session-coordinator.ts
+          player/src/playback/shaka-adapter.ts
+          player/src/providers/create-browser-provider-runtime.ts
+          player/src/watch/playback-session-observer.ts
+          player/test-ts/watch-playback-events.test.ts
+          player/test-ts/watch-playback-recovery.test.ts
+          EOF
+          git diff --name-only 79d9ff13da28b13ce2f5a6dfed2e56313eb472ac...HEAD | sort > /tmp/watch-i-actual.txt
+          sort -o /tmp/watch-i-expected.txt /tmp/watch-i-expected.txt
+          diff -u /tmp/watch-i-expected.txt /tmp/watch-i-actual.txt
