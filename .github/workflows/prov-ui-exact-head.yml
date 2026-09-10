@@ -1,7 +1,7 @@
 name: PROV-UI exact-head full gates
 
 on:
-  push:
+  pull_request:
     branches:
       - verification/prov-ui-exact-head
 
