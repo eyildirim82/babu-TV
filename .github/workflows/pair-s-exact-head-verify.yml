@@ -1,0 +1,68 @@
+name: PAIR-S exact-head verification
+
+on:
+  push:
+    branches:
+      - verification/pair-s-20dac66
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact production head
+        uses: actions/checkout@v4
+        with:
+          ref: 20dac66aab17f3dc2858ab594e78c50afa264ceb
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Assert exact production head
+        run: test "$(git rev-parse HEAD)" = "20dac66aab17f3dc2858ab594e78c50afa264ceb"
+
+      - name: npm test
+        run: npm test
+
+      - name: npm run typecheck
+        run: npm run typecheck
+
+      - name: npm run brand:check
+        run: npm run brand:check
+
+      - name: npm run build
+        run: npm run build
+
+      - name: npm run tizen:build
+        run: npm run tizen:build
+
+      - name: git diff --exit-code
+        run: git diff --exit-code
+
+      - name: Exact scope assertion
+        shell: bash
+        run: |
+          git diff --name-only b55a01642cd03a555712dd64026f3e22f1a81323...HEAD | sort > /tmp/actual
+          printf '%s\n' \
+            'player/src/pairing/session.ts' \
+            'player/test-ts/pairing-session.test.ts' | sort > /tmp/expected
+          diff -u /tmp/expected /tmp/actual
+
+      - name: Exact-base diff check
+        run: git diff --check b55a01642cd03a555712dd64026f3e22f1a81323...HEAD
+
+      - name: PAIR-S source boundary audit
+        shell: bash
+        run: |
+          ! grep -n 'Math\.random' player/src/pairing/session.ts
+          ! grep -nE "from ['\"].*(pairing/(crypto|relay)|storage|providers|playback)" player/src/pairing/session.ts
+          ! grep -nE 'console\.(log|info|warn|error)|JSON\.stringify' player/src/pairing/session.ts
