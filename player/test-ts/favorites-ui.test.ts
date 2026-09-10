@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import type { FocusState } from '../src/domain/actions.js';
 import type { Channel } from '../src/domain/models.js';
 
 async function loadPresentation() {
@@ -15,6 +16,14 @@ async function loadViewModel() {
     return await import('../src/favorites/view-model.js');
   } catch {
     assert.fail('favorites view-model module should be available');
+  }
+}
+
+async function loadFocus() {
+  try {
+    return await import('../src/favorites/focus.js');
+  } catch {
+    assert.fail('favorites focus module should be available');
   }
 }
 
@@ -95,4 +104,75 @@ test('FAV-UI exposes an empty presentation without inventing missing-channel ent
     title: 'Favoriler boş',
     message: 'Favoriye eklediğiniz kanallar burada görünür.',
   });
+});
+
+test('FAV-UI focus sync preserves stable focus and reuses existing playing/restore precedence', async () => {
+  const focus = await loadFocus();
+  const viewModel = await loadViewModel();
+  const c1 = channel('p1', 'c1', 'Bir');
+  const c2 = channel('p1', 'c2', 'İki');
+  const ready = viewModel.buildFavoritesViewModel({
+    providerId: 'p1',
+    channels: [c2, c1],
+    reconciliation: {
+      available: [
+        { providerId: 'p1', channelId: 'c1', addedAtMs: 10 },
+        { providerId: 'p1', channelId: 'c2', addedAtMs: 20 },
+      ],
+      missing: [],
+    },
+  });
+  const initial: FocusState = {
+    screen: 'LIVE_TV',
+    zone: 'CHANNEL',
+    itemId: 'c2',
+    restoreItemId: 'c1',
+  };
+
+  assert.equal(focus.syncFavoritesFocus(initial, ready, 'c1').itemId, 'c2');
+
+  const onlyC1 = viewModel.buildFavoritesViewModel({
+    providerId: 'p1',
+    channels: [c1],
+    reconciliation: {
+      available: [{ providerId: 'p1', channelId: 'c1', addedAtMs: 10 }],
+      missing: [],
+    },
+  });
+  assert.equal(focus.syncFavoritesFocus(initial, onlyC1, 'c1').itemId, 'c1');
+});
+
+test('FAV-UI focus movement is remote-first, clamped, and empty-safe without playback actions', async () => {
+  const focus = await loadFocus();
+  const viewModel = await loadViewModel();
+  const c1 = channel('p1', 'c1', 'Bir');
+  const c2 = channel('p1', 'c2', 'İki');
+  const ready = viewModel.buildFavoritesViewModel({
+    providerId: 'p1',
+    channels: [c1, c2],
+    reconciliation: {
+      available: [
+        { providerId: 'p1', channelId: 'c1', addedAtMs: 10 },
+        { providerId: 'p1', channelId: 'c2', addedAtMs: 20 },
+      ],
+      missing: [],
+    },
+  });
+  const initial: FocusState = {
+    screen: 'LIVE_TV',
+    zone: 'CHANNEL',
+    itemId: 'c1',
+    restoreItemId: 'c1',
+  };
+
+  const next = focus.moveFavoritesFocus(initial, ready, 'NEXT');
+  assert.equal(next.itemId, 'c2');
+  assert.equal(focus.moveFavoritesFocus(next, ready, 'NEXT').itemId, 'c2');
+
+  const empty = viewModel.buildFavoritesViewModel({
+    providerId: 'p1',
+    channels: [],
+    reconciliation: { available: [], missing: [] },
+  });
+  assert.equal(focus.syncFavoritesFocus(next, empty, null).itemId, null);
 });
