@@ -43,3 +43,20 @@ test('EPG-Q next lookup returns null when there is no future programme', async (
   const query = new RepositoryEpgQuery(repo, { lookBehindMs: 1000, lookAheadMs: 1000 });
   assert.equal(await query.getNext('p1', 'c1', 150), null);
 });
+
+test('EPG-Q window lookup delegates provider, channel, and half-open window', async () => {
+  const repo = new MemoryEpgProgramRepository();
+  await repo.replaceWindow('p1', { startMs: 0, endMs: 400 }, [
+    { channelId: 'c1', startMs: 100, endMs: 200, title: 'A', description: null },
+    { channelId: 'c1', startMs: 200, endMs: 300, title: 'B', description: null },
+    { channelId: 'c2', startMs: 100, endMs: 300, title: 'Other channel', description: null },
+  ]);
+  await repo.replaceWindow('p2', { startMs: 0, endMs: 400 }, [
+    { channelId: 'c1', startMs: 100, endMs: 300, title: 'Other provider', description: null },
+  ]);
+  const query = new RepositoryEpgQuery(repo, { lookBehindMs: 1000, lookAheadMs: 1000 });
+  assert.deepEqual(
+    (await query.listWindow('p1', 'c1', { startMs: 150, endMs: 250 })).map((program) => program.title),
+    ['A', 'B'],
+  );
+});
