@@ -73,6 +73,10 @@ export class ProviderEpgService {
       }
 
       const sourcePrograms = await source.listPrograms(window);
+      if (sourcePrograms.length === 0) {
+        return { providerId, status: 'success', programCount: 0 };
+      }
+
       const byChannel = new Map<string, EpgSourceProgram[]>();
       for (const sourceProgram of sourcePrograms) {
         const channelId = matchEpgChannel(providerId, sourceProgram.sourceChannel, descriptors);
@@ -82,18 +86,38 @@ export class ProviderEpgService {
         byChannel.set(channelId, channelPrograms);
       }
 
-      const normalized: EpgProgram[] = [];
+      const normalizedByChannel = new Map<string, readonly EpgProgram[]>();
+      const refreshedPrograms: EpgProgram[] = [];
       for (const [channelId, programs] of byChannel) {
-        normalized.push(...normalizeEpgPrograms(channelId, programs).filter((program) => intersects(program, window)));
+        const normalized = normalizeEpgPrograms(channelId, programs)
+          .filter((program) => intersects(program, window));
+        if (normalized.length === 0) continue;
+        normalizedByChannel.set(channelId, normalized);
+        refreshedPrograms.push(...normalized);
       }
 
-      if (sourcePrograms.length > 0 && normalized.length === 0) {
+      if (refreshedPrograms.length === 0) {
         return { providerId, status: 'failed', code: 'MALFORMED' };
       }
 
-      const nextPrograms = deterministicPrograms(normalized);
-      await this.deps.repository.replaceWindow(providerId, window, nextPrograms);
-      return { providerId, status: 'success', programCount: nextPrograms.length };
+      const preservedPrograms: EpgProgram[] = [];
+      for (const channel of channels) {
+        if (normalizedByChannel.has(channel.id)) continue;
+        preservedPrograms.push(
+          ...await this.deps.repository.listPrograms(providerId, channel.id, window),
+        );
+      }
+
+      await this.deps.repository.replaceWindow(
+        providerId,
+        window,
+        deterministicPrograms([...refreshedPrograms, ...preservedPrograms]),
+      );
+      return {
+        providerId,
+        status: 'success',
+        programCount: refreshedPrograms.length,
+      };
     } catch (error) {
       return { providerId, status: 'failed', code: errorCode(error) };
     }
