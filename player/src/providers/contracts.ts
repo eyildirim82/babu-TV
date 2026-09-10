@@ -7,6 +7,7 @@ import type {
   ProviderKind,
   ProviderRecord,
 } from '../domain/models.js';
+import type { EpgChannelDescriptor, EpgSource } from '../epg/contracts.js';
 import type { StreamRequest } from '../playback/contracts.js';
 
 export interface ProviderProfile {
@@ -17,9 +18,15 @@ export interface ProviderProfile {
   maxConnections: number | null;
 }
 
+export interface ProviderEpgCapability {
+  describeChannels(channels: readonly Channel[]): readonly EpgChannelDescriptor[];
+  createSource(channels: readonly Channel[]): EpgSource;
+}
+
 export interface ProviderAdapter {
   readonly providerId: ProviderId;
   readonly kind: ProviderKind;
+  readonly epg?: ProviderEpgCapability;
   getProfile(): Promise<ProviderProfile>;
   listCategories(): Promise<readonly Category[]>;
   listChannels(): Promise<readonly Channel[]>;
