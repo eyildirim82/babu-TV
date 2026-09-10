@@ -69,6 +69,30 @@ test('FAV-UI projects the virtual Favorites category by provider-scoped stable f
   assert.equal(model.categoryKey, 'virtual:favorites');
   assert.equal(model.categoryLabel, 'Favoriler');
   assert.equal(model.status, 'ready');
+  assert.equal(model.emptyState, null);
   assert.deepEqual(model.channels, [p1c1, p1c2]);
   assert.deepEqual(model.focusItemIds, ['c1', 'c2']);
+});
+
+test('FAV-UI exposes an empty presentation without inventing missing-channel entries', async () => {
+  const viewModel = await loadViewModel();
+
+  const model = viewModel.buildFavoritesViewModel({
+    providerId: 'p1',
+    channels: [channel('p1', 'other', 'Diğer')],
+    reconciliation: {
+      available: [],
+      missing: [
+        { providerId: 'p1', channelId: 'removed', addedAtMs: 10 },
+      ],
+    },
+  });
+
+  assert.equal(model.status, 'empty');
+  assert.deepEqual(model.channels, []);
+  assert.deepEqual(model.focusItemIds, []);
+  assert.deepEqual(model.emptyState, {
+    title: 'Favoriler boş',
+    message: 'Favoriye eklediğiniz kanallar burada görünür.',
+  });
 });
