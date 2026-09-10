@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-10  
 **Owner:** REVIEW / Integration Controller  
-**Status:** RC ROADMAP ACTIVE — RC-F0 CLOSED GREEN; WAVE 1 PLANNING  
+**Status:** RC ROADMAP ACTIVE — RC-F0 CLOSED GREEN; 13 WAVE 1 CORE ROLES PLAN-BACKED AND OPEN  
 **Starting baseline:** `main@f3061cbad574b507b1f80cf23e19b8af179e90b0`  
 **Baseline verify:** `34414698392` SUCCESS
 
@@ -49,11 +49,12 @@ Approved product spec: `docs/superpowers/specs/2026-09-07-babustv-v1-product-and
 | Maximum-parallel execution design | `CLOSED GREEN` | design and RC-F0 bounded plan integrated before production start |
 | RC-F0 shared contracts | `CLOSED GREEN` | PR #37 squash-merged; resulting `main@aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`; post-merge verify `34487321835` SUCCESS |
 | Wave 1 implementation base | `CLOSED GREEN` | common exact base frozen at `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` |
-| Open implementation blocker | bounded role plans | Wave 1 roles are not OPEN until their individual plans are approved |
+| Wave 1 bounded plan pack | `CLOSED GREEN` | 13 independent core roles have controller-authored bounded plans; live status is `OPEN` in `v1-parallel-execution.md` |
+| Open implementation blocker | none for the 13 core lanes | `PAIR-WEB` remains separately `BLOCKED-CONTRACT` until pairing interfaces are frozen |
 
 ## RC product implementation queue
 
-This table remains product-level. The actual worker decomposition is tracked separately in `docs/verification/v1-parallel-execution.md`.
+This table remains product-level. A role becoming `OPEN` means it may start; package status stays `PLANNED` until a scoped worker branch/PR actually begins implementation. The actual worker decomposition is tracked separately in `docs/verification/v1-parallel-execution.md`.
 
 | Order | Work package | Status | TV required to implement? | Exit condition |
 | ---: | --- | --- | --- | --- |
@@ -76,7 +77,7 @@ This table remains product-level. The actual worker decomposition is tracked sep
 
 ## Parallel execution overlay
 
-RC-F0 is merged and its post-merge `main` is GREEN. The common Wave 1 implementation base is now frozen at:
+RC-F0 is merged and its post-merge `main` is GREEN. The common Wave 1 implementation base is frozen at:
 
 ```text
 aac531b15bad85f6e7ae42c6ff1a6b71eed289d1
@@ -84,17 +85,17 @@ aac531b15bad85f6e7ae42c6ff1a6b71eed289d1
 
 Post-merge verification: `34487321835` SUCCESS.
 
-First-wave target roles:
+The following 13 core roles have bounded plans and are `OPEN`:
 
 ```text
 EPG-N EPG-X EPG-XML EPG-MAP EPG-Q
 FAV-D SRCH-C M3U-V WATCH-R WATCH-S
-PAIR-C PAIR-S PAIR-R PAIR-WEB
+PAIR-C PAIR-S PAIR-R
 ```
 
-Architectural capacity is roughly 13–14 simultaneous first-wave branches. Recommended active concurrency is 8–12 workers so controller review and CI remain effective.
+`PAIR-WEB` remains `BLOCKED-CONTRACT` until the pairing crypto/session/relay interfaces are merged and frozen. Recommended active concurrency is 8–12 workers so controller review and CI remain effective even though all 13 independent core roles are eligible to start.
 
-The core lanes are currently waiting for their own bounded implementation plans. `PAIR-WEB` also remains blocked on the required pairing interfaces. Shared runtime/storage hot-zone changes are deliberately deferred to named persistence/integration/composition roles. Core workers must not independently modify central IndexedDB schema, `main.js`, or shared Live TV composition unless their bounded plan explicitly grants ownership.
+All 13 production branches must start from exact `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`, not from later documentation-only `main` commits unless the controller explicitly records a new production base. Shared runtime/storage hot-zone changes remain deferred to named persistence/integration/composition roles.
 
 ## Required per-package workflow
 
@@ -213,7 +214,9 @@ Current controller state:
 - PR #37 was squash-merged to `main@aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`;
 - post-merge `main` verify `34487321835` is SUCCESS;
 - `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` is the common exact Wave 1 implementation base;
-- Wave 1 production roles remain closed until their bounded plans are approved; `PAIR-WEB` additionally waits for pairing interface freeze;
+- 13 independent core roles have approved bounded plans and are `OPEN`; the live plan paths/ownership are recorded in `v1-parallel-execution.md`;
+- `PAIR-WEB` remains `BLOCKED-CONTRACT` until the pairing core interfaces are merged/frozen;
+- dependent Wave 2/UI roles remain blocked until their required core predecessors merge and post-merge verification is GREEN;
 - old B0/M3G/Xtream worker branches are historical evidence, not implementation bases;
 - merge authority remains Controller / explicit user instruction.
 
