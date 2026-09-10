@@ -60,3 +60,22 @@ test('EPG-Q window lookup delegates provider, channel, and half-open window', as
     ['A', 'B'],
   );
 });
+
+test('EPG-Q window lookup rejects non-finite and empty windows', async () => {
+  const repo = new MemoryEpgProgramRepository();
+  const query = new RepositoryEpgQuery(repo, { lookBehindMs: 1000, lookAheadMs: 1000 });
+  const invalidWindows = [
+    { startMs: 100, endMs: 100 },
+    { startMs: Number.NaN, endMs: 200 },
+    { startMs: 100, endMs: Number.POSITIVE_INFINITY },
+  ];
+
+  for (const window of invalidWindows) {
+    await assert.rejects(
+      query.listWindow('p1', 'c1', window),
+      (error: unknown) =>
+        error instanceof RangeError &&
+        error.message === 'EPG query window must be finite and non-empty.',
+    );
+  }
+});
