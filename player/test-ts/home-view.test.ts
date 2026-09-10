@@ -2,12 +2,21 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { HomeViewModel } from '../src/home/home-domain.js';
 
+type HomePresentationState =
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'error'; readonly message: string }
+  | { readonly kind: 'ready'; readonly model: HomeViewModel };
+
 interface HomeViewModule {
   HomeView: new (
     document: Document,
     callbacks: { onIntent(intent: unknown): void; onBack(): void },
   ) => {
-    show(state: { kind: 'ready'; model: HomeViewModel }): void;
+    show(state: HomePresentationState): void;
+    setState(state: HomePresentationState): void;
+    hide(): void;
+    isVisible(): boolean;
+    handleAction(action: 'left' | 'right' | 'up' | 'down' | 'select' | 'back'): void;
   };
 }
 
@@ -177,4 +186,32 @@ test('HOME-UI renders ready Home sections in domain order using text nodes', asy
   assert.match(text, /Son Kanal/);
   assert.match(text, /Favori Kanal/);
   assert.match(text, /Sık Kanal/);
+});
+
+test('HOME-UI loading and error states stay non-actionable and render safe supplied copy', async () => {
+  const home = await loadHomeView();
+  assert.ok(home, 'HOME-UI presentation module should exist');
+
+  const document = new FakeDocument();
+  let intents = 0;
+  const view = new home.HomeView(asDocument(document), {
+    onIntent: () => { intents += 1; },
+    onBack: () => {},
+  });
+
+  view.show({ kind: 'loading' });
+  assert.equal(view.isVisible(), true);
+  assert.match(textTree(document.body), /Ana sayfa hazırlanıyor…/);
+  view.handleAction('select');
+  assert.equal(intents, 0);
+
+  view.setState({ kind: 'error', message: 'Bağlantı <yeniden> denenemedi' });
+  const errorText = textTree(document.body);
+  assert.match(errorText, /Bağlantı <yeniden> denenemedi/);
+  assert.doesNotMatch(errorText, /Salon <script>/);
+  view.handleAction('select');
+  assert.equal(intents, 0);
+
+  view.hide();
+  assert.equal(view.isVisible(), false);
 });
