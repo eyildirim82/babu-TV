@@ -2,7 +2,7 @@
 
 Date: 2026-09-10  
 Owner: REVIEW / Integration Controller  
-Status: V1 RC ROADMAP OPEN — MAXIMUM PARALLEL DESIGN APPROVED; PRODUCTION NOT STARTED; PHYSICAL-TIZEN RELEASE ACCEPTANCE DEFERRED
+Status: V1 RC ACTIVE — RC-F0 CLOSED GREEN; WAVE 1 BASE FROZEN; ROLE PLANS PENDING; PHYSICAL-TIZEN RELEASE ACCEPTANCE DEFERRED
 
 ## Purpose
 
@@ -18,6 +18,7 @@ Canonical sources:
 - `docs/superpowers/plans/2026-09-08-m3-live-tv-core.md`
 - `docs/superpowers/plans/2026-09-10-xtream-provider-entry.md`
 - `docs/superpowers/plans/2026-09-10-babustv-v1-rc-roadmap.md`
+- `docs/superpowers/plans/2026-09-10-v1-rc-f0-shared-contracts.md`
 - `docs/verification/v1-rc-readiness.md`
 - `docs/verification/v1-parallel-execution.md`
 - `docs/verification/b0-execution-status.md`
@@ -35,14 +36,18 @@ Canonical sources:
 | Starting main verify | `34414698392` SUCCESS |
 | B0 implementation | B0A + B0B + B0C + B0D + B0E + B0F + B0G MERGED |
 | Xtream entry | prerequisite #28 + XT-A #29 + XT-B #30 + XT-C #31 MERGED |
-| Open implementation blocker | NONE at roadmap creation |
-| V1 RC implementation | PLANNED; not started |
-| Parallel execution design | APPROVED; docs branch only |
+| RC-F0 worker | `8a216600b8244c58e7fabb8069f2320b906b21b4`; all plan-required gates GREEN |
+| RC-F0 integration | PR #37 squash-merged to `main@aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` |
+| Post-RC-F0 main verify | `34487321835` SUCCESS |
+| Wave 1 common base | `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` |
+| Open implementation blocker | individual Wave 1 bounded plans not yet approved |
+| V1 RC implementation | RC-F0 CLOSED GREEN; Wave 1 planning next |
+| Parallel execution design | APPROVED and integrated |
 | M3 Tizen UI/runtime acceptance | DEFERRED external evidence |
 | M2 WidgetData real-Tizen probe | PENDING external evidence |
 | Merge authority | Controller / explicit user instruction |
 
-New production work must branch from the then-current exact GREEN `main`, not from historical B0/M3G/Xtream worker or evidence branches.
+New Wave 1 production work must branch from exact GREEN base `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`, not from historical B0/M3G/Xtream worker or evidence branches and not from later documentation-only commits unless controller records a new base.
 
 ## Closed foundation gates
 
@@ -92,6 +97,33 @@ Key evidence:
 
 Xtream blockers: none.
 
+### RC-F0 shared contracts — CLOSED GREEN
+
+```text
+RC roadmap/docs + bounded plan
+          ↓
+foundation/v1-rc-contracts
+          ↓
+worker head 8a216600...
+          ↓
+PR #37 squash merge
+          ↓
+main@aac531b15bad85f6e7ae42c6ff1a6b71eed289d1
+          ↓
+verify 34487321835 SUCCESS
+```
+
+Key evidence:
+
+- final worker head `8a216600b8244c58e7fabb8069f2320b906b21b4`;
+- exact-head primary verify `34485061474` SUCCESS;
+- auxiliary exact-head gate run `34486768193`: `brand:check` PASS, `tizen:build` PASS, clean diff PASS;
+- exact five-file RC-F0 scope preserved;
+- PR #37 squash-merged to `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`;
+- post-merge push verify `34487321835` SUCCESS.
+
+RC-F0 blockers: none.
+
 ## V1 RC maximum-parallel queue
 
 The RC program is controlled by:
@@ -106,7 +138,7 @@ Execution shape:
 ```text
 RC roadmap docs
       ↓
-RC-F0 shared contract foundation
+RC-F0 shared contract foundation — CLOSED GREEN
       ↓ exact GREEN post-F0 main
       ↓
 13–14 independent first-wave core lanes
@@ -130,24 +162,22 @@ Physical-TV acceptance does not block these deterministic implementation waves. 
 
 ## Immediate next gate
 
-No production branch should begin from a documentation branch.
+The common Wave 1 production base is frozen at `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` and its post-merge `main` verification `34487321835` is GREEN.
 
-After the RC roadmap + maximum-parallel documentation is approved, merged, and the resulting `main` is GREEN:
+Next controller actions:
 
-1. write and approve the bounded `RC-F0` shared-contract foundation plan;
-2. create `foundation/v1-rc-contracts` from that exact GREEN `main`;
-3. run characterization → RED where behavior/contracts require it → minimum foundation → GREEN;
-4. open Draft PR with exact base/head, changed-file ownership, and evidence;
-5. controller reviews before Ready/merge;
-6. verify the post-RC-F0 `main` exact GREEN;
-7. record that SHA as the common first-wave base;
-8. activate as many approved Wave 1 roles as review/CI capacity safely supports, target 8–12 concurrently.
+1. write and approve the bounded implementation plans for independent Wave 1 roles;
+2. ensure every plan explicitly uses exact base `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` unless a controller exception is recorded;
+3. mark only plan-backed roles `OPEN` in `docs/verification/v1-parallel-execution.md`;
+4. start up to 8–12 non-overlapping workers concurrently;
+5. keep `PAIR-WEB` blocked until its required pairing payload/session interfaces are frozen;
+6. review each Draft PR independently and require post-merge GREEN before dependent waves advance.
 
-Do not start the old monolithic `M4A` branch model. EPG core is now decomposed into `EPG-N`, `EPG-X`, `EPG-XML`, `EPG-MAP`, and `EPG-Q` plus later integration packages.
+Do not start the old monolithic `M4A` branch model. EPG core remains decomposed into `EPG-N`, `EPG-X`, `EPG-XML`, `EPG-MAP`, and `EPG-Q` plus later integration packages.
 
 ## First-wave role set
 
-After RC-F0 GREEN, these are the intended independent core roles:
+The exact common implementation base for these roles is `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`.
 
 ```text
 EPG-N      common EPG normalization
@@ -166,7 +196,7 @@ PAIR-R     ciphertext-only relay contract
 PAIR-WEB   phone pairing UI after payload interfaces are frozen
 ```
 
-Detailed branch names, dependencies, output contracts, and later waves are canonical in `docs/verification/v1-parallel-execution.md`.
+Detailed branch names, dependencies, output contracts, and live status are canonical in `docs/verification/v1-parallel-execution.md`.
 
 ## Hot-zone policy
 
@@ -251,10 +281,6 @@ Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=CONTROLLER.
 ```
 
 ```text
-Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=RC-F0.
-```
-
-```text
 Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=EPG-N.
 ```
 
@@ -321,7 +347,7 @@ An RC candidate may exist while these are explicitly `PENDING`/`DEFERRED`. Final
 
 ## Historical evidence checkpoints
 
-- First-wave base: `0af80caf24eab206f303f67c177a5d716fb38a6d`.
+- First B0-wave base: `0af80caf24eab206f303f67c177a5d716fb38a6d`.
 - B0D merge result: `ceb994b94f93c8939bad6f72e7fda354c5ad9cf9`; post-merge `34397292047` SUCCESS.
 - B0E merge result: `43020e6fab513a018bd789183b2a9b9afd07fba0`; post-merge `34403420282` SUCCESS.
 - B0G merge result: `40cb22b2816b2d32104799591c67f9e8a6bb7d64`; post-merge `34406702831` SUCCESS.
@@ -331,5 +357,7 @@ An RC candidate may exist while these are explicitly `PENDING`/`DEFERRED`. Final
 - XT-C final browser smoke: `34414088818` SUCCESS.
 - XT-C resulting main: `640e503ed53c45c4f838a385846f0d857cfa6e40`; post-merge `34414324515` SUCCESS.
 - Docs closeout resulting main: `f3061cbad574b507b1f80cf23e19b8af179e90b0`; post-merge verify `34414698392` SUCCESS.
+- RC-F0 final worker head: `8a216600b8244c58e7fabb8069f2320b906b21b4`; primary verify `34485061474` SUCCESS; auxiliary exact-head gates `34486768193` SUCCESS.
+- RC-F0 resulting main / Wave 1 common implementation base: `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`; post-merge verify `34487321835` SUCCESS.
 
-These SHAs are historical evidence checkpoints, not permanent base instructions.
+These SHAs are historical evidence checkpoints except the explicitly frozen current Wave 1 base `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`.
