@@ -40,4 +40,27 @@ export class RepositoryEpgQuery {
     );
     return matches[0] ?? null;
   }
+
+  async getNext(
+    providerId: ProviderId,
+    channelId: ChannelId,
+    atMs: number,
+  ): Promise<EpgProgram | null> {
+    const current = await this.getCurrent(providerId, channelId, atMs);
+    const threshold = current?.endMs ?? atMs;
+    const endMs = atMs + this.bounds.lookAheadMs;
+    if (endMs <= threshold) {
+      return null;
+    }
+
+    const programs = await this.repository.listPrograms(providerId, channelId, {
+      startMs: threshold,
+      endMs,
+    });
+    const matches = programs.filter((program) => program.startMs >= threshold);
+    matches.sort(
+      (a, b) => a.startMs - b.startMs || a.endMs - b.endMs || a.title.localeCompare(b.title),
+    );
+    return matches[0] ?? null;
+  }
 }
