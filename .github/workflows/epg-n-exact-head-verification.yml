@@ -1,0 +1,53 @@
+name: EPG-N exact-head verification
+
+on:
+  push:
+    branches:
+      - verification/epg-n-f4bc411
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout final production head
+        uses: actions/checkout@v4
+        with:
+          ref: f4bc411ee1d0c8ef6d76a193d7db8eadde407f14
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Assert exact production head
+        run: test "$(git rev-parse HEAD)" = "f4bc411ee1d0c8ef6d76a193d7db8eadde407f14"
+
+      - name: Run brand gate
+        run: npm run brand:check
+
+      - name: Run Tizen staging build
+        run: npm run tizen:build
+
+      - name: Ensure verification did not modify tracked files
+        run: git diff --exit-code
+
+      - name: Check base-to-head diff whitespace
+        run: git diff --check aac531b15bad85f6e7ae42c6ff1a6b71eed289d1...HEAD
+
+      - name: Verify exact owned scope
+        shell: bash
+        run: |
+          actual="$(git diff --name-only aac531b15bad85f6e7ae42c6ff1a6b71eed289d1...HEAD | sort)"
+          expected="$(printf '%s\n' 'player/src/epg/normalize.ts' 'player/test-ts/epg-normalize.test.ts' | sort)"
+          printf 'Changed files:\n%s\n' "$actual"
+          test "$actual" = "$expected"
