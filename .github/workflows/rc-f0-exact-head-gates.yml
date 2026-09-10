@@ -1,0 +1,40 @@
+name: rc-f0-exact-head-gates
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout RC-F0 exact head
+        uses: actions/checkout@v4
+        with:
+          ref: 8a216600b8244c58e7fabb8069f2320b906b21b4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Assert exact head
+        run: test "$(git rev-parse HEAD)" = "8a216600b8244c58e7fabb8069f2320b906b21b4"
+
+      - name: Brand separation gate
+        run: npm run brand:check
+
+      - name: Tizen staging gate
+        run: npm run tizen:build
+
+      - name: Ensure gates do not modify tracked files
+        run: git diff --exit-code
