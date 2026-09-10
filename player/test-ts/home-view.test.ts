@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import type { HomeViewModel } from '../src/home/home-domain.js';
 
@@ -401,4 +402,19 @@ test('HOME-UI Back delegates one layer and never emits a HomeActionIntent', asyn
   view.handleAction('back');
   assert.equal(backs, 1);
   assert.deepEqual(intents, []);
+});
+
+test('HOME-UI stylesheet is scoped, TV-distance, focus-visible, and reduced-motion safe', async () => {
+  const css = await readFile(new URL('../src/ui/home.css', import.meta.url), 'utf8').catch(() => null);
+  assert.ok(css, 'HOME-UI scoped stylesheet should exist');
+  assert.match(css, /\.home-page\b/);
+  assert.match(css, /\.home-action:focus-visible/);
+  assert.match(css, /var\(--babu-bg\)/);
+  assert.match(css, /var\(--babu-accent-strong\)/);
+  assert.match(css, /min-height:\s*(?:7[2-9]|[89]\d|1\d\d)px/);
+  assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
+  assert.match(css, /transition:\s*none/);
+  assert.match(css, /animation:\s*none/);
+  assert.doesNotMatch(css, /(^|\n)\s*(?:html|body|:root|#)/m);
+  assert.doesNotMatch(css, /\.babu-/);
 });
