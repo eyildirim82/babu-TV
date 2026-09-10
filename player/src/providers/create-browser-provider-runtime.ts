@@ -4,6 +4,7 @@ import {
 } from '../credentials/samsung-widgetdata-credential-store.js';
 import { StructuredCatalogRepository } from '../repository/structured-catalog-repository.js';
 import { StructuredProviderRepository } from '../repository/structured-provider-repository.js';
+import { StructuredWatchStateRepository } from '../repository/structured-watch-state-repository.js';
 import { IndexedDbStructuredStore } from '../storage/indexeddb-structured-store.js';
 import { FetchProviderHttpClient } from './http/fetch-provider-http-client.js';
 import { ProviderAdapterFactoryImpl } from './provider-adapter-factory.js';
@@ -20,6 +21,7 @@ export function createBrowserProviderRuntime(deps: BrowserProviderRuntimeDepende
   const store = new IndexedDbStructuredStore(deps.indexedDb);
   const providers = new StructuredProviderRepository(store);
   const catalog = new StructuredCatalogRepository(store);
+  const watchState = new StructuredWatchStateRepository(store);
   const credentials = new SamsungWidgetDataCredentialStore(deps.widgetData);
   const http = new FetchProviderHttpClient(deps.fetchImpl);
   const adapters = new ProviderAdapterFactoryImpl(http);
@@ -29,6 +31,7 @@ export function createBrowserProviderRuntime(deps: BrowserProviderRuntimeDepende
   return {
     providers,
     catalog,
+    watchState,
     credentials,
     http,
     adapters,
