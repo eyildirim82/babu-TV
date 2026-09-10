@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-10  
 **Owner:** REVIEW / Integration Controller  
-**Status:** RC ROADMAP OPEN — IMPLEMENTATION NOT STARTED  
+**Status:** RC ROADMAP OPEN — MAXIMUM PARALLEL DESIGN APPROVED; IMPLEMENTATION NOT STARTED  
 **Starting baseline:** `main@f3061cbad574b507b1f80cf23e19b8af179e90b0`  
 **Baseline verify:** `34414698392` SUCCESS
 
@@ -17,6 +17,10 @@ It separates:
 - physical-Tizen acceptance that must remain pending/deferred until an applicable runtime is available.
 
 Detailed roadmap: `docs/superpowers/plans/2026-09-10-babustv-v1-rc-roadmap.md`.
+
+Maximum-parallel execution design: `docs/superpowers/specs/2026-09-10-babustv-v1-maximum-parallel-execution-design.md`.
+
+Live role/dependency board: `docs/verification/v1-parallel-execution.md`.
 
 Approved product spec: `docs/superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md`.
 
@@ -42,41 +46,61 @@ Approved product spec: `docs/superpowers/specs/2026-09-07-babustv-v1-product-and
 | Xtream remote-first entry UI | `CLOSED GREEN` | PR #30 merged |
 | Xtream application integration | `CLOSED GREEN` | PR #31 merged; post-merge product baseline `640e503...` GREEN |
 | Docs closeout baseline | `CLOSED GREEN` | `main@f3061cb...`; verify `34414698392` SUCCESS |
-| Open implementation blocker at roadmap start | none | New work may begin from fresh GREEN `main` after scoped plan approval |
+| Maximum-parallel execution design | `PLANNED` | approved design on docs branch; no production started |
+| Open implementation blocker at roadmap start | none | production waits only for docs integration + RC-F0 bounded plan |
 
-## RC implementation queue
+## RC product implementation queue
+
+This table remains product-level. The actual worker decomposition is tracked separately in `docs/verification/v1-parallel-execution.md`.
 
 | Order | Work package | Status | TV required to implement? | Exit condition |
 | ---: | --- | --- | --- | --- |
-| 1 | M4A EPG Core | `PLANNED` | No | Normalized current/next/detail + bounded cache/query + malformed/large-data tests |
-| 2 | M4B Live TV EPG presentation | `PLANNED` | No | Remote-first EPG UI + missing-EPG degradation + 1920×1080 evidence |
-| 3 | M4C Favorites | `PLANNED` | No | Provider-scoped stable-ID durable favorites + virtual Favorites scope |
-| 4 | M4D Local Search | `PLANNED` | No | Turkish-safe local search + large-list benchmark + highlight≠playback preserved |
-| 5 | M4E Channel Options | `PLANNED` | No | Core actions reachable with six basic remote actions |
-| 6 | M3U Provider-Core onboarding parity | `PLANNED` | No | Modern M3U add/validate/register/sync/activate flow; no credential leakage |
-| 7 | M5A Watch State | `PLANNED` | No | Last watched + meaningful watch stats + provider-scoped frequently-watched state |
-| 8 | M5B Home | `PLANNED` | No | Provider / Last Watched / Live TV / Favorites / Frequently Watched / Settings flow |
-| 9 | M5C Provider Management | `PLANNED` | No | Switch/add/edit/delete with provider-scoped cleanup |
-| 10 | M5D First Run | `PLANNED` | No | Short branded Provider Ekle flow; later boots remain restrained |
-| 11 | M6 Secure Pairing | `PLANNED` | No for protocol/browser development | Ephemeral encrypted single-use pairing + public/self-host-compatible relay contract |
-| 12 | M7 Hardening | `PLANNED` | No for deterministic matrix | Large/malformed/offline/migration/focus/security cases GREEN |
-| 13 | Browser Release Matrix | `PLANNED` | No | Deterministic 1920×1080 release smoke GREEN |
-| 14 | Tizen build/package RC gate | `PLANNED` | No for build; environment-dependent for package signing | Available package/staging gates GREEN, unavailable paths honestly classified |
-| 15 | V1 RC versioning decision | `PLANNED` | No | Explicit choice: independent `1.0.0-rc.1` line or inherited version continuation |
+| 0 | RC-F0 shared contracts | `PLANNED` | No | common EPG/user-state/capability seams frozen without feature behavior |
+| 1 | M4 EPG core/integration | `PLANNED` | No | normalized current/next/detail + bounded cache/query + malformed/large-data tests |
+| 2 | M4 Live TV EPG presentation | `PLANNED` | No | remote-first EPG UI + missing-EPG degradation + 1920×1080 evidence |
+| 3 | M4 Favorites | `PLANNED` | No | provider-scoped stable-ID durable favorites + virtual Favorites scope |
+| 4 | M4 Local Search | `PLANNED` | No | Turkish-safe local search + large-list benchmark + highlight≠playback preserved |
+| 5 | M4 Channel Options | `PLANNED` | No | core actions reachable with six basic remote actions |
+| 6 | M3U Provider-Core onboarding parity | `PLANNED` | No | modern M3U add/validate/register/sync/activate flow; no credential leakage |
+| 7 | M5 Watch State | `PLANNED` | No | last watched + meaningful watch stats + provider-scoped frequently-watched state |
+| 8 | M5 Home | `PLANNED` | No | Provider / Last Watched / Live TV / Favorites / Frequently Watched / Settings flow |
+| 9 | M5 Provider Management | `PLANNED` | No | switch/add/edit/delete with provider-scoped cleanup |
+| 10 | M5 First Run | `PLANNED` | No | short branded Provider Ekle flow; later boots remain restrained |
+| 11 | M6 Secure Pairing | `PLANNED` | No for protocol/browser development | ephemeral encrypted single-use pairing + public/self-host-compatible relay contract |
+| 12 | M7 Hardening | `PLANNED` | No for deterministic matrix | large/malformed/offline/migration/focus/security cases GREEN |
+| 13 | Browser Release Matrix | `PLANNED` | No | deterministic 1920×1080 release smoke GREEN |
+| 14 | Tizen build/package RC gate | `PLANNED` | No for build; environment-dependent for package signing | available package/staging gates GREEN, unavailable paths honestly classified |
+| 15 | V1 RC versioning decision | `PLANNED` | No | explicit choice: independent `1.0.0-rc.1` line or inherited version continuation |
+
+## Parallel execution overlay
+
+After RC-F0 merges and post-merge `main` is GREEN, the product queue above fans out into independent bounded roles.
+
+First-wave target roles:
+
+```text
+EPG-N EPG-X EPG-XML EPG-MAP EPG-Q
+FAV-D SRCH-C M3U-V WATCH-R WATCH-S
+PAIR-C PAIR-S PAIR-R PAIR-WEB
+```
+
+Architectural capacity is roughly 13–14 simultaneous first-wave branches. Recommended active concurrency is 8–12 workers so controller review and CI remain effective.
+
+Shared runtime/storage hot-zone changes are deliberately deferred to named persistence/integration/composition roles. Core workers must not independently modify central IndexedDB schema, `main.js`, or shared Live TV composition unless their bounded plan explicitly grants ownership.
 
 ## Required per-package workflow
 
 Each production package must have a bounded scope and independent review gate:
 
 ```text
-fresh GREEN main
-  → approved slice spec/plan
+fresh exact GREEN allowed base
+  → approved role spec/plan
   → characterization
   → RED
   → minimum implementation
   → focused GREEN
   → full regression/typecheck/build/security gates
-  → exact diff review
+  → exact diff + file-ownership review
   → browser/Tizen evidence as applicable
   → Draft PR
   → controller review
@@ -121,18 +145,18 @@ These rows are not repository implementation blockers while TV access is unavail
 | Gate | Current status | Required evidence |
 | --- | --- | --- |
 | M2 WidgetData credential-store runtime probe | `PENDING` | API access + synthetic write/read + relaunch persistence + replace + remove + absence + sanitized failure |
-| M3 13-row Live TV UI/playback runtime matrix | `DEFERRED` | Directly observable supported Tizen runtime with remote/human/screen evidence |
-| Real optional Samsung keys | `DEFERRED` | Supported-key discovery and behavior on device |
-| Real CH± / numeric keys | `DEFERRED` | Physical remote acceptance |
-| Shaka → AVPlay/native fallback | `DEFERRED` | Reproducible on-device fallback evidence |
-| Lifecycle / suspend / resume / relaunch | `DEFERRED` | Real-device lifecycle smoke |
-| Back / exit convention | `DEFERRED` | Real Samsung behavior observed |
-| Repeated real-device zapping | `DEFERRED` | Stability and interruption observation |
-| Long playback / memory | `DEFERRED` | Extended physical-runtime session |
-| On-device network loss/recovery | `DEFERRED` | Observable recovery/failure behavior |
-| Persisted settings/provider after relaunch | `DEFERRED` | Real Tizen persistence check |
-| Supported Tizen floor/model acceptance | `DEFERRED` | Applicable hardware/RTL/emulator matrix |
-| Final release install/package smoke | `DEFERRED` | Candidate WGT installed and exercised on release-truth environment |
+| M3 13-row Live TV UI/playback runtime matrix | `DEFERRED` | directly observable supported Tizen runtime with remote/human/screen evidence |
+| Real optional Samsung keys | `DEFERRED` | supported-key discovery and behavior on device |
+| Real CH± / numeric keys | `DEFERRED` | physical remote acceptance |
+| Shaka → AVPlay/native fallback | `DEFERRED` | reproducible on-device fallback evidence |
+| Lifecycle / suspend / resume / relaunch | `DEFERRED` | real-device lifecycle smoke |
+| Back / exit convention | `DEFERRED` | real Samsung behavior observed |
+| Repeated real-device zapping | `DEFERRED` | stability and interruption observation |
+| Long playback / memory | `DEFERRED` | extended physical-runtime session |
+| On-device network loss/recovery | `DEFERRED` | observable recovery/failure behavior |
+| Persisted settings/provider after relaunch | `DEFERRED` | real Tizen persistence check |
+| Supported Tizen floor/model acceptance | `DEFERRED` | applicable hardware/RTL/emulator matrix |
+| Final release install/package smoke | `DEFERRED` | candidate WGT installed and exercised on release-truth environment |
 
 No row in this table may be converted to PASS solely because unit tests, browser smoke, package construction, install, or launch succeeded.
 
@@ -173,11 +197,12 @@ Synthetic/fake provider data only in public CI and screenshots.
 
 ## Controller state
 
-At creation of this board:
+At creation of this parallel design:
 
-- repository baseline is GREEN;
-- no production implementation for this roadmap has started;
-- the next production package is M4A only after its bounded spec/plan is written and approved;
+- repository product baseline is GREEN;
+- no production implementation for the RC roadmap has started;
+- the next production package is `RC-F0`, only after docs merge + post-merge GREEN `main` + bounded RC-F0 plan approval;
+- after RC-F0 post-merge GREEN, controller records a common exact Wave 1 base and may activate independent roles according to `v1-parallel-execution.md`;
 - old B0/M3G/Xtream worker branches are historical evidence, not implementation bases;
 - merge authority remains Controller / explicit user instruction.
 
