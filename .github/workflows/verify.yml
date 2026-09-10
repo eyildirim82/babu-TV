@@ -14,10 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout exact source revision
+      - name: Checkout SRCH-UI exact production head
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          ref: 5eea64fce5d6eb0e8265580bcbd3c9dcf303f6df
+          fetch-depth: 0
+
+      - name: Confirm exact production head
+        run: test "$(git rev-parse HEAD)" = "5eea64fce5d6eb0e8265580bcbd3c9dcf303f6df"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -28,14 +32,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run characterization tests
+      - name: npm test
         run: npm test
 
-      - name: Typecheck
+      - name: npm run typecheck
         run: npm run typecheck
 
-      - name: Build production player
+      - name: Requested npm run brand evidence
+        continue-on-error: true
+        run: npm run brand
+
+      - name: Canonical brand gate
+        run: npm run brand:check
+
+      - name: npm run build
         run: npm run build
 
-      - name: Ensure verification did not modify tracked files
+      - name: npm run tizen
+        run: npm run tizen
+
+      - name: git diff --exit-code
         run: git diff --exit-code
+
+      - name: Exact-base diff check
+        run: git diff --check 7b9b61cc099907535f570fb46f30997581a06995...HEAD
