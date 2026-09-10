@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Compose the merged EPG, Favorites, Search, and Channel Actions feature contracts into the existing M3 Live TV controller/view while preserving highlight ≠ playback, stable focus, cache/failure isolation, and one-layer Back semantics.
+**Goal:** Compose the merged EPG, Favorites, Search, and Channel Actions contracts into the existing M3 Live TV controller/view while preserving highlight != playback, stable focus, failure isolation, and one-layer Back semantics.
 
-**Architecture:** M4-COMP adds a Live-TV-local feature composition seam. The controller consumes injected feature ports and the existing pure UI/domain modules; the DOM view renders the resulting feature presentation state. Provider repositories/runtime remain outside this lane: browser/application wiring supplies the ports later in M5-COMP, avoiding new storage/provider ownership in M4.
+**Architecture:** M4-COMP adds a Live-TV-local feature composition seam. The controller consumes injected feature ports and existing pure domain/UI modules; the DOM view renders only projected presentation state. Provider repositories/runtime remain outside this lane: M5-COMP later adapts concrete browser repositories/services to the M4 ports, so M4 never creates a second store or expands provider/storage ownership.
 
-**Tech Stack:** TypeScript 5.9, existing M3 controller/state/DOM view, EPG-UI, FAV-UI, SRCH-C/SRCH-UI, ACT-UI, Node `node:test`/`tsx`; no new dependency.
+**Tech Stack:** TypeScript 5.9, existing M3 controller/state/DOM view, EPG-UI, FAV-D/FAV-UI, SRCH-C/SRCH-UI, ACT-UI, Node `node:test`/`tsx`; no new dependency.
 
 **Spec:** `docs/superpowers/specs/2026-09-10-wave3b-home-m4-pairing-execution-design.md`
 
@@ -16,34 +16,38 @@
 - Branch: `integration/m4-live-tv-composition`.
 - Exact implementation base: `b55a01642cd03a555712dd64026f3e22f1a81323`.
 - Approved hot-zone ownership: `player/src/live-tv/live-tv-controller.ts`, `player/src/live-tv/dom-live-tv-view.ts`, `player/src/live-tv/create-live-tv-runtime.ts`, and `player/src/live-tv/contracts.ts` only if an unavoidable Live-TV-specific contract addition is required.
-- New focused helper allowed: `player/src/live-tv/live-tv-feature-composition.ts`.
-- Focused tests: `player/test-ts/m4-live-tv-composition.test.ts` plus only narrowly necessary existing Live TV test updates caused by intentional contract extension.
-- Forbidden: `player/src/main.js`, `player/index.html`, `player/src/providers/create-browser-provider-runtime.ts`, storage/repository implementations, Provider Core semantics, credential handling, Shaka/AVPlay/recovery behavior.
-- Feature ports are injected; M4 must not instantiate a second store/repository stack merely to obtain Favorites or EPG data.
-- Favorites toggle, Program Info, Search highlight/result focus, EPG display, and highlight movement never start playback.
-- Explicit channel Select and explicit `PLAY_CHANNEL` action remain the only play-intent routes.
-- Back closes exactly one active Live TV UI layer per invocation before delegating to existing outer behavior.
+- New focused helper: `player/src/live-tv/live-tv-feature-composition.ts`.
+- Primary focused test: `player/test-ts/m4-live-tv-composition.test.ts`; update an existing Live TV test only when an intentional public contract extension requires it.
+- Forbidden: `player/src/main.js`, `player/index.html`, `player/src/providers/create-browser-provider-runtime.ts`, storage/repository implementations, Provider Core semantics, credential handling, Shaka/AVPlay/session/recovery behavior.
+- M4 ports expose domain operations, not repositories/storage objects.
+- Favorites toggle, Program Info, Search focus/highlight, EPG display, and ordinary channel highlight never start playback.
+- Explicit existing channel Select and ACT-UI `PLAY_CHANNEL` are the only play-intent routes.
+- Back closes one active Live TV UI layer per invocation before delegating to existing outer behavior.
 
 ---
 
-### Task 1: Freeze injected M4 feature ports and local layer state
+### Task 1: Freeze injected feature ports and presentation-layer state
 
 **Files:**
 - Create: `player/src/live-tv/live-tv-feature-composition.ts`
 - Create: `player/test-ts/m4-live-tv-composition.test.ts`
 
 **Interfaces:**
-- Consumes: `EpgQuery`, Favorites domain/service-compatible read/toggle seam, `searchCatalog`, SRCH-UI projection/input contracts, ACT-UI channel-action contracts, provider/channel IDs.
-- Produces: `LiveTvFeaturePorts`, `LiveTvFeatureState`, `LiveTvFeatureComposition`.
+- Consumes: `EpgQuery`, `FavoriteReconciliation`, SRCH-C/SRCH-UI contracts, ACT-UI contracts, provider/channel IDs.
+- Produces: `LiveTvFavoritePort`, `LiveTvFeaturePorts`, `LiveTvFeatureLayer`, `LiveTvFeatureState`, `LiveTvFeatureComposition`.
 
-- [ ] **Step 1: Write RED contract test**
+- [ ] **Step 1: Write import-failure RED and freeze the narrow port**
 
-Start with an import-failure RED test and freeze a narrow port surface similar to:
+Use this boundary:
 
 ```ts
 export interface LiveTvFavoritePort {
   isFavorite(providerId: ProviderId, channelId: ChannelId): Promise<boolean>;
-  toggle(providerId: ProviderId, channelId: ChannelId, nowMs: number): Promise<boolean>;
+  toggle(providerId: ProviderId, channelId: ChannelId): Promise<boolean>;
+  reconcile(
+    providerId: ProviderId,
+    availableChannelIds: ReadonlySet<ChannelId>,
+  ): Promise<FavoriteReconciliation>;
 }
 
 export interface LiveTvFeaturePorts {
@@ -55,7 +59,7 @@ export interface LiveTvFeaturePorts {
 export type LiveTvFeatureLayer = 'none' | 'search' | 'actions' | 'program-info';
 ```
 
-Do not expose repositories, credentials, provider URLs, storage objects, or playback engines through these ports.
+This mirrors the existing FavoriteService behavior instead of reimplementing reconciliation. Do not expose repository/storage/credential/provider URL/playback objects.
 
 - [ ] **Step 2: Prove RED**
 
@@ -66,15 +70,15 @@ npm run typecheck -w player
 
 Expected: FAIL because `live-tv-feature-composition.ts` does not exist.
 
-- [ ] **Step 3: Implement local feature state**
+- [ ] **Step 3: Implement presentation-only local state**
 
-State must retain only presentation/focus data: active feature layer, Search query/focus/restore key, Channel Actions state/context, optional EPG presentation, favorite flag for the highlighted channel, and Program Info presentation. It must not own provider catalog, playback status, or session state already owned by M3.
+State may contain only: active feature layer; Search query/focus/restore key and key->channel mapping; Channel Actions state/context; EPG presentation; favorite flag for the selected/highlighted channel; Favorites virtual-category projection; Program Info presentation. It must not duplicate the M3 provider catalog, playback status, pending intent, session state, or FavoriteRepository contents.
 
-- [ ] **Step 4: Add explicit failure-degradation test**
+- [ ] **Step 4: Add failure-degradation RED/GREEN**
 
-Injected EPG/favorite read failures must produce unavailable/non-destructive presentation state and must not throw through the controller path. A failed favorite toggle must preserve the previous displayed favorite state and return a sanitized feature result rather than alter playback state.
+EPG read failure must project `unavailable`; favorite read/reconcile failure must keep Live TV usable and return an empty/non-destructive feature projection. Failed toggle preserves the prior displayed favorite state. No raw caught error string reaches presentation.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 npm run test:ts -w player -- --test-name-pattern="M4-COMP"
@@ -85,7 +89,7 @@ git commit -m "feat(live-tv): add injected M4 feature composition"
 
 ---
 
-### Task 2: Compose EPG and Favorites without changing M3 playback ownership
+### Task 2: Compose EPG and Favorites without changing playback ownership
 
 **Files:**
 - Modify: `player/src/live-tv/live-tv-feature-composition.ts`
@@ -93,25 +97,26 @@ git commit -m "feat(live-tv): add injected M4 feature composition"
 - Modify: `player/test-ts/m4-live-tv-composition.test.ts`
 
 **Interfaces:**
-- Consumes: `buildEpgLiveTvViewModel`, `presentEpgLiveTv`, `favoriteActionPresentation`, existing Favorites contracts.
-- Produces: async presentation refresh tied to current provider + visible/highlighted stable channel IDs.
+- Consumes: `buildEpgLiveTvViewModel`, `presentEpgLiveTv`, `buildFavoritesViewModel`, `favoriteActionPresentation`, injected `LiveTvFavoritePort`.
+- Produces: stale-safe feature presentation refresh for the active provider/visible/highlighted channels.
 
-- [ ] **Step 1: Write RED EPG/favorite integration tests**
+- [ ] **Step 1: Write RED integration tests**
 
-Prove:
+Prove all of the following:
 
-1. entering/syncing a provider can request presentation refresh for only that provider's stable channel IDs;
-2. EPG current/next failures resolve to missing/unavailable presentation and do not change `LiveTvState.playbackStatus`, `playingChannelId`, or pending intent;
-3. highlighting another channel refreshes selected-channel EPG/favorite presentation but emits no `ChannelIntentPort.requestChannel` call;
-4. favorite toggle updates only favorite presentation/domain port; it emits zero play requests.
+1. provider entry/catalog sync refreshes feature presentation only with `state.providerId` and current stable channel IDs;
+2. EPG current/next failure never changes `LiveTvState.playbackStatus`, `playingChannelId`, or `pendingIntent`;
+3. moving channel highlight refreshes selected EPG/favorite presentation but calls `ChannelIntentPort.requestChannel` zero times;
+4. Favorites virtual projection comes from `favorites.reconcile(providerId, availableIds)` -> `buildFavoritesViewModel`, not local favorite filtering semantics;
+5. favorite toggle calls only `favorites.toggle` and then refreshes presentation; it never requests playback.
 
-- [ ] **Step 2: Add feature dependency to controller**
+- [ ] **Step 2: Extend controller dependencies compatibly**
 
-Extend `LiveTvControllerDependencies` with an optional injected feature composition/port object so existing tests/callers remain source-compatible. The controller may schedule a presentation refresh after render-relevant state changes, but stale async completion must be rejected using a monotonically increasing local presentation generation or equivalent provider/highlight key check.
+Add an optional injected M4 composition/ports dependency so existing M3 tests/callers remain source-compatible. Presentation refreshes may be async; reject stale completion using a monotonically increasing generation plus provider/highlight identity check before applying the result.
 
-- [ ] **Step 3: Preserve provider-scoped identity**
+- [ ] **Step 3: Keep provider-scoped identity explicit**
 
-Every feature request must carry `state.providerId` plus the stable `ChannelId`; never use channel ID alone as a cross-provider cache key.
+Never cache or request feature data by channel ID alone. Any retained presentation generation/key includes ProviderId + ChannelId where channel identity is involved.
 
 - [ ] **Step 4: Run GREEN and commit**
 
@@ -124,7 +129,7 @@ git commit -m "feat(live-tv): compose EPG and Favorites presentation"
 
 ---
 
-### Task 3: Compose Search and Channel Actions with one-layer Back ownership
+### Task 3: Compose Search and Channel Actions with strict Back ownership
 
 **Files:**
 - Modify: `player/src/live-tv/live-tv-feature-composition.ts`
@@ -133,37 +138,37 @@ git commit -m "feat(live-tv): compose EPG and Favorites presentation"
 
 **Interfaces:**
 - Consumes: `searchCatalog`, `projectSearchView`, `handleSearchKeyboard`, `buildChannelActions`, `createChannelActionsState`, `reduceChannelActions`, `activateChannelAction`.
-- Produces: Search/actions layer behavior translated to existing Live TV scope/highlight or explicit play/favorite/info actions.
+- Produces: Search/actions presentation transitions translated to existing Live TV highlight/play request paths.
 
-- [ ] **Step 1: Write RED Search acceptance**
+- [ ] **Step 1: Write Search RED**
 
-Use synthetic catalog rows to prove Search query projection is delegated to SRCH-C/SRCH-UI. Result focus/highlight changes must emit zero playback requests. Activating a Search result closes Search (or returns to overlay), sets/restores stable highlighted channel identity through the existing Live TV reducer path, and still does not play until the existing explicit channel-select/play action occurs.
+Use synthetic provider-scoped channels. Search ranking must come from `searchCatalog`; presentation from `projectSearchView`; keyboard focus from `handleSearchKeyboard`. Maintain an internal result-key -> `{ providerId, channelId }` lookup from the returned search results. Moving Search focus emits no playback. `ACTIVATE_RESULT` closes Search and moves/restores the normal Live TV highlight through the existing reducer/controller path; it does not play the result.
 
-- [ ] **Step 2: Write RED Channel Actions acceptance**
+- [ ] **Step 2: Write Channel Actions RED**
 
-Prove the action surface uses ACT-UI exactly:
+Assert exact ACT-UI mapping:
 
 ```text
-WATCH        -> PLAY_CHANNEL -> existing requestPlayback path
-FAVORITE     -> TOGGLE_FAVORITE -> favorite port only
+WATCH        -> PLAY_CHANNEL     -> existing controller requestPlayback
+FAVORITE     -> TOGGLE_FAVORITE  -> injected favorite port only
 PROGRAM_INFO -> SHOW_PROGRAM_INFO -> program-info layer only
 ```
 
-`OPTIONS` may open the action layer for the highlighted/playing channel, but Tools/Menu is not required for core navigation. A missing EPG program omits `PROGRAM_INFO` using `buildChannelActions` rather than inventing a disabled action.
+Build the action list with `buildChannelActions({ providerId, channelId, isFavorite, programInfoAvailable })`. Missing EPG omits Program Info rather than inventing a disabled action.
 
-- [ ] **Step 3: Implement strict layer priority and Back**
+- [ ] **Step 3: Implement one-layer Back priority**
 
-Use this close priority:
+Close in this order:
 
 ```text
-program-info -> actions -> search -> existing options/overlay -> outer existing Back behavior
+program-info -> actions -> search -> existing option layer -> existing overlay -> platform outer Back/exit behavior
 ```
 
-One `BACK` handles one layer only. Do not call `platform.exitApp()` while any M4 or existing Live TV layer is open.
+Each BACK invocation performs at most one close/delegation transition.
 
-- [ ] **Step 4: Keep explicit playback route centralized**
+- [ ] **Step 4: Preserve centralized play ownership**
 
-Translate only ACT-UI `PLAY_CHANNEL` into the controller's existing `requestPlayback(channelId)` path. Never invoke resolver/session directly from the feature composition helper.
+Only translate ACT-UI `PLAY_CHANNEL` to the controller's existing `requestPlayback(channelId)`. The feature helper never calls resolver/session/adapters directly.
 
 - [ ] **Step 5: Run GREEN and commit**
 
@@ -177,7 +182,7 @@ git commit -m "feat(live-tv): compose Search and channel actions"
 
 ---
 
-### Task 4: Render M4 presentation in the existing DOM view
+### Task 4: Render M4 features in the existing DOM view
 
 **Files:**
 - Modify: `player/src/live-tv/dom-live-tv-view.ts`
@@ -185,44 +190,44 @@ git commit -m "feat(live-tv): compose Search and channel actions"
 - Modify: `player/src/live-tv/contracts.ts` only if the final typed render model cannot remain in `live-tv-controller.ts`
 - Modify: `player/test-ts/m4-live-tv-composition.test.ts`
 
-- [ ] **Step 1: Write RED DOM presentation tests**
+- [ ] **Step 1: Write DOM RED tests**
 
-With the repository's existing DOM fake, prove:
+Using the repository's DOM fake, prove:
 
-- channel rows can show current EPG title/time when available and remain usable when absent/unavailable;
-- selected-channel detail renders current/next presentation without changing focus;
-- Favorites virtual scope/empty state is visible when selected;
-- Search input/results are focusable by the feature state's stable result key;
-- Channel Actions expose exactly the ACT-UI labels;
-- Program Info is a separate dismissible layer;
-- `data-presentation-state` continues to distinguish highlighted/focused/playing rather than conflating them.
+- channel rows show EPG current title/time when available and stay usable for missing/unavailable EPG;
+- selected current/next/detail presentation does not steal focus;
+- Favorites virtual category uses `buildFavoritesViewModel` output and renders its approved empty state;
+- Search input/results use stable result keys;
+- action labels exactly match ACT-UI;
+- Program Info is a separately dismissible layer;
+- existing `data-presentation-state` still distinguishes highlighted/focused/playing.
 
-- [ ] **Step 2: Extend the render model, not the playback state**
+- [ ] **Step 2: Extend only the render model**
 
-Add M4 feature presentation to `LiveTvViewModel` (or a Live-TV-local equivalent) instead of adding EPG/favorite/search UI fields to core `LiveTvState`. Keep M3 playback state pure.
+Place M4 presentation data in `LiveTvViewModel` or a Live-TV-local render type. Do not add EPG/Favorites/Search/Actions presentation fields to core `LiveTvState`.
 
-- [ ] **Step 3: Render through safe DOM APIs**
+- [ ] **Step 3: Use safe DOM APIs**
 
-Use `createElement`, `textContent`, classes, and datasets. Do not write provider/channel/program/search text through `innerHTML`. Do not render credentials, source URLs, stream URLs, or raw error text.
+Render external/provider/catalog/program text using `createElement`, `textContent`, classes and datasets; no `innerHTML`. Never render credentials, EPG source URLs, provider URLs, transient stream URLs, ciphertext, or raw exception text.
 
-- [ ] **Step 4: Preserve stable focus after rerender**
+- [ ] **Step 4: Restore focus only for the owning layer**
 
-The DOM view may restore focus to a stable `data-channel-id` / search result key / action ID only when the feature/controller state says that layer owns focus. Rendering EPG text must never steal focus.
+Use stable channel IDs/search keys/action IDs. EPG text rerender alone must not focus any element. Layer focus must not overwrite the M3 playing-channel visual state.
 
 - [ ] **Step 5: Run GREEN and commit**
 
 ```bash
 npm run test:ts -w player -- --test-name-pattern="M4-COMP|Live TV"
 npm run typecheck -w player
-git add player/src/live-tv/dom-live-tv-view.ts player/src/live-tv/live-tv-controller.ts player/src/live-tv/contracts.ts player/test-ts/m4-live-tv-composition.test.ts
+git add player/src/live-tv/dom-live-tv-view.ts player/src/live-tv/live-tv-controller.ts player/test-ts/m4-live-tv-composition.test.ts
 git commit -m "feat(live-tv): render M4 feature layers"
 ```
 
-If `contracts.ts` was not required, do not stage or modify it.
+If `player/src/live-tv/contracts.ts` is truly required by the typed render contract, add it to the same commit and document why in the PR; otherwise leave it untouched.
 
 ---
 
-### Task 5: Expose optional feature-port injection through Live TV runtime
+### Task 5: Expose optional M4 ports through Live TV runtime
 
 **Files:**
 - Modify: `player/src/live-tv/create-live-tv-runtime.ts`
@@ -230,21 +235,19 @@ If `contracts.ts` was not required, do not stage or modify it.
 
 **Interfaces:**
 - Consumes: application-provided `LiveTvFeaturePorts`.
-- Produces: M4-capable controller construction without provider-runtime/storage ownership.
+- Produces: M4-capable controller construction with no provider-runtime/storage ownership.
 
-- [ ] **Step 1: Write RED runtime-injection test**
+- [ ] **Step 1: Write runtime injection RED**
 
-Prove `createBrowserLiveTvRuntime` / its construction seam can receive an optional `featurePorts` dependency and pass it into the M4 composition/controller. Existing callers that omit it must retain current M3 startup/fallback behavior so `main.js` requires no change in this lane.
+Prove `createBrowserLiveTvRuntime` can accept optional `featurePorts` and pass them into the controller/composition. Existing `main.js` callers that omit the field must compile and retain current M3 startup/fallback behavior.
 
 - [ ] **Step 2: Implement optional injection only**
 
-Extend `BrowserLiveTvRuntimeDependencies` with an optional M4 feature-port field. When absent, construct the controller with M3-only behavior. Do not instantiate `StructuredFavoriteRepository`, modify `createBrowserProviderRuntime`, or create a second `IndexedDbStructuredStore` here.
+Extend `BrowserLiveTvRuntimeDependencies` with `featurePorts?: LiveTvFeaturePorts`. When absent, run current M3-only behavior. Do not instantiate `StructuredFavoriteRepository`, alter `createBrowserProviderRuntime`, or create a second `IndexedDbStructuredStore` here. M5-COMP will adapt the concrete FavoriteService/EPG query/runtime objects.
 
-M5-COMP will supply final browser repository/domain adapters and stylesheet/navigation wiring.
+- [ ] **Step 3: Add regression coverage**
 
-- [ ] **Step 3: Add regression assertions**
-
-Prove cache-first startup, failed background refresh isolation, watch observation, resolver/session construction, and legacy fallback behavior remain unchanged when feature ports are absent or when a presentation refresh fails.
+Prove cache-first startup, failed background provider refresh isolation, watch observer wiring, resolver/session construction and legacy fallback remain unchanged with no feature ports, and presentation-port failures cannot switch runtime mode or control playback.
 
 - [ ] **Step 4: Run GREEN and commit**
 
@@ -279,10 +282,8 @@ git diff --check b55a01642cd03a555712dd64026f3e22f1a81323...HEAD
 git diff b55a01642cd03a555712dd64026f3e22f1a81323...HEAD
 ```
 
-Expected production changes are bounded to approved Live TV hot-zone files plus `live-tv-feature-composition.ts`. No `main.js`, `index.html`, provider runtime, storage/repository, credential, playback adapter/session/recovery, package metadata, or unrelated UI files.
+Expected changes: `live-tv-feature-composition.ts`, focused M4 test, and only the approved existing Live TV hot-zone files actually required by integration. No `main.js`, `index.html`, provider runtime, storage/repository, credentials, playback adapters/session/recovery, package metadata, or unrelated UI files.
 
-- [ ] **Step 3: Record invariant evidence in Draft PR**
+- [ ] **Step 3: Open Draft PR with controller evidence**
 
-PR body must include exact base/head/files and explicit tests proving: highlight != playback; Search focus != playback; Favorite toggle != playback; Program Info != playback; only explicit play actions reach `requestPlayback`; stable-ID focus restoration; EPG failure isolation; one-layer Back; existing M3 startup/playback/recovery tests GREEN; canonical exact-head gates; physical Tizen runtime `NOT VERIFIED` unless separately executed.
-
-Do not mark Ready or merge.
+Record exact base/head/files and explicit evidence for: highlight != playback; Search focus/result activation != playback; Favorite toggle != playback; Program Info != playback; only explicit play reaches `requestPlayback`; provider-scoped/stale-safe presentation refresh; Favorites reconciliation delegated to FAV-D; EPG failure isolation; one-layer Back; existing M3 startup/playback/recovery tests GREEN; canonical exact-head gates. Physical Tizen runtime is `NOT VERIFIED` unless separately run. Do not mark Ready or merge.
