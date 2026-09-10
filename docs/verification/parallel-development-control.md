@@ -2,21 +2,24 @@
 
 Date: 2026-09-10  
 Owner: REVIEW / Integration Controller  
-Status: V1 RC ROADMAP OPEN — IMPLEMENTATION NOT STARTED; PHYSICAL-TIZEN RELEASE ACCEPTANCE DEFERRED
+Status: V1 RC ROADMAP OPEN — MAXIMUM PARALLEL DESIGN APPROVED; PRODUCTION NOT STARTED; PHYSICAL-TIZEN RELEASE ACCEPTANCE DEFERRED
 
 ## Purpose
 
-This is the canonical compact control/evidence board for `eyildirim82/babu-TV`. It records the current integration baseline, the new V1 RC work queue, dependency/parallelism rules, and external runtime evidence debt that must not be mistaken for a repository implementation blocker.
+This is the canonical compact control/evidence board for `eyildirim82/babu-TV`. It records the current integration baseline, V1 RC work queue, maximum-parallel execution rules, dependency gates, and external runtime evidence debt that must not be mistaken for a repository implementation blocker.
 
 Canonical sources:
 
 - `docs/superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md`
 - `docs/superpowers/specs/2026-09-09-babustv-brand-separation-design.md`
 - `docs/superpowers/specs/2026-09-08-m3-live-tv-core-design.md`
+- `docs/superpowers/specs/2026-09-10-babustv-v1-rc-scope.md`
+- `docs/superpowers/specs/2026-09-10-babustv-v1-maximum-parallel-execution-design.md`
 - `docs/superpowers/plans/2026-09-08-m3-live-tv-core.md`
 - `docs/superpowers/plans/2026-09-10-xtream-provider-entry.md`
 - `docs/superpowers/plans/2026-09-10-babustv-v1-rc-roadmap.md`
 - `docs/verification/v1-rc-readiness.md`
+- `docs/verification/v1-parallel-execution.md`
 - `docs/verification/b0-execution-status.md`
 - `docs/verification/b0-brand-separation.md`
 - `docs/verification/xtream-provider-entry.md`
@@ -34,6 +37,7 @@ Canonical sources:
 | Xtream entry | prerequisite #28 + XT-A #29 + XT-B #30 + XT-C #31 MERGED |
 | Open implementation blocker | NONE at roadmap creation |
 | V1 RC implementation | PLANNED; not started |
+| Parallel execution design | APPROVED; docs branch only |
 | M3 Tizen UI/runtime acceptance | DEFERRED external evidence |
 | M2 WidgetData real-Tizen probe | PENDING external evidence |
 | Merge authority | Controller / explicit user instruction |
@@ -88,45 +92,114 @@ Key evidence:
 
 Xtream blockers: none.
 
-## V1 RC queue
+## V1 RC maximum-parallel queue
 
-The next program of work is controlled by:
+The RC program is controlled by:
 
-- `docs/superpowers/plans/2026-09-10-babustv-v1-rc-roadmap.md`;
-- `docs/verification/v1-rc-readiness.md`.
+- `docs/superpowers/plans/2026-09-10-babustv-v1-rc-roadmap.md` for product sequencing;
+- `docs/superpowers/specs/2026-09-10-babustv-v1-maximum-parallel-execution-design.md` for architectural branch boundaries;
+- `docs/verification/v1-parallel-execution.md` for live ROLE/dependency status;
+- `docs/verification/v1-rc-readiness.md` for release readiness.
 
-High-level sequence:
+Execution shape:
 
 ```text
-M4 EPG / Favorites / Search
-        ↓
-M3U Provider-Core onboarding parity
-        ↓
-M5 Watch State / Home / Provider Management / First Run
-        ↓
-M6 Secure QR / Phone Pairing
-        ↓
-M7 Hardening / Security / Migration / Performance
-        ↓
-Browser Release Matrix + Tizen Build/Package Gate
-        ↓
-V1 RC candidate
+RC roadmap docs
+      ↓
+RC-F0 shared contract foundation
+      ↓ exact GREEN post-F0 main
+      ↓
+13–14 independent first-wave core lanes
+      ↓
+persistence/provider integration lanes
+      ↓
+independent UI lanes
+      ↓
+M4 / M5 / Pairing composition
+      ↓
+parallel hardening domains
+      ↓
+RC-BROWSER + RC-PACKAGE
+      ↓
+repository-complete V1 RC
 ```
+
+Recommended active concurrency is 8–12 workers. Architectural first-wave capacity is approximately 13–14 branches, but controller review/CI capacity is the limiting factor.
 
 Physical-TV acceptance does not block these deterministic implementation waves. It does block final release acceptance.
 
 ## Immediate next gate
 
-No M4 production branch should begin from this docs branch.
+No production branch should begin from a documentation branch.
 
-After this roadmap documentation is merged and the resulting `main` is GREEN:
+After the RC roadmap + maximum-parallel documentation is approved, merged, and the resulting `main` is GREEN:
 
-1. write and approve a bounded M4A EPG Core spec/implementation plan;
-2. create the M4A branch from that exact GREEN `main`;
-3. run RED → minimum implementation → GREEN;
-4. open Draft PR with exact base/head and evidence;
+1. write and approve the bounded `RC-F0` shared-contract foundation plan;
+2. create `foundation/v1-rc-contracts` from that exact GREEN `main`;
+3. run characterization → RED where behavior/contracts require it → minimum foundation → GREEN;
+4. open Draft PR with exact base/head, changed-file ownership, and evidence;
 5. controller reviews before Ready/merge;
-6. dependent M4 work starts only from the required post-merge GREEN baseline.
+6. verify the post-RC-F0 `main` exact GREEN;
+7. record that SHA as the common first-wave base;
+8. activate as many approved Wave 1 roles as review/CI capacity safely supports, target 8–12 concurrently.
+
+Do not start the old monolithic `M4A` branch model. EPG core is now decomposed into `EPG-N`, `EPG-X`, `EPG-XML`, `EPG-MAP`, and `EPG-Q` plus later integration packages.
+
+## First-wave role set
+
+After RC-F0 GREEN, these are the intended independent core roles:
+
+```text
+EPG-N      common EPG normalization
+EPG-X      Xtream EPG adapter/parser
+EPG-XML    XMLTV parser
+EPG-MAP    EPG/channel reconciliation
+EPG-Q      current/next/detail query core
+FAV-D      Favorites domain/service
+SRCH-C     Turkish-safe Search core
+M3U-V      M3U onboarding validation primitives
+WATCH-R    last-watched/watch-event domain
+WATCH-S    frequently-watched scoring
+PAIR-C     pairing crypto primitives
+PAIR-S     pairing session TTL/single-use/replay
+PAIR-R     ciphertext-only relay contract
+PAIR-WEB   phone pairing UI after payload interfaces are frozen
+```
+
+Detailed branch names, dependencies, output contracts, and later waves are canonical in `docs/verification/v1-parallel-execution.md`.
+
+## Hot-zone policy
+
+Core workers do not casually modify shared composition/migration files. Integration-owned hot zones include by default:
+
+```text
+player/src/main.js
+player/index.html
+player/src/live-tv/live-tv-controller.ts
+player/src/live-tv/dom-live-tv-view.ts
+player/src/live-tv/create-live-tv-runtime.ts
+player/src/providers/create-browser-provider-runtime.ts
+player/src/storage/contracts.ts
+player/src/storage/indexeddb-structured-store.ts
+application-wide settings/navigation composition
+global runtime copy/shell presentation
+```
+
+Every bounded worker plan must explicitly declare:
+
+```text
+Owns
+Read-only dependencies
+Forbidden hot zones
+Consumes
+Produces
+Exact base SHA
+RED/GREEN commands
+Full verification commands
+Draft PR evidence requirements
+```
+
+If a worker discovers that a forbidden hot-zone change is required, it reports an integration requirement instead of expanding scope.
 
 ## Parallel development rules for the RC program
 
@@ -135,47 +208,69 @@ Parallelism is allowed only when both file ownership and semantic dependencies a
 Controller must reject parallel work when:
 
 - two branches both change shared provider/repository contracts without an agreed base order;
-- two branches own the same focus/navigation surface;
-- Home work assumes watch-state/favorites/search interfaces that have not yet merged;
-- M3U onboarding bypasses Provider Core to avoid waiting for a dependency;
+- two branches both claim IndexedDB schema-version ownership;
+- two branches own the same focus/navigation composition surface;
+- a UI branch embeds feature-core behavior merely to avoid waiting for a dependency;
+- Home work assumes watch-state/Favorites/Search interfaces that are not frozen;
+- M3U onboarding bypasses Provider Core;
 - M6 pairing invents a second credential persistence path instead of using `CredentialStore`;
-- hardening branches mix unrelated feature development with regression fixes.
+- hardening branches mix unrelated feature development with regression fixes;
+- a branch silently rebases onto another active worker branch without controller-recorded dependency.
 
-Recommended dependency shape:
+Integration is its own reviewed work. Central composition branches should mostly wire already-tested modules and must not become catch-all implementation branches.
+
+## Dependency shape
 
 ```text
-M4A EPG Core
-   ├─→ M4B EPG UI
-   └─→ later Home current-program cards
+RC-F0
+  ↓
+EPG-N/X/XML/MAP/Q ─→ EPG persistence/provider integration ─→ EPG-UI ─┐
+FAV-D ─────────────→ user-state persistence ────────────────→ FAV-UI ├→ M4-COMP
+SRCH-C ─────────────────────────────────────────────────────→ SRCH-UI ┤
+                                                                ACT-UI ┘
 
-M4C Favorites ─→ M5 Home Favorites row
-M4D Search    ─→ final navigation/search smoke
-M3U onboarding parity ─→ complete first-run/provider-management flows
-M5A Watch State ─→ M5B Home
-M5C Provider Management depends on stable Provider Core onboarding/switch/delete contracts
-M6 Pairing depends on final onboarding transaction + CredentialStore boundaries
-M7 begins only after feature scope is frozen
+M3U-V → M3U Provider Core integration → M3U-UI ────────────────┐
+WATCH-R + WATCH-S → user persistence → playback event integration ─┤
+Favorites/watch/provider read contracts → HOME-D → HOME-UI ───────┤→ M5-COMP
+provider operations → PROV-UI ─────────────────────────────────────┤
+Xtream + M3U callbacks → FIRST-UI ─────────────────────────────────┘
+
+PAIR-C + PAIR-S + PAIR-R + PAIR-WEB + onboarding contracts → PAIR-I
+
+M4-COMP + M5-COMP + PAIR-I(if V1) → PERF / FAIL / MIG / NAV / PLAY / SEC
+                                           ↓
+                               RC-BROWSER + RC-PACKAGE
 ```
 
 ## Short worker commands
 
-Use short role prompts only after the relevant bounded plan exists and is merged/available on `main`.
-
-Examples:
+Use short role prompts only after controller marks the relevant role OPEN and its bounded plan exists.
 
 ```text
 Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=CONTROLLER.
 ```
 
 ```text
-Repo eyildirim82/babu-TV. V1 RC roadmap ve M4A planını oku. ROLE=M4A.
+Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=RC-F0.
 ```
 
 ```text
-Repo eyildirim82/babu-TV. V1 RC readiness boardunu oku. ROLE=RC-VERIFY.
+Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=EPG-N.
 ```
 
-Do not invent a ROLE for a work package whose scoped implementation plan has not been approved.
+```text
+Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=FAV-D.
+```
+
+```text
+Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=WATCH-S.
+```
+
+```text
+Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=PAIR-C.
+```
+
+Do not invent or activate a ROLE whose scoped contract/plan has not been approved.
 
 ## M3G runtime evidence — archived repository track / external acceptance deferred
 
@@ -213,14 +308,16 @@ An RC candidate may exist while these are explicitly `PENDING`/`DEFERRED`. Final
 
 1. refresh live GitHub state before every merge decision;
 2. enforce exact GREEN `main` as the base for new production waves;
-3. require bounded plan approval before implementation;
-4. review latest head, changed files, CI, security boundaries, and evidence;
-5. reject scope drift even when CI is GREEN;
-6. keep highlight/playback, provider, credential, and focus invariants intact across new features;
-7. treat screenshots/manual evidence as first-class where required;
-8. keep unavailable physical-runtime acceptance separate from code completion;
-9. update `v1-rc-readiness.md` and this board after integrations;
-10. require post-merge `main` GREEN before dependent work starts.
+3. maintain the ROLE/dependency state in `v1-parallel-execution.md`;
+4. require bounded plan approval before activating a production role;
+5. enforce file ownership and hot-zone restrictions;
+6. review latest head, changed files, CI, security boundaries, and evidence;
+7. reject scope drift even when CI is GREEN;
+8. keep highlight/playback, provider, credential, and focus invariants intact across new features;
+9. treat screenshots/manual evidence as first-class where required;
+10. keep unavailable physical-runtime acceptance separate from code completion;
+11. update `v1-rc-readiness.md`, `v1-parallel-execution.md`, and this board after integrations;
+12. require post-merge `main` GREEN before dependent work starts.
 
 ## Historical evidence checkpoints
 
