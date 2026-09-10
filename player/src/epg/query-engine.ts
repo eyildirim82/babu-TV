@@ -3,14 +3,18 @@ import type {
   EpgProgram,
   ProviderId,
 } from '../domain/models.js';
-import type { EpgProgramRepository } from './contracts.js';
+import type {
+  EpgProgramRepository,
+  EpgQuery,
+  EpgWindow,
+} from './contracts.js';
 
 export interface EpgQueryBounds {
   lookBehindMs: number;
   lookAheadMs: number;
 }
 
-export class RepositoryEpgQuery {
+export class RepositoryEpgQuery implements EpgQuery {
   constructor(
     private readonly repository: EpgProgramRepository,
     private readonly bounds: EpgQueryBounds,
@@ -62,5 +66,13 @@ export class RepositoryEpgQuery {
       (a, b) => a.startMs - b.startMs || a.endMs - b.endMs || a.title.localeCompare(b.title),
     );
     return matches[0] ?? null;
+  }
+
+  async listWindow(
+    providerId: ProviderId,
+    channelId: ChannelId,
+    window: EpgWindow,
+  ): Promise<readonly EpgProgram[]> {
+    return this.repository.listPrograms(providerId, channelId, window);
   }
 }
