@@ -29,6 +29,10 @@ export class FavoriteService {
     return this.repository.delete(providerId, channelId);
   }
 
+  deleteProvider(providerId: ProviderId): Promise<void> {
+    return this.repository.deleteProvider(providerId);
+  }
+
   async toggle(providerId: ProviderId, channelId: ChannelId): Promise<boolean> {
     if (await this.repository.has(providerId, channelId)) {
       await this.repository.delete(providerId, channelId);
