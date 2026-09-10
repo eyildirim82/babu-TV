@@ -22,7 +22,7 @@ function createOperations(options: {
 } = {}) {
   const events: string[] = [];
   let providers = [...(options.providers ?? [provider('provider-a', 'Salon'), provider('provider-b', 'Mutfak', 'm3u')])];
-  let activeProviderId = options.activeProviderId ?? 'provider-a';
+  let activeProviderId: string | null = options.activeProviderId === undefined ? 'provider-a' : options.activeProviderId;
 
   return {
     events,
