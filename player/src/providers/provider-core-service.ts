@@ -26,6 +26,10 @@ export interface ProviderSyncPort {
   refresh(providerId: ProviderId): Promise<ProviderSyncReport>;
 }
 
+export interface ProviderEpgCleanupPort {
+  deleteProvider(providerId: ProviderId): Promise<void>;
+}
+
 function missingProvider(): ProviderError {
   return new ProviderError('NOT_FOUND', null, 'Provider configuration was not found.');
 }
@@ -53,6 +57,7 @@ export class ProviderCoreService {
     private readonly credentials: CredentialStore,
     private readonly sync: ProviderSyncPort,
     private readonly adapters: ProviderAdapterFactory | null = null,
+    private readonly epgCleanup: ProviderEpgCleanupPort | null = null,
   ) {}
 
   async registerProvider(
@@ -119,6 +124,13 @@ export class ProviderCoreService {
 
     await this.credentials.remove(providerId);
     await this.catalog.removeProviderCatalog(providerId);
+    if (this.epgCleanup !== null) {
+      try {
+        await this.epgCleanup.deleteProvider(providerId);
+      } catch {
+        // EPG cleanup is best-effort and must not block provider availability semantics.
+      }
+    }
     await this.providers.removeProvider(providerId);
   }
 }
