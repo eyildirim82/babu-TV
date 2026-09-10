@@ -2,7 +2,7 @@
 
 Date: 2026-09-10  
 Owner: REVIEW / Integration Controller  
-Status: V1 RC ACTIVE — RC-F0 CLOSED GREEN; WAVE 1 BASE FROZEN; ROLE PLANS PENDING; PHYSICAL-TIZEN RELEASE ACCEPTANCE DEFERRED
+Status: V1 RC ACTIVE — RC-F0 CLOSED GREEN; WAVE 1 BASE FROZEN; 13 CORE ROLES PLAN-BACKED AND OPEN; PHYSICAL-TIZEN RELEASE ACCEPTANCE DEFERRED
 
 ## Purpose
 
@@ -19,6 +19,7 @@ Canonical sources:
 - `docs/superpowers/plans/2026-09-10-xtream-provider-entry.md`
 - `docs/superpowers/plans/2026-09-10-babustv-v1-rc-roadmap.md`
 - `docs/superpowers/plans/2026-09-10-v1-rc-f0-shared-contracts.md`
+- `docs/superpowers/plans/2026-09-10-v1-wave1-*.md` for the 13 bounded core-role plans
 - `docs/verification/v1-rc-readiness.md`
 - `docs/verification/v1-parallel-execution.md`
 - `docs/verification/b0-execution-status.md`
@@ -40,14 +41,15 @@ Canonical sources:
 | RC-F0 integration | PR #37 squash-merged to `main@aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` |
 | Post-RC-F0 main verify | `34487321835` SUCCESS |
 | Wave 1 common base | `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` |
-| Open implementation blocker | individual Wave 1 bounded plans not yet approved |
-| V1 RC implementation | RC-F0 CLOSED GREEN; Wave 1 planning next |
+| Wave 1 bounded plans | 13 independent core roles PLAN-BACKED and `OPEN` |
+| Open implementation blocker | none for the 13 core lanes; `PAIR-WEB` remains `BLOCKED-CONTRACT` |
+| V1 RC implementation | RC-F0 CLOSED GREEN; Wave 1 core lanes ready to start |
 | Parallel execution design | APPROVED and integrated |
 | M3 Tizen UI/runtime acceptance | DEFERRED external evidence |
 | M2 WidgetData real-Tizen probe | PENDING external evidence |
 | Merge authority | Controller / explicit user instruction |
 
-New Wave 1 production work must branch from exact GREEN base `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`, not from historical B0/M3G/Xtream worker or evidence branches and not from later documentation-only commits unless controller records a new base.
+New Wave 1 production work must branch from exact GREEN base `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`, not from historical B0/M3G/Xtream worker/evidence branches and not from later documentation-only commits unless controller records a new base.
 
 ## Closed foundation gates
 
@@ -130,7 +132,7 @@ The RC program is controlled by:
 
 - `docs/superpowers/plans/2026-09-10-babustv-v1-rc-roadmap.md` for product sequencing;
 - `docs/superpowers/specs/2026-09-10-babustv-v1-maximum-parallel-execution-design.md` for architectural branch boundaries;
-- `docs/verification/v1-parallel-execution.md` for live ROLE/dependency status;
+- `docs/verification/v1-parallel-execution.md` for live ROLE/dependency status and exact bounded plan paths;
 - `docs/verification/v1-rc-readiness.md` for release readiness.
 
 Execution shape:
@@ -141,7 +143,7 @@ RC roadmap docs
 RC-F0 shared contract foundation — CLOSED GREEN
       ↓ exact GREEN post-F0 main
       ↓
-13–14 independent first-wave core lanes
+13 independent first-wave core lanes — PLAN-BACKED / OPEN
       ↓
 persistence/provider integration lanes
       ↓
@@ -156,22 +158,22 @@ RC-BROWSER + RC-PACKAGE
 repository-complete V1 RC
 ```
 
-Recommended active concurrency is 8–12 workers. Architectural first-wave capacity is approximately 13–14 branches, but controller review/CI capacity is the limiting factor.
+Recommended active concurrency is 8–12 workers. All 13 core lanes may be OPEN while controller review/CI capacity remains the limiting simultaneous-work factor.
 
 Physical-TV acceptance does not block these deterministic implementation waves. It does block final release acceptance.
 
 ## Immediate next gate
 
-The common Wave 1 production base is frozen at `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` and its post-merge `main` verification `34487321835` is GREEN.
+The common Wave 1 production base is frozen at `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` and its post-merge `main` verification `34487321835` is GREEN. Thirteen independent core roles now have bounded plans and are `OPEN`.
 
 Next controller actions:
 
-1. write and approve the bounded implementation plans for independent Wave 1 roles;
-2. ensure every plan explicitly uses exact base `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` unless a controller exception is recorded;
-3. mark only plan-backed roles `OPEN` in `docs/verification/v1-parallel-execution.md`;
-4. start up to 8–12 non-overlapping workers concurrently;
-5. keep `PAIR-WEB` blocked until its required pairing payload/session interfaces are frozen;
-6. review each Draft PR independently and require post-merge GREEN before dependent waves advance.
+1. create/confirm each OPEN production branch from exact `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`;
+2. start 8–12 non-overlapping workers concurrently by default;
+3. require every worker to follow its bounded TDD plan and open a Draft PR only;
+4. keep `PAIR-WEB` blocked until its required pairing payload/session interfaces are merged and frozen;
+5. review each Draft PR independently for exact head, file ownership, CI, security, and scope before Ready/merge;
+6. require post-merge GREEN before dependent Wave 2/UI lanes advance.
 
 Do not start the old monolithic `M4A` branch model. EPG core remains decomposed into `EPG-N`, `EPG-X`, `EPG-XML`, `EPG-MAP`, and `EPG-Q` plus later integration packages.
 
@@ -180,23 +182,23 @@ Do not start the old monolithic `M4A` branch model. EPG core remains decomposed 
 The exact common implementation base for these roles is `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`.
 
 ```text
-EPG-N      common EPG normalization
-EPG-X      Xtream EPG adapter/parser
-EPG-XML    XMLTV parser
-EPG-MAP    EPG/channel reconciliation
-EPG-Q      current/next/detail query core
-FAV-D      Favorites domain/service
-SRCH-C     Turkish-safe Search core
-M3U-V      M3U onboarding validation primitives
-WATCH-R    last-watched/watch-event domain
-WATCH-S    frequently-watched scoring
-PAIR-C     pairing crypto primitives
-PAIR-S     pairing session TTL/single-use/replay
-PAIR-R     ciphertext-only relay contract
-PAIR-WEB   phone pairing UI after payload interfaces are frozen
+EPG-N      common EPG normalization                         OPEN
+EPG-X      Xtream EPG adapter/parser                        OPEN
+EPG-XML    XMLTV parser                                     OPEN
+EPG-MAP    EPG/channel reconciliation                       OPEN
+EPG-Q      current/next/detail query core                   OPEN
+FAV-D      Favorites domain/service                         OPEN
+SRCH-C     Turkish-safe Search core                         OPEN
+M3U-V      M3U onboarding validation primitives             OPEN
+WATCH-R    last-watched/watch-event domain                  OPEN
+WATCH-S    frequently-watched scoring                       OPEN
+PAIR-C     pairing crypto primitives                        OPEN
+PAIR-S     pairing session TTL/single-use/replay            OPEN
+PAIR-R     ciphertext-only relay contract                   OPEN
+PAIR-WEB   phone pairing UI after payload interfaces freeze BLOCKED-CONTRACT
 ```
 
-Detailed branch names, dependencies, output contracts, and live status are canonical in `docs/verification/v1-parallel-execution.md`.
+Detailed branch names, exact bounded plan paths, dependencies, output contracts, and live status are canonical in `docs/verification/v1-parallel-execution.md`.
 
 ## Hot-zone policy
 
@@ -215,7 +217,7 @@ application-wide settings/navigation composition
 global runtime copy/shell presentation
 ```
 
-Every bounded worker plan must explicitly declare:
+Every bounded worker plan explicitly declares:
 
 ```text
 Owns
@@ -274,7 +276,7 @@ M4-COMP + M5-COMP + PAIR-I(if V1) → PERF / FAIL / MIG / NAV / PLAY / SEC
 
 ## Short worker commands
 
-Use short role prompts only after controller marks the relevant role OPEN and its bounded plan exists.
+Use short role prompts only for roles marked `OPEN` in the live board. Examples:
 
 ```text
 Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=CONTROLLER.
@@ -296,7 +298,7 @@ Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=WATCH-S.
 Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=PAIR-C.
 ```
 
-Do not invent or activate a ROLE whose scoped contract/plan has not been approved.
+The full OPEN-role prompt set is maintained in `docs/verification/v1-parallel-execution.md`. Do not invent or activate a role outside that board.
 
 ## M3G runtime evidence — archived repository track / external acceptance deferred
 
@@ -333,7 +335,7 @@ An RC candidate may exist while these are explicitly `PENDING`/`DEFERRED`. Final
 ## Controller duties
 
 1. refresh live GitHub state before every merge decision;
-2. enforce exact GREEN `main` as the base for new production waves;
+2. enforce exact GREEN allowed base for new production waves;
 3. maintain the ROLE/dependency state in `v1-parallel-execution.md`;
 4. require bounded plan approval before activating a production role;
 5. enforce file ownership and hot-zone restrictions;
@@ -343,7 +345,7 @@ An RC candidate may exist while these are explicitly `PENDING`/`DEFERRED`. Final
 9. treat screenshots/manual evidence as first-class where required;
 10. keep unavailable physical-runtime acceptance separate from code completion;
 11. update `v1-rc-readiness.md`, `v1-parallel-execution.md`, and this board after integrations;
-12. require post-merge `main` GREEN before dependent work starts.
+12. require post-merge GREEN before dependent work starts.
 
 ## Historical evidence checkpoints
 
