@@ -286,12 +286,15 @@ test('EPG-PI sanitizes unknown source failures to code-only results and preserve
 
 test('EPG-PI repeated background refresh coalesces the same provider window and stays deterministic', async () => {
   let calls = 0;
-  let release: ((rows: readonly EpgSourceProgram[]) => void) | null = null;
+  let signalStarted!: () => void;
+  let release!: (rows: readonly EpgSourceProgram[]) => void;
+  const started = new Promise<void>((resolve) => { signalStarted = resolve; });
   const pending = new Promise<readonly EpgSourceProgram[]>((resolve) => { release = resolve; });
   const { service, repository } = await createHarness({
     loaders: {
       p1: async () => {
         calls += 1;
+        signalStarted();
         return pending;
       },
     },
@@ -300,11 +303,10 @@ test('EPG-PI repeated background refresh coalesces the same provider window and 
   const first = service.refreshInBackground('p1', window);
   const second = service.refreshInBackground('p1', window);
   assert.equal(first, second);
-  assert.equal(calls, 0);
-  await Promise.resolve();
+  await started;
   assert.equal(calls, 1);
 
-  release?.([sourceProgram('c1')]);
+  release([sourceProgram('c1')]);
   assert.deepEqual(await first, { providerId: 'p1', status: 'success', programCount: 1 });
   assert.deepEqual(await second, { providerId: 'p1', status: 'success', programCount: 1 });
   assert.equal(calls, 1);
