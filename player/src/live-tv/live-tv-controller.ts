@@ -1,4 +1,4 @@
-import type { LogicalInput } from '../domain/actions.js';
+import type { LogicalAction, LogicalInput } from '../domain/actions.js';
 import type {
   Category,
   Channel,
@@ -7,11 +7,19 @@ import type {
 } from '../domain/models.js';
 import type { Platform } from '../platform/contracts.js';
 import type { ProviderSnapshot } from '../providers/provider-core-service.js';
+import type { SearchKeyboardEvent } from '../search/search-input-boundary.js';
 import type { ChannelIntentEvent, LiveTvState } from './contracts.js';
+import type {
+  LiveTvFeatureComposition,
+  LiveTvFeatureRefreshInput,
+  LiveTvFeatureState,
+  LiveTvSearchActivation,
+} from './live-tv-feature-composition.js';
 import {
   channelsForScope,
   createInitialLiveTvState,
   reduceLiveTv,
+  scopeKey,
 } from './live-tv-state.js';
 import {
   NumericZapBuffer,
@@ -22,6 +30,7 @@ export interface LiveTvViewModel {
   categories: readonly Category[];
   channels: readonly Channel[];
   visibleChannels: readonly Channel[];
+  features?: LiveTvFeatureState;
 }
 
 export interface LiveTvView {
@@ -41,6 +50,7 @@ export interface LiveTvControllerDependencies {
   platform: Platform;
   view: LiveTvView;
   numericTimers?: NumericZapTimers;
+  features?: LiveTvFeatureComposition;
 }
 
 const defaultNumericTimers: NumericZapTimers = {
@@ -52,12 +62,34 @@ const defaultNumericTimers: NumericZapTimers = {
   },
 };
 
-function modelFor(snapshot: ProviderSnapshot, state: LiveTvState): LiveTvViewModel {
-  return {
+function modelFor(
+  snapshot: ProviderSnapshot,
+  state: LiveTvState,
+  features: LiveTvFeatureState | null,
+): LiveTvViewModel {
+  const model: LiveTvViewModel = {
     categories: snapshot.categories,
     channels: snapshot.channels,
     visibleChannels: channelsForScope(snapshot.channels, state.activeScope),
   };
+  return features === null ? model : { ...model, features };
+}
+
+function searchEventFor(action: LogicalAction): SearchKeyboardEvent | null {
+  switch (action) {
+    case 'UP':
+      return { key: 'ArrowUp', keyCode: 38 };
+    case 'DOWN':
+      return { key: 'ArrowDown', keyCode: 40 };
+    case 'LEFT':
+      return { key: 'ArrowLeft', keyCode: 37 };
+    case 'RIGHT':
+      return { key: 'ArrowRight', keyCode: 39 };
+    case 'SELECT':
+      return { key: 'Enter', keyCode: 13 };
+    default:
+      return null;
+  }
 }
 
 export class LiveTvController {
@@ -65,6 +97,8 @@ export class LiveTvController {
   private snapshot: ProviderSnapshot | null = null;
   private optionLayerOpen = false;
   private numericBuffer: NumericZapBuffer | null = null;
+  private featureState: LiveTvFeatureState | null = null;
+  private featureGeneration = 0;
 
   constructor(private readonly deps: LiveTvControllerDependencies) {}
 
@@ -75,6 +109,8 @@ export class LiveTvController {
       { type: 'ENTER', channels: snapshot.channels },
     );
     this.optionLayerOpen = false;
+    this.featureState = null;
+    this.featureGeneration += 1;
     this.numericBuffer = new NumericZapBuffer({
       timers: this.deps.numericTimers ?? defaultNumericTimers,
       onChange: (value) => {
@@ -87,6 +123,7 @@ export class LiveTvController {
       },
     });
     this.render();
+    this.refreshFeatures();
   }
 
   syncCatalog(snapshot: ProviderSnapshot): void {
@@ -113,6 +150,7 @@ export class LiveTvController {
       });
     }
     this.render();
+    this.refreshFeatures();
   }
 
   state(): LiveTvState {
@@ -122,10 +160,37 @@ export class LiveTvController {
     return this.current;
   }
 
+  openSearch(query = ''): void {
+    const input = this.featureInput();
+    if (input === null || this.deps.features === undefined || this.featureState === null) return;
+    this.featureState = this.deps.features.openSearch(input, query);
+    this.render();
+  }
+
+  updateSearchQuery(query: string): void {
+    const input = this.featureInput();
+    if (input === null || this.deps.features === undefined || this.featureState === null) return;
+    this.featureState = this.deps.features.updateSearchQuery(input, query);
+    this.render();
+  }
+
+  handleSearchKeyboard(event: SearchKeyboardEvent): boolean {
+    if (this.deps.features === undefined || this.featureState?.layer !== 'search') return false;
+    const interaction = this.deps.features.handleSearchKeyboard(event);
+    this.featureState = interaction.state;
+    if (interaction.activation !== null) {
+      this.applySearchActivation(interaction.activation);
+    } else {
+      this.render();
+    }
+    return interaction.handled;
+  }
+
   async handleInput(input: LogicalInput): Promise<void> {
     if (this.current === null || this.snapshot === null) return;
 
     if (input.type === 'DIGIT') {
+      if (this.featureState?.layer !== undefined && this.featureState.layer !== 'none') return;
       if (!this.numericEnabled()) return;
       this.numericBuffer?.push(input.digit);
       return;
@@ -134,6 +199,7 @@ export class LiveTvController {
     const action = input.action;
     if (action === 'BACK') {
       this.numericBuffer?.clear();
+      if (this.closeFeatureLayer()) return;
       if (this.optionLayerOpen) {
         this.optionLayerOpen = false;
         this.render();
@@ -147,6 +213,8 @@ export class LiveTvController {
       this.deps.platform.exitApp();
       return;
     }
+
+    if (await this.handleFeatureLayerAction(action)) return;
 
     if (action === 'OPTIONS') {
       this.optionLayerOpen = true;
@@ -167,6 +235,7 @@ export class LiveTvController {
           channels: this.snapshot.channels,
         });
         this.render();
+        this.refreshFeatures();
       }
       return;
     }
@@ -186,6 +255,7 @@ export class LiveTvController {
           channels: this.snapshot.channels,
         });
         this.render();
+        this.refreshFeatures();
       }
       return;
     }
@@ -194,6 +264,18 @@ export class LiveTvController {
       if (this.current.overlayZone === 'CATEGORY') {
         this.current = { ...this.current, overlayZone: 'CHANNEL' };
         this.render();
+        return;
+      }
+      if (this.current.overlayZone === 'ACTIONS') {
+        const featureInput = this.featureInput();
+        if (
+          featureInput !== null
+          && this.deps.features !== undefined
+          && this.featureState !== null
+        ) {
+          this.featureState = this.deps.features.openActions(featureInput);
+          this.render();
+        }
         return;
       }
       if (this.current.overlayZone === 'CHANNEL' && this.current.highlightedChannelId !== null) {
@@ -268,9 +350,155 @@ export class LiveTvController {
     this.render();
   }
 
+  private featureInput(): LiveTvFeatureRefreshInput | null {
+    if (this.current === null || this.snapshot === null) return null;
+    return {
+      providerId: this.current.providerId,
+      channels: this.snapshot.channels,
+      visibleChannels: channelsForScope(this.snapshot.channels, this.current.activeScope),
+      categories: this.snapshot.categories,
+      highlightedChannelId: this.current.highlightedChannelId,
+    };
+  }
+
+  private refreshFeatures(): void {
+    const input = this.featureInput();
+    if (input === null || this.deps.features === undefined) return;
+    const generation = ++this.featureGeneration;
+    const providerId = input.providerId;
+    const highlightedChannelId = input.highlightedChannelId;
+    void this.deps.features.refresh(input).then((state) => {
+      if (generation !== this.featureGeneration || this.current === null) return;
+      if (
+        this.current.providerId !== providerId
+        || this.current.highlightedChannelId !== highlightedChannelId
+      ) {
+        return;
+      }
+      this.featureState = state;
+      this.render();
+    }).catch(() => {
+      // Presentation feature failure must never make M3 Live TV unusable.
+    });
+  }
+
+  private closeFeatureLayer(): boolean {
+    if (
+      this.deps.features === undefined
+      || this.featureState === null
+      || this.featureState.layer === 'none'
+    ) {
+      return false;
+    }
+    if (!this.deps.features.closeTopLayer()) return false;
+    this.featureState = this.deps.features.current();
+    this.render();
+    return true;
+  }
+
+  private async handleFeatureLayerAction(action: LogicalAction): Promise<boolean> {
+    if (
+      this.deps.features === undefined
+      || this.featureState === null
+      || this.featureState.layer === 'none'
+    ) {
+      return false;
+    }
+
+    if (this.featureState.layer === 'program-info') return true;
+
+    if (this.featureState.layer === 'search') {
+      const event = searchEventFor(action);
+      if (event !== null) this.handleSearchKeyboard(event);
+      return true;
+    }
+
+    if (this.featureState.layer === 'actions') {
+      if (action === 'UP' || action === 'DOWN') {
+        this.featureState = this.deps.features.moveAction(
+          action === 'DOWN' ? 'NEXT' : 'PREVIOUS',
+        );
+        this.render();
+      } else if (action === 'SELECT') {
+        await this.activateFeatureAction();
+      }
+      return true;
+    }
+
+    return true;
+  }
+
+  private async activateFeatureAction(): Promise<void> {
+    if (this.current === null || this.deps.features === undefined) return;
+    const intent = this.deps.features.activateFocusedAction();
+    if (intent === null || intent.providerId !== this.current.providerId) return;
+    if (intent.channelId !== this.current.highlightedChannelId) return;
+
+    if (intent.type === 'PLAY_CHANNEL') {
+      this.deps.features.closeTopLayer();
+      this.featureState = this.deps.features.current();
+      this.render();
+      await this.requestPlayback(intent.channelId);
+      return;
+    }
+
+    if (intent.type === 'SHOW_PROGRAM_INFO') {
+      this.featureState = this.deps.features.openProgramInfo();
+      this.render();
+      return;
+    }
+
+    const input = this.featureInput();
+    if (input === null) return;
+    const providerId = input.providerId;
+    const channelId = input.highlightedChannelId;
+    const state = await this.deps.features.toggleFavorite(input);
+    if (
+      this.current === null
+      || this.current.providerId !== providerId
+      || this.current.highlightedChannelId !== channelId
+    ) {
+      this.refreshFeatures();
+      return;
+    }
+    this.featureState = state;
+    this.render();
+  }
+
+  private applySearchActivation(activation: LiveTvSearchActivation): void {
+    if (this.current === null || this.snapshot === null) return;
+    if (activation.providerId !== this.current.providerId) return;
+    const target = this.snapshot.channels.find(
+      (channel) => channel.providerId === activation.providerId && channel.id === activation.channelId,
+    );
+    if (target === undefined) return;
+
+    const allScope = { kind: 'all' as const };
+    this.current = reduceLiveTv(this.current, {
+      type: 'SET_SCOPE',
+      scope: allScope,
+      channels: this.snapshot.channels,
+    });
+    this.current = {
+      ...this.current,
+      overlayOpen: true,
+      overlayZone: 'CHANNEL',
+      highlightedChannelId: target.id,
+      restoreChannelIdByScope: {
+        ...this.current.restoreChannelIdByScope,
+        [scopeKey(allScope)]: target.id,
+      },
+    };
+    this.render();
+    this.refreshFeatures();
+  }
+
   private render(): void {
     if (this.current === null || this.snapshot === null) return;
-    this.deps.view.render(this.current, modelFor(this.snapshot, this.current));
+    this.deps.view.render(
+      this.current,
+      modelFor(this.snapshot, this.current, this.featureState),
+    );
   }
 
   private moveZone(delta: -1 | 1): void {
@@ -309,6 +537,7 @@ export class LiveTvController {
       channels: this.snapshot.channels,
     });
     this.render();
+    this.refreshFeatures();
   }
 
   private zapTarget(direction: 'PREVIOUS' | 'NEXT'): ChannelId | null {
@@ -342,7 +571,9 @@ export class LiveTvController {
 
   private async requestPlayback(channelId: ChannelId): Promise<void> {
     if (this.current === null || this.snapshot === null) return;
-    const target = this.snapshot.channels.find((channel) => channel.id === channelId);
+    const target = this.snapshot.channels.find(
+      (channel) => channel.providerId === this.current?.providerId && channel.id === channelId,
+    );
     if (target === undefined) return;
 
     this.current = {
@@ -351,6 +582,7 @@ export class LiveTvController {
       numericInput: '',
     };
     this.render();
+    this.refreshFeatures();
     await this.deps.intent.requestChannel({
       providerId: this.current.providerId,
       channelId: target.id,
