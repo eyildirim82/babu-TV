@@ -178,7 +178,7 @@ class RuntimeObjectStore {
   }
 
   put(value: unknown): IDBRequest<IDBValidKey> {
-    return request(this.transaction, () => {
+    return request<IDBValidKey>(this.transaction, () => {
       const key = recordOf(value)[this.schema.keyPath];
       if (typeof key !== 'string' && typeof key !== 'number') throw new Error('Invalid test key.');
       this.schema.data.set(key, value);
