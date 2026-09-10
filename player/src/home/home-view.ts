@@ -23,6 +23,12 @@ type HomeFocusKey =
   | `home-favorite:${string}`
   | `home-frequent:${string}`;
 
+interface HomeFocusPosition {
+  readonly row: number;
+  readonly column: number;
+  readonly key: HomeFocusKey;
+}
+
 function appendText(
   document: Document,
   parent: HTMLElement,
@@ -58,6 +64,10 @@ function channelMeta(card: HomeChannelDisplay): string | null {
 export class HomeView {
   private state: HomePresentationState = { kind: 'loading' };
   private readonly actionMap = new Map<HomeFocusKey, HomeActionIntent>();
+  private readonly elementMap = new Map<HomeFocusKey, HTMLElement>();
+  private focusRows: HomeFocusKey[][] = [];
+  private focusPosition: HomeFocusPosition | null = null;
+  private restoreKey: HomeFocusKey | null = null;
 
   constructor(
     private readonly document: Document,
@@ -85,19 +95,63 @@ export class HomeView {
   hide(): void {
     this.document.getElementById('home-page')?.remove();
     this.actionMap.clear();
+    this.elementMap.clear();
+    this.focusRows = [];
+    this.focusPosition = null;
+    this.restoreKey = null;
   }
 
   isVisible(): boolean {
     return this.document.getElementById('home-page') !== null;
   }
 
-  handleAction(_action: HomeInputAction): void {
-    // Remote focus and explicit intent dispatch are added in the next bounded TDD task.
+  handleAction(action: HomeInputAction): void {
+    if (!this.isVisible()) return;
+
+    if (action === 'back') {
+      this.callbacks.onBack();
+      return;
+    }
+
+    const current = this.focusPosition;
+    if (current === null) return;
+
+    if (action === 'select') {
+      const intent = this.actionMap.get(current.key);
+      if (intent !== undefined) this.callbacks.onIntent(intent);
+      return;
+    }
+
+    if (action === 'left' || action === 'right') {
+      const row = this.focusRows[current.row];
+      if (row === undefined) return;
+      const nextColumn = action === 'left'
+        ? Math.max(0, current.column - 1)
+        : Math.min(row.length - 1, current.column + 1);
+      const key = row[nextColumn];
+      if (key !== undefined) this.focusKey(key);
+      return;
+    }
+
+    if (action === 'up' || action === 'down') {
+      const nextRowIndex = action === 'up'
+        ? Math.max(0, current.row - 1)
+        : Math.min(this.focusRows.length - 1, current.row + 1);
+      const row = this.focusRows[nextRowIndex];
+      if (row === undefined) return;
+      const key = row[Math.min(current.column, row.length - 1)];
+      if (key !== undefined) this.focusKey(key);
+    }
   }
 
   private render(root: HTMLElement): void {
+    const stableKey = this.focusPosition?.key ?? this.restoreKey;
     while (root.firstChild) root.removeChild(root.firstChild);
     this.actionMap.clear();
+    this.elementMap.clear();
+    this.focusRows = [];
+    this.focusPosition = null;
+    this.restoreKey = stableKey;
 
     if (this.state.kind === 'loading') {
       root.setAttribute('aria-busy', 'true');
@@ -112,47 +166,44 @@ export class HomeView {
     }
 
     this.renderReady(root, this.state.model);
+    const target = this.resolveFocusKey(this.state.model, stableKey);
+    if (target !== null) this.focusKey(target);
   }
 
   private renderReady(root: HTMLElement, model: HomeViewModel): void {
     const providerSection = appendSection(this.document, root, 'Sağlayıcı');
     const providerRow = this.appendRow(providerSection);
+    const providerKeys: HomeFocusKey[] = [];
     for (const provider of model.providerSelector.options) {
-      const button = this.appendAction(
-        providerRow,
-        `home-provider:${provider.providerId}`,
-        provider.name,
-        provider.intent,
-      );
+      const key: HomeFocusKey = `home-provider:${provider.providerId}`;
+      const button = this.appendAction(providerRow, key, provider.name, provider.intent);
       button.setAttribute('aria-pressed', provider.isActive ? 'true' : 'false');
+      providerKeys.push(key);
     }
+    this.addFocusRow(providerKeys);
 
     if (model.lastWatched !== null) {
       const lastSection = appendSection(this.document, root, 'Son İzlenen');
       const lastRow = this.appendRow(lastSection);
-      this.appendChannelAction(
-        lastRow,
-        `home-last-watched:${model.lastWatched.channelId}`,
-        model.lastWatched,
-        model.lastWatched.intent,
-      );
+      const key: HomeFocusKey = `home-last-watched:${model.lastWatched.channelId}`;
+      this.appendChannelAction(lastRow, key, model.lastWatched, model.lastWatched.intent);
+      this.addFocusRow([key]);
     }
 
     const liveSection = appendSection(this.document, root, 'Canlı TV');
     const liveRow = this.appendRow(liveSection);
     if (model.liveTv.available && model.liveTv.intent !== null) {
       this.appendAction(liveRow, 'home-live-tv', 'Canlı TV’yi Aç', model.liveTv.intent);
+      this.addFocusRow(['home-live-tv']);
     }
 
     const favoritesSection = appendSection(this.document, root, 'Favoriler');
     const favoritesRow = this.appendRow(favoritesSection);
+    const favoriteKeys: HomeFocusKey[] = [];
     for (const card of model.favorites.items) {
-      this.appendChannelAction(
-        favoritesRow,
-        `home-favorite:${card.channelId}`,
-        card,
-        card.intent,
-      );
+      const key: HomeFocusKey = `home-favorite:${card.channelId}`;
+      this.appendChannelAction(favoritesRow, key, card, card.intent);
+      favoriteKeys.push(key);
     }
     if (model.favorites.viewAllIntent !== null) {
       this.appendAction(
@@ -161,22 +212,24 @@ export class HomeView {
         'Tüm Favoriler',
         model.favorites.viewAllIntent,
       );
+      favoriteKeys.push('home-favorites-view-all');
     }
+    this.addFocusRow(favoriteKeys);
 
     const frequentSection = appendSection(this.document, root, 'Sık İzlenenler');
     const frequentRow = this.appendRow(frequentSection);
+    const frequentKeys: HomeFocusKey[] = [];
     for (const card of model.frequentlyWatched.items) {
-      this.appendChannelAction(
-        frequentRow,
-        `home-frequent:${card.channelId}`,
-        card,
-        card.intent,
-      );
+      const key: HomeFocusKey = `home-frequent:${card.channelId}`;
+      this.appendChannelAction(frequentRow, key, card, card.intent);
+      frequentKeys.push(key);
     }
+    this.addFocusRow(frequentKeys);
 
     const settingsSection = appendSection(this.document, root, 'Ayarlar');
     const settingsRow = this.appendRow(settingsSection);
     this.appendAction(settingsRow, 'home-settings', 'Ayarları Aç', model.settings.intent);
+    this.addFocusRow(['home-settings']);
   }
 
   private appendRow(section: HTMLElement): HTMLElement {
@@ -199,6 +252,7 @@ export class HomeView {
     button.textContent = label;
     parent.appendChild(button);
     this.actionMap.set(key, intent);
+    this.elementMap.set(key, button);
     return button;
   }
 
@@ -212,5 +266,44 @@ export class HomeView {
     button.className = 'home-action home-channel-card';
     const meta = channelMeta(card);
     if (meta !== null) appendText(this.document, button, 'span', meta, 'home-channel-meta');
+  }
+
+  private addFocusRow(keys: HomeFocusKey[]): void {
+    if (keys.length > 0) this.focusRows.push(keys);
+  }
+
+  private resolveFocusKey(model: HomeViewModel, stableKey: HomeFocusKey | null): HomeFocusKey | null {
+    if (stableKey !== null && this.actionMap.has(stableKey)) return stableKey;
+
+    const defaultKey = this.defaultFocusKey(model);
+    if (defaultKey !== null && this.actionMap.has(defaultKey)) return defaultKey;
+
+    return this.focusRows[0]?.[0] ?? null;
+  }
+
+  private defaultFocusKey(model: HomeViewModel): HomeFocusKey | null {
+    if (model.defaultFocus.kind === 'live-tv') return 'home-live-tv';
+    if (model.defaultFocus.kind === 'last-watched') {
+      return `home-last-watched:${model.defaultFocus.channelId}`;
+    }
+
+    const activeProviderId = model.providerSelector.activeProviderId;
+    if (activeProviderId !== null) return `home-provider:${activeProviderId}`;
+    const firstProvider = model.providerSelector.options[0];
+    return firstProvider === undefined ? null : `home-provider:${firstProvider.providerId}`;
+  }
+
+  private focusKey(key: HomeFocusKey): void {
+    for (let row = 0; row < this.focusRows.length; row += 1) {
+      const column = this.focusRows[row]?.indexOf(key) ?? -1;
+      if (column < 0) continue;
+
+      this.focusPosition = { row, column, key };
+      this.restoreKey = key;
+      const element = this.elementMap.get(key);
+      element?.focus();
+      element?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      return;
+    }
   }
 }
