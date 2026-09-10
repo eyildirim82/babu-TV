@@ -12,6 +12,8 @@ export interface HomeViewCallbacks {
   onBack(): void;
 }
 
+type HomeChannelDisplay = Pick<HomeChannelCard, 'name' | 'number' | 'currentProgram'>;
+
 type HomeFocusKey =
   | 'home-live-tv'
   | 'home-favorites-view-all'
@@ -47,7 +49,7 @@ function appendSection(
   return section;
 }
 
-function channelMeta(card: HomeChannelCard): string | null {
+function channelMeta(card: HomeChannelDisplay): string | null {
   if (card.currentProgram?.title) return card.currentProgram.title;
   if (card.number !== null) return `Kanal ${card.number}`;
   return null;
@@ -203,7 +205,7 @@ export class HomeView {
   private appendChannelAction(
     parent: HTMLElement,
     key: HomeFocusKey,
-    card: HomeChannelCard,
+    card: HomeChannelDisplay,
     intent: HomeActionIntent,
   ): void {
     const button = this.appendAction(parent, key, card.name, intent);
