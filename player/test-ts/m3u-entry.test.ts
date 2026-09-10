@@ -168,7 +168,7 @@ test('valid submit forwards the preserved input exactly once while pending and b
   });
   view.show();
   const input = document.getElementById('m3u-playlist-url')!;
-  input.value = '  https://demo.invalid/private.m3u?token=secret  ';
+  input.value = '  https://example.invalid/playlist.m3u?quality=hd  ';
 
   view.handleAction('down');
   view.handleAction('select');
@@ -176,7 +176,7 @@ test('valid submit forwards the preserved input exactly once while pending and b
   view.handleAction('back');
   await flush();
 
-  assert.deepEqual(submissions, [{ playlistUrl: '  https://demo.invalid/private.m3u?token=secret  ' }]);
+  assert.deepEqual(submissions, [{ playlistUrl: '  https://example.invalid/playlist.m3u?quality=hd  ' }]);
   assert.equal(backs, 0);
   assert.equal(document.getElementById('m3u-connect')!.disabled, true);
   assert.equal(document.getElementById('m3u-status')!.textContent, 'Oynatma listesi ekleniyor…');
@@ -197,20 +197,20 @@ test('failed onboarding preserves input, exposes only safe error copy, and retur
       throw new ProviderError(
         'NETWORK',
         null,
-        'network detail with https://demo.invalid/private.m3u?token=must-not-leak',
+        'transport detail for https://example.invalid/playlist.m3u?quality=hd',
       );
     },
     onBack: () => {},
   });
   view.show();
   const input = document.getElementById('m3u-playlist-url')!;
-  input.value = 'https://demo.invalid/private.m3u?token=secret';
+  input.value = 'https://example.invalid/playlist.m3u?quality=hd';
 
   await focusConnect(view);
 
-  assert.equal(input.value, 'https://demo.invalid/private.m3u?token=secret');
+  assert.equal(input.value, 'https://example.invalid/playlist.m3u?quality=hd');
   assert.equal(document.getElementById('m3u-status')!.textContent, 'Oynatma listesine ulaşılamadı.');
-  assert.doesNotMatch(document.getElementById('m3u-status')!.textContent, /demo\.invalid|token=/i);
+  assert.doesNotMatch(document.getElementById('m3u-status')!.textContent, /example\.invalid|quality=hd/i);
   assert.equal(document.getElementById('m3u-connect')!.disabled, false);
   assert.equal(document.activeElement?.id, 'm3u-connect');
 });
