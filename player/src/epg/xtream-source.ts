@@ -1,4 +1,5 @@
 import type { EpgSourceProgram } from './contracts.js';
+import type { ProviderHttpClient } from '../providers/http/contracts.js';
 import { ProviderError } from '../providers/errors.js';
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -69,4 +70,18 @@ export function decodeXtreamEpgResponse(
   }
 
   return programs;
+}
+
+export async function loadXtreamChannelEpg(
+  http: ProviderHttpClient,
+  requestUrl: string,
+  providerChannelId: string,
+): Promise<readonly EpgSourceProgram[]> {
+  try {
+    const raw = await http.getJson<unknown>(requestUrl);
+    return decodeXtreamEpgResponse(raw, providerChannelId);
+  } catch (error) {
+    if (error instanceof ProviderError) throw error;
+    throw new ProviderError('NETWORK', null, 'Provider EPG request failed.');
+  }
 }
