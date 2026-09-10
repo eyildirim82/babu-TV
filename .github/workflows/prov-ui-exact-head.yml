@@ -39,6 +39,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Tizen staging build
+        run: npm run tizen:build
+
       - name: Tizen package
         run: npm run tizen
 
