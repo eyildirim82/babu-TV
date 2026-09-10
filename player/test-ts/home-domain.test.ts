@@ -80,7 +80,7 @@ test('HOME-D selects a valid provider-scoped Last Watched card and focuses it by
     number: null,
     lastPlayedAtMs: 9_000,
     currentProgram: null,
-    intent: { type: 'OPEN_LIVE_TV_CHANNEL', providerId: 'p1', channelId: 'c2' },
+    intent: { type: 'PLAY_CHANNEL', providerId: 'p1', channelId: 'c2' },
   });
   assert.deepEqual(model.defaultFocus, { kind: 'last-watched', channelId: 'c2' });
 });
