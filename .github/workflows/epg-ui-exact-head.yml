@@ -40,6 +40,9 @@ jobs:
       - name: npm run build
         run: npm run build
 
+      - name: npm run tizen:build
+        run: npm run tizen:build
+
       - name: npm run tizen
         run: npm run tizen
 
