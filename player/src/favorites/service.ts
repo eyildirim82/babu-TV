@@ -1,6 +1,11 @@
 import type { ChannelId, ProviderId } from '../domain/models.js';
 import type { FavoriteRecord, FavoriteRepository } from './contracts.js';
 
+export interface FavoriteReconciliation {
+  available: readonly FavoriteRecord[];
+  missing: readonly FavoriteRecord[];
+}
+
 export class FavoriteService {
   constructor(
     private readonly repository: FavoriteRepository,
@@ -32,5 +37,16 @@ export class FavoriteService {
 
     await this.add(providerId, channelId);
     return true;
+  }
+
+  async reconcile(
+    providerId: ProviderId,
+    availableChannelIds: ReadonlySet<ChannelId>,
+  ): Promise<FavoriteReconciliation> {
+    const records = await this.repository.list(providerId);
+    return {
+      available: records.filter((record) => availableChannelIds.has(record.channelId)),
+      missing: records.filter((record) => !availableChannelIds.has(record.channelId)),
+    };
   }
 }
