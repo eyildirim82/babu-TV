@@ -1,0 +1,79 @@
+name: EPG-MAP PR42 exact-head verification
+
+on:
+  push:
+    branches:
+      - verification/epg-map-42-0b0c6cd
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PRODUCTION_SHA: 0b0c6cd1aedc2a2df9fefb91c615d82fb42edf25
+      FROZEN_BASE: aac531b15bad85f6e7ae42c6ff1a6b71eed289d1
+    steps:
+      - name: Checkout final production head explicitly
+        uses: actions/checkout@v4
+        with:
+          ref: 0b0c6cd1aedc2a2df9fefb91c615d82fb42edf25
+          fetch-depth: 0
+
+      - name: Prove exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          echo "production_sha=$PRODUCTION_SHA"
+          echo "checked_out_sha=$actual"
+          test "$actual" = "$PRODUCTION_SHA"
+
+      - name: Verify exact scope against frozen Wave 1 base
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$FROZEN_BASE" HEAD
+          git diff --name-only "$FROZEN_BASE"...HEAD | sort | tee /tmp/actual-scope.txt
+          printf '%s\n' \
+            'player/src/epg/channel-mapper.ts' \
+            'player/test-ts/epg-channel-mapper.test.ts' \
+            | sort > /tmp/expected-scope.txt
+          diff -u /tmp/expected-scope.txt /tmp/actual-scope.txt
+          echo 'scope_exact=true'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Brand check
+        run: npm run brand:check
+
+      - name: Tizen build
+        run: npm run tizen:build
+
+      - name: Ensure verification did not modify tracked files
+        run: git diff --exit-code
+
+      - name: Diff whitespace check against frozen Wave 1 base
+        run: git diff --check "$FROZEN_BASE"...HEAD
+
+      - name: Record evidence summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### EPG-MAP PR #42 exact-head verification'
+            echo
+            echo "- Production SHA: \`$PRODUCTION_SHA\`"
+            echo "- Frozen base: \`$FROZEN_BASE\`"
+            echo "- Checked-out SHA: \`$(git rev-parse HEAD)\`"
+            echo '- Verification workflow is on a separate verification-only branch.'
+          } >> "$GITHUB_STEP_SUMMARY"
