@@ -2,6 +2,10 @@ import type { PlaybackEnginePort, PlaybackResult, StreamRequest } from './contra
 
 export type NativeBufferingCallback = (buffering: boolean, percent?: number) => void;
 export type NativeErrorCallback = (type: unknown) => void;
+export type NativePlaybackTerminalCallback = (event: {
+  token: number;
+  reason: 'ended' | 'error';
+}) => void;
 
 export interface NativePlayOptions {
   userAgent?: string | null;
@@ -13,6 +17,8 @@ export interface LegacyAvplayPort {
   isAvailable(): boolean;
   onBuffering(callback: NativeBufferingCallback): void;
   onError(callback: NativeErrorCallback): void;
+  onPlaybackTerminal?(callback: NativePlaybackTerminalCallback): void;
+  getPlaybackToken?(): number | null;
   play(url: string, options?: NativePlayOptions): Promise<boolean>;
   pause(): void;
   resume(): void;
@@ -49,6 +55,14 @@ export class AvplayAdapter implements PlaybackEnginePort {
 
   onError(callback: NativeErrorCallback): void {
     this.legacy.onError(callback);
+  }
+
+  onPlaybackTerminal(callback: NativePlaybackTerminalCallback): void {
+    this.legacy.onPlaybackTerminal?.(callback);
+  }
+
+  getPlaybackToken(): number | null {
+    return this.legacy.getPlaybackToken?.() ?? null;
   }
 
   play(url: string, options: NativePlayOptions = {}): Promise<boolean> {
