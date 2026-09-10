@@ -9,6 +9,12 @@ import { MemoryEpgProgramRepository } from './support/v1-rc-memory-repositories.
 
 type FlatRecord = Record<string, unknown>;
 type IndexDefinition = { keyPath: string | readonly string[]; unique: boolean };
+type MutableRequest<T> = {
+  result: T;
+  error: DOMException | null;
+  onsuccess: ((this: IDBRequest<T>, ev: Event) => unknown) | null;
+  onerror: ((this: IDBRequest<T>, ev: Event) => unknown) | null;
+};
 
 class RecordingObjectStore {
   readonly data = new Map<IDBValidKey, unknown>();
@@ -76,18 +82,19 @@ function recordOf(value: unknown): FlatRecord {
 
 function request<T>(transaction: RecordingTransaction, operation: () => T): IDBRequest<T> {
   transaction.beginRequest();
-  const value = {
+  const state: MutableRequest<T> = {
     result: undefined as T,
     error: null,
     onsuccess: null,
     onerror: null,
-  } as unknown as IDBRequest<T>;
+  };
+  const value = state as unknown as IDBRequest<T>;
   queueMicrotask(() => {
     try {
-      value.result = operation();
-      value.onsuccess?.call(value, new Event('success'));
+      state.result = operation();
+      state.onsuccess?.call(value, new Event('success'));
     } catch {
-      value.onerror?.call(value, new Event('error'));
+      state.onerror?.call(value, new Event('error'));
     } finally {
       transaction.endRequest();
     }
@@ -102,19 +109,20 @@ function cursorRequest(
 ): IDBRequest<IDBCursorWithValue | null> {
   transaction.beginRequest();
   let index = 0;
-  const value = {
-    result: null as IDBCursorWithValue | null,
+  const state: MutableRequest<IDBCursorWithValue | null> = {
+    result: null,
     error: null,
     onsuccess: null,
     onerror: null,
-  } as unknown as IDBRequest<IDBCursorWithValue | null>;
+  };
+  const value = state as unknown as IDBRequest<IDBCursorWithValue | null>;
 
   const emit = () => {
     queueMicrotask(() => {
       const entry = entries[index];
       if (!entry) {
-        value.result = null;
-        value.onsuccess?.call(value, new Event('success'));
+        state.result = null;
+        state.onsuccess?.call(value, new Event('success'));
         transaction.endRequest();
         return;
       }
@@ -127,8 +135,8 @@ function cursorRequest(
           emit();
         },
       } as unknown as IDBCursorWithValue;
-      value.result = cursor;
-      value.onsuccess?.call(value, new Event('success'));
+      state.result = cursor;
+      state.onsuccess?.call(value, new Event('success'));
     });
   };
 
