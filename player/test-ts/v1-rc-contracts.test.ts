@@ -47,3 +47,43 @@ test('RC-F0 memory seams isolate providers', async () => {
   );
   assert.deepEqual(await epg.listPrograms('p2', 'shared', { startMs: 0, endMs: 100 }), []);
 });
+
+test('RC-F0 cleanup stays provider scoped and returned records are copies', async () => {
+  const favorites = new MemoryFavoriteRepository();
+  await favorites.put({ providerId: 'p1', channelId: 'c1', addedAtMs: 1 });
+  await favorites.put({ providerId: 'p2', channelId: 'c1', addedAtMs: 2 });
+  await favorites.deleteProvider('p1');
+  assert.equal(await favorites.has('p1', 'c1'), false);
+  assert.equal(await favorites.has('p2', 'c1'), true);
+
+  const first = (await favorites.list('p2'))[0];
+  if (!first) throw new Error('favorite fixture missing');
+  (first as { addedAtMs: number }).addedAtMs = 999;
+  assert.equal((await favorites.list('p2'))[0]?.addedAtMs, 2);
+
+  const watch = new MemoryWatchStateRepository();
+  await watch.setLastWatched({ providerId: 'p1', channelId: 'c1', lastPlayedAtMs: 1 });
+  await watch.putAggregate({
+    providerId: 'p1',
+    channelId: 'c1',
+    meaningfulWatchMs: 1000,
+    meaningfulOpenCount: 1,
+    lastMeaningfulWatchAtMs: 1,
+  });
+  await watch.deleteChannel('p1', 'c1');
+  assert.equal(await watch.getLastWatched('p1'), null);
+  assert.equal(await watch.getAggregate('p1', 'c1'), null);
+});
+
+test('RC-F0 EPG memory seam treats windows as half-open intersections', async () => {
+  const epg = new MemoryEpgProgramRepository();
+  await epg.replaceWindow('p1', { startMs: 0, endMs: 100 }, [
+    { channelId: 'c1', startMs: 0, endMs: 50, title: 'A', description: null },
+    { channelId: 'c1', startMs: 50, endMs: 100, title: 'B', description: null },
+  ]);
+
+  assert.deepEqual(
+    (await epg.listPrograms('p1', 'c1', { startMs: 50, endMs: 100 })).map((p) => p.title),
+    ['B'],
+  );
+});
