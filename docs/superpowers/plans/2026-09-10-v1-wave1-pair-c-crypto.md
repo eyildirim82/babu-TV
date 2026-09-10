@@ -96,7 +96,7 @@ Implement URL-safe Base64 encode/decode helpers for `Uint8Array` without Node-on
 
 - [ ] **Step 4: Implement TV key generation**
 
-Use `globalThis.crypto?.subtle`; if absent, throw `UNAVAILABLE`. Generate ECDH P-256 with `extractable: true`, export only `keyPair.publicKey` as JWK, and return the private `CryptoKey` object without exporting/serializing it.
+Use `globalThis.crypto?.subtle`; if absent, throw `UNAVAILABLE`. Generate ECDH P-256 with `extractable: false`, export only `keyPair.publicKey` as JWK, assert `keyPair.privateKey.extractable === false`, and return the non-extractable private `CryptoKey` object without exporting/serializing it. Web Crypto keeps the generated public ECDH key exportable even when the private key is created non-extractable.
 
 - [ ] **Step 5: Commit API/key generation**
 
@@ -120,7 +120,7 @@ git commit -m "feat(pairing): add ephemeral crypto contract"
 `encryptForPairingTv` must:
 
 1. import the TV public JWK as ECDH P-256 public key;
-2. generate a fresh ephemeral sender P-256 ECDH key pair;
+2. generate a fresh ephemeral sender P-256 ECDH key pair with a non-extractable private key while keeping the public key exportable;
 3. derive a non-extractable AES-GCM 256-bit key from sender private + TV public;
 4. generate exactly 12 random IV bytes with `crypto.getRandomValues`;
 5. encrypt with AES-GCM using `new TextEncoder().encode('babustv-pairing-v1')` as `additionalData`;
@@ -139,7 +139,7 @@ Prove one flipped ciphertext byte is rejected, a different TV key cannot decrypt
 
 - [ ] **Step 4: Add no-secret-surface assertions**
 
-Assert the JSON-serializable envelope has exactly `version`, `algorithm`, `senderPublicKey`, `iv`, and `ciphertext`; it must not contain a TV private key, sender private key, plaintext property, URL, provider type, username, password, or token field.
+Assert the JSON-serializable envelope has exactly `version`, `algorithm`, `senderPublicKey`, `iv`, and `ciphertext`; it must not contain a TV private key, sender private key, plaintext property, URL, provider type, username, password, or token field. Assert both generated private ECDH keys are non-extractable.
 
 - [ ] **Step 5: Run GREEN and commit**
 
@@ -178,4 +178,4 @@ Expected: only the two owned files. Confirm no provider credential schema/data, 
 
 - [ ] **Step 3: Open Draft PR**
 
-Record exact base/head, round-trip RED/GREEN, tamper/wrong-key rejection, envelope surface audit, Web Crypto availability classification, full gates, and scope audit. Do not claim physical-Tizen crypto support from Node/browser tests; that remains later evidence. Do not Ready/merge.
+Record exact base/head, round-trip RED/GREEN, tamper/wrong-key rejection, non-extractable private-key assertions, envelope surface audit, Web Crypto availability classification, full gates, and scope audit. Do not claim physical-Tizen crypto support from Node/browser tests; that remains later evidence. Do not Ready/merge.
