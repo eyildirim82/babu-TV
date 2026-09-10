@@ -1,7 +1,9 @@
 import type { XtreamCredential } from '../../credentials/contracts.js';
 import type { Category, Channel, ChannelId, ProviderId } from '../../domain/models.js';
+import type { EpgSourceProgram, EpgWindow } from '../../epg/contracts.js';
+import { loadXtreamChannelEpg } from '../../epg/xtream-source.js';
 import type { StreamRequest } from '../../playback/contracts.js';
-import type { ProviderAdapter, ProviderProfile } from '../contracts.js';
+import type { ProviderAdapter, ProviderEpgCapability, ProviderProfile } from '../contracts.js';
 import { ProviderError } from '../errors.js';
 import type { ProviderHttpClient } from '../http/contracts.js';
 import {
@@ -35,6 +37,10 @@ function normalizeServerUrl(raw: string): string {
   return `${parsed.origin}${pathname}`;
 }
 
+function intersects(program: EpgSourceProgram, window: EpgWindow): boolean {
+  return program.startMs < window.endMs && program.endMs > window.startMs;
+}
+
 export class XtreamProvider implements ProviderAdapter {
   readonly kind = 'xtream' as const;
   private readonly serverUrl: string;
@@ -46,6 +52,39 @@ export class XtreamProvider implements ProviderAdapter {
     private readonly http: ProviderHttpClient,
   ) {
     this.serverUrl = normalizeServerUrl(credential.serverUrl);
+  }
+
+  get epg(): ProviderEpgCapability {
+    return {
+      describeChannels: (channels) => channels
+        .filter((channel) => channel.providerId === this.providerId)
+        .map((channel) => ({
+          providerId: this.providerId,
+          channelId: channel.id,
+          name: channel.name,
+          epgIds: [channel.id],
+        })),
+      createSource: (channels) => {
+        const scopedChannels = channels.filter((channel) => channel.providerId === this.providerId);
+        return {
+          providerId: this.providerId,
+          listPrograms: async (window) => {
+            const programs: EpgSourceProgram[] = [];
+            for (const channel of scopedChannels) {
+              const requestUrl = new URL(this.apiUrl('get_short_epg'));
+              requestUrl.searchParams.set('stream_id', channel.id);
+              const partition = await loadXtreamChannelEpg(
+                this.http,
+                requestUrl.toString(),
+                channel.id,
+              );
+              programs.push(...partition.filter((program) => intersects(program, window)));
+            }
+            return programs;
+          },
+        };
+      },
+    };
   }
 
   private apiUrl(action?: string): string {
