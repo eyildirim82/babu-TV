@@ -1,0 +1,57 @@
+name: EPG-PI exact production head
+
+on:
+  push:
+    branches:
+      - verification/epg-pi-305a6383
+
+permissions:
+  contents: read
+
+jobs:
+  exact-production-head:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout verification revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout and assert exact production SHA
+        run: |
+          git checkout --detach 305a63836885bfdf2d8ca2158ba55aa97b9351fa
+          test "$(git rev-parse HEAD)" = "305a63836885bfdf2d8ca2158ba55aa97b9351fa"
+          test "$(git merge-base 79d9ff13da28b13ce2f5a6dfed2e56313eb472ac HEAD)" = "79d9ff13da28b13ce2f5a6dfed2e56313eb472ac"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm test
+        run: npm test
+
+      - name: npm run typecheck
+        run: npm run typecheck
+
+      - name: npm run brand:check
+        run: npm run brand:check
+
+      - name: npm run build
+        run: npm run build
+
+      - name: npm run tizen:build
+        run: npm run tizen:build
+
+      - name: git diff --exit-code
+        run: git diff --exit-code
+
+      - name: Exact-base diff check
+        run: git diff --check 79d9ff13da28b13ce2f5a6dfed2e56313eb472ac...HEAD
+
+      - name: Exact changed files
+        run: git diff --name-only 79d9ff13da28b13ce2f5a6dfed2e56313eb472ac...HEAD
