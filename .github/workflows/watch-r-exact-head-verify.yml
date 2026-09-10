@@ -1,0 +1,56 @@
+name: WATCH-R exact-head verification
+
+on:
+  push:
+    branches:
+      - verification/watch-r-36885456
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_HEAD: 36885456b0fb53b8a6182d50dba3ba14c4f19ab8
+      FROZEN_BASE: aac531b15bad85f6e7ae42c6ff1a6b71eed289d1
+    steps:
+      - name: Checkout exact production head
+        uses: actions/checkout@v4
+        with:
+          ref: 36885456b0fb53b8a6182d50dba3ba14c4f19ab8
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify exact head and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          mapfile -t changed < <(git diff --name-only "$FROZEN_BASE...HEAD")
+          printf 'changed file: %s\n' "${changed[@]}"
+          test "${#changed[@]}" -eq 2
+          test "${changed[0]}" = "player/src/watch/service.ts"
+          test "${changed[1]}" = "player/test-ts/watch-service.test.ts"
+
+      - name: Run plan-required exact-head gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '$ npm run brand:check'
+          npm run brand:check
+          echo '$ npm run tizen:build'
+          npm run tizen:build
+          echo '$ git diff --exit-code'
+          git diff --exit-code
+          echo "$ git diff --check $FROZEN_BASE...HEAD"
+          git diff --check "$FROZEN_BASE...HEAD"
