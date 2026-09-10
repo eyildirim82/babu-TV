@@ -73,6 +73,13 @@ export class RepositoryEpgQuery implements EpgQuery {
     channelId: ChannelId,
     window: EpgWindow,
   ): Promise<readonly EpgProgram[]> {
+    if (
+      !Number.isFinite(window.startMs) ||
+      !Number.isFinite(window.endMs) ||
+      window.startMs >= window.endMs
+    ) {
+      throw new RangeError('EPG query window must be finite and non-empty.');
+    }
     return this.repository.listPrograms(providerId, channelId, window);
   }
 }
