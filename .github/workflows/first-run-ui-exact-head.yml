@@ -1,0 +1,70 @@
+name: FIRST-UI exact-head verification
+
+on:
+  push:
+    branches:
+      - verification/first-run-ui-exact-head
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact production head
+        uses: actions/checkout@v4
+        with:
+          ref: 06e390f4f8170bbb6dc409fd0418eb54e6ce04a2
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run requested exact-head gates
+        shell: bash
+        run: |
+          set +e
+          failed=0
+          gate() {
+            echo "::group::$*"
+            "$@"
+            status=$?
+            echo "exit=$status"
+            echo "::endgroup::"
+            if [ "$status" -ne 0 ]; then
+              failed=1
+            fi
+          }
+
+          gate npm test
+          gate npm run typecheck
+          gate npm run brand
+          gate npm run build
+          gate npm run tizen
+          gate git diff --exit-code
+          gate git diff --check 7b9b61cc099907535f570fb46f30997581a06995...HEAD
+
+          echo "Requested-gate aggregate exit=$failed"
+          exit "$failed"
+
+      - name: Run repository canonical brand/Tizen aliases
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          npm run brand:check
+          brand_status=$?
+          echo "brand:check exit=$brand_status"
+          npm run tizen:build
+          tizen_status=$?
+          echo "tizen:build exit=$tizen_status"
+          if [ "$brand_status" -ne 0 ] || [ "$tizen_status" -ne 0 ]; then
+            exit 1
+          fi
