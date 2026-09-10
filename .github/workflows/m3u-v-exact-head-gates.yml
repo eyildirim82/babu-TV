@@ -17,6 +17,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ef15155f3bf011f97f332d1bf0b4717a46dd237c
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -30,11 +31,29 @@ jobs:
       - name: Assert exact head
         run: test "$(git rev-parse HEAD)" = "ef15155f3bf011f97f332d1bf0b4717a46dd237c"
 
+      - name: Full test suite
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Brand separation gate
         run: npm run brand:check
+
+      - name: Production build
+        run: npm run build
 
       - name: Tizen staging gate
         run: npm run tizen:build
 
-      - name: Ensure gates do not modify tracked files
+      - name: Ensure verification did not modify tracked files
         run: git diff --exit-code
+
+      - name: Audit exact Wave 1 scope and diff
+        shell: bash
+        run: |
+          base=aac531b15bad85f6e7ae42c6ff1a6b71eed289d1
+          expected=$'player/src/providers/m3u/m3u-entry-validation.ts\nplayer/test-ts/m3u-entry-validation.test.ts'
+          actual="$(git diff --name-only "$base"...HEAD | sort)"
+          test "$actual" = "$expected"
+          git diff --check "$base"...HEAD
