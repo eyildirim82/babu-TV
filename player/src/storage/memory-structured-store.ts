@@ -7,6 +7,7 @@ const KEY_PATHS: Readonly<Record<StructuredStoreName, 'id' | 'key'>> = {
   categories: 'key',
   channels: 'key',
   app_state: 'key',
+  epg_programs: 'key',
 };
 
 function copyValue<T>(value: T): T {
@@ -37,6 +38,7 @@ export class MemoryStructuredStore implements StructuredStore {
     categories: new Map(),
     channels: new Map(),
     app_state: new Map(),
+    epg_programs: new Map(),
   };
 
   async get<T>(store: StructuredStoreName, key: IDBValidKey): Promise<T | null> {
