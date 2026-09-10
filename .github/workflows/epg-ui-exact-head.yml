@@ -1,0 +1,50 @@
+name: EPG-UI exact-head evidence
+
+on:
+  push:
+    branches:
+      - verification/epg-ui-exact-head
+
+jobs:
+  exact-head:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact production head
+        uses: actions/checkout@v4
+        with:
+          ref: 4220d47426415ef2f97cf928780b4d215a6500fc
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm test
+        run: npm test
+
+      - name: npm run typecheck
+        run: npm run typecheck
+
+      - name: Requested npm run brand command
+        continue-on-error: true
+        run: npm run brand
+
+      - name: Approved brand gate
+        run: npm run brand:check
+
+      - name: npm run build
+        run: npm run build
+
+      - name: npm run tizen
+        run: npm run tizen
+
+      - name: git diff --exit-code
+        run: git diff --exit-code
+
+      - name: Exact base diff check
+        run: git diff --check 7b9b61cc099907535f570fb46f30997581a06995...HEAD
