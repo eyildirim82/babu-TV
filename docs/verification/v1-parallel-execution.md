@@ -2,9 +2,10 @@
 
 **Date:** 2026-09-10  
 **Owner:** REVIEW / Integration Controller  
-**Status:** DESIGN APPROVED — PRODUCTION NOT STARTED  
+**Status:** DESIGN APPROVED — RC-F0 PLAN DRAFTED; PRODUCTION NOT STARTED  
 **Parent roadmap:** `docs/superpowers/plans/2026-09-10-babustv-v1-rc-roadmap.md`  
-**Execution design:** `docs/superpowers/specs/2026-09-10-babustv-v1-maximum-parallel-execution-design.md`
+**Execution design:** `docs/superpowers/specs/2026-09-10-babustv-v1-maximum-parallel-execution-design.md`  
+**RC-F0 plan:** `docs/superpowers/plans/2026-09-10-v1-rc-f0-shared-contracts.md`
 
 ## Purpose
 
@@ -41,7 +42,9 @@ Recommended active concurrency: **8–12 workers**. The first-wave architecture 
 
 | ROLE | Branch | Status | Depends on | Ownership summary |
 | --- | --- | --- | --- | --- |
-| `RC-F0` | `foundation/v1-rc-contracts` | `WAITING-FOR-PLAN` | RC docs merged + GREEN main | shared EPG/user-state repository contracts, capability seams, test doubles; no feature behavior |
+| `RC-F0` | `foundation/v1-rc-contracts` | `PLAN-DRAFTED` | RC docs merged + GREEN main + plan approval | shared EPG/user-state repository contracts and test doubles; no feature behavior |
+
+RC-F0 plan scope is intentionally contract-only. It does not bump IndexedDB schema/version and does not touch provider runtime, Live TV composition, playback, credentials, or UI.
 
 Only RC-F0 may intentionally prepare shared contract seams before the first fan-out. RC-F0 must remain small.
 
@@ -199,13 +202,15 @@ Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=CONTROLLER.
 
 Production implementation is **not started** by this documentation branch.
 
-Next repository gate after documentation approval/merge:
+Current gate sequence:
 
-1. post-merge `main` must be exact GREEN;
-2. write/approve RC-F0 bounded implementation plan;
-3. implement and merge RC-F0;
-4. verify post-F0 `main` GREEN;
-5. controller records that exact SHA as Wave 1 base;
-6. open as many Wave 1 roles as review/CI capacity safely supports, recommended 8–12 concurrently.
+1. merge the approved RC roadmap/parallel-execution documentation through controller authority;
+2. verify resulting `main` exact GREEN;
+3. approve `docs/superpowers/plans/2026-09-10-v1-rc-f0-shared-contracts.md`;
+4. create `foundation/v1-rc-contracts` from that exact GREEN `main`;
+5. implement/verify/merge RC-F0;
+6. verify post-F0 `main` GREEN;
+7. controller records that exact SHA as Wave 1 base;
+8. open as many Wave 1 roles as review/CI capacity safely supports, recommended 8–12 concurrently.
 
 Physical-TV evidence remains governed by the existing RC readiness/controller boards and is not changed by this parallelization design.
