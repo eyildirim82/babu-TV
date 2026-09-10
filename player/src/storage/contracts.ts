@@ -1,4 +1,4 @@
-export type StructuredStoreName = 'providers' | 'categories' | 'channels' | 'app_state';
+export type StructuredStoreName = 'providers' | 'categories' | 'channels' | 'app_state' | 'epg_programs';
 
 export interface StructuredStore {
   get<T>(store: StructuredStoreName, key: IDBValidKey): Promise<T | null>;
