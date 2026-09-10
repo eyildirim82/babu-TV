@@ -130,19 +130,23 @@ test('HOME-D preserves WATCH-S ranking semantics while excluding foreign, stale,
   assert.equal('score' in model.frequentlyWatched.items[0]!, false);
 });
 
-test('HOME-D attaches optional current EPG only when it matches the projected channel', () => {
+test('HOME-D attaches optional current EPG only from the active provider partition', () => {
   const matching = { channelId: 'c1', startMs: 1, endMs: 2, title: 'Now', description: null };
+  const foreignSameChannel = { channelId: 'c1', startMs: 1, endMs: 2, title: 'Foreign', description: null };
   const mismatched = { channelId: 'other', startMs: 1, endMs: 2, title: 'Wrong', description: null };
 
   const withMatching = createHomeViewModel(input({
     favorites: [{ providerId: 'p1', channelId: 'c1', addedAtMs: 1 }],
-    currentPrograms: new Map([['c1', matching]]),
+    currentPrograms: new Map([
+      ['p2', new Map([['c1', foreignSameChannel]])],
+      ['p1', new Map([['c1', matching]])],
+    ]),
   }));
   assert.deepEqual(withMatching.favorites.items[0]?.currentProgram, matching);
 
   const withMismatch = createHomeViewModel(input({
     favorites: [{ providerId: 'p1', channelId: 'c1', addedAtMs: 1 }],
-    currentPrograms: new Map([['c1', mismatched]]),
+    currentPrograms: new Map([['p1', new Map([['c1', mismatched]])]]),
   }));
   assert.equal(withMismatch.favorites.items[0]?.currentProgram, null);
 });
