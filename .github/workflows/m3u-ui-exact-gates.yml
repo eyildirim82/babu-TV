@@ -1,0 +1,63 @@
+name: m3u-ui-exact-gates
+
+on:
+  push:
+    branches:
+      - verification/m3u-ui-61-full-gates
+
+permissions:
+  contents: read
+
+jobs:
+  exact-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact production head
+        uses: actions/checkout@v4
+        with:
+          ref: f22d596ba7db49158b3951cc967fc1b950cb9ad4
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify exact head
+        run: test "$(git rev-parse HEAD)" = "f22d596ba7db49158b3951cc967fc1b950cb9ad4"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Brand check
+        run: npm run brand:check
+
+      - name: Build
+        run: npm run build
+
+      - name: Tizen stage build
+        run: npm run tizen:build
+
+      - name: Tizen package
+        run: npm run tizen
+
+      - name: Verify bounded scope and clean patch
+        shell: bash
+        run: |
+          git diff --check 7b9b61cc099907535f570fb46f30997581a06995...HEAD
+          actual="$(git diff --name-only 7b9b61cc099907535f570fb46f30997581a06995...HEAD | sort)"
+          expected="$(printf '%s\n' \
+            player/src/m3u-entry.ts \
+            player/src/ui/m3u-entry.css \
+            player/test-ts/m3u-entry.test.ts | sort)"
+          test "$actual" = "$expected"
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
