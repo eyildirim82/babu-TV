@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { performance } from 'node:perf_hooks';
 import { normalizeSearchText, searchCatalog } from '../src/search/search-core.js';
 
 test('SRCH-C is Turkish-case-safe for channel and category names', () => {
@@ -87,4 +88,29 @@ test('SRCH-C has provider-agnostic stable ordering and category lookup by channe
   const categoryOnly = [{ providerId: 'p1', id: 'cat-channel', name: 'Kanal', categoryId: 'news', logoUrl: null, number: 1 }];
   assert.deepEqual(searchCatalog({ channels: categoryOnly, categories: [...categories].reverse(), query: 'haber' }).map((x) => x.channel.id), ['cat-channel']);
   assert.deepEqual(searchCatalog({ channels: [{ ...categoryOnly[0], providerId: 'p2' }], categories, query: 'haber' }), []);
+});
+
+test('SRCH-C stays responsive on a 10,000-channel synthetic catalog', () => {
+  const categories = Array.from({ length: 100 }, (_, index) => ({
+    providerId: 'p1',
+    id: `cat-${index}`,
+    name: `Kategori ${index}`,
+  }));
+  const channels = Array.from({ length: 10_000 }, (_, index) => ({
+    providerId: 'p1',
+    id: `c-${index}`,
+    name: `Kanal ${index}`,
+    categoryId: `cat-${index % 100}`,
+    logoUrl: null,
+    number: index + 1,
+  }));
+  channels[9_997] = { ...channels[9_997], name: 'Özel İstanbul Kanalı' };
+
+  searchCatalog({ channels, categories, query: 'özel istanbul kanalı' });
+  const start = performance.now();
+  const results = searchCatalog({ channels, categories, query: 'özel istanbul kanalı' });
+  const elapsedMs = performance.now() - start;
+
+  assert.equal(results[0]?.channel.id, 'c-9997');
+  assert.ok(elapsedMs < 500, `expected 10,000-channel search under 500 ms, got ${elapsedMs.toFixed(2)} ms`);
 });
