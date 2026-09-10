@@ -93,8 +93,8 @@ export interface HomeProjectionInput {
   readonly watchAggregates: readonly WatchAggregate[];
   readonly nowMs: number;
   readonly watchScorePolicy: WatchScorePolicy;
-  /** Optional current EPG values must already come from the active provider's EpgQuery partition. */
-  readonly currentPrograms?: ReadonlyMap<ChannelId, EpgProgram>;
+  /** Optional current EPG values, explicitly partitioned by provider then stable channel ID. */
+  readonly currentPrograms?: ReadonlyMap<ProviderId, ReadonlyMap<ChannelId, EpgProgram>>;
 }
 
 export interface HomeViewModel {
@@ -115,9 +115,10 @@ function compareStableId(a: string, b: string): number {
 
 function currentProgramFor(
   input: HomeProjectionInput,
+  providerId: ProviderId,
   channelId: ChannelId,
 ): EpgProgram | null {
-  const program = input.currentPrograms?.get(channelId) ?? null;
+  const program = input.currentPrograms?.get(providerId)?.get(channelId) ?? null;
   return program?.channelId === channelId ? program : null;
 }
 
@@ -132,7 +133,7 @@ function channelCard(
     name: channel.name,
     logoUrl: channel.logoUrl,
     number: channel.number,
-    currentProgram: currentProgramFor(input, channel.id),
+    currentProgram: currentProgramFor(input, providerId, channel.id),
     intent: {
       type: 'OPEN_LIVE_TV_CHANNEL',
       providerId,
