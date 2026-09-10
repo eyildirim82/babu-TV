@@ -11,10 +11,18 @@ import type {
   ProviderSnapshot,
 } from '../providers/provider-core-service.js';
 import type { ProviderRepository } from '../repository/provider-repository.js';
+import {
+  LegacyPlaybackTerminalBinder,
+  PlaybackWatchObserver,
+  WatchObservingPlayerSession,
+} from '../watch/playback-session-observer.js';
+import { WatchStateService } from '../watch/service.js';
 import { ChannelIntentCoordinator } from './channel-intent-coordinator.js';
 import { DomLiveTvView } from './dom-live-tv-view.js';
 import { LiveTvController } from './live-tv-controller.js';
 import { ProviderStreamResolver } from './provider-stream-resolver.js';
+
+const MEANINGFUL_WATCH_MINIMUM_MS = 30_000;
 
 export interface LiveTvRuntimeProviderPort {
   getActiveProviderId(): Promise<ProviderId | null>;
@@ -103,6 +111,7 @@ export async function createBrowserLiveTvRuntime(
     const {
       providers,
       catalog,
+      watchState,
       credentials,
       adapters,
       core,
@@ -112,9 +121,22 @@ export async function createBrowserLiveTvRuntime(
       fetchImpl: deps.fetchImpl,
     });
     const resolver = new ProviderStreamResolver(providers, credentials, adapters);
-    const session = new PlayerSessionCoordinator(
-      new ShakaAdapter(deps.legacyPlayer),
-      new AvplayAdapter(deps.legacyAvplay),
+    const shaka = new ShakaAdapter(deps.legacyPlayer);
+    const avplay = new AvplayAdapter(deps.legacyAvplay);
+    const watchService = new WatchStateService(watchState, {
+      minimumSessionMs: MEANINGFUL_WATCH_MINIMUM_MS,
+    });
+    const watchObserver = new PlaybackWatchObserver(watchService, {
+      now: () => Date.now(),
+    });
+    const terminalBinder = new LegacyPlaybackTerminalBinder(watchObserver, {
+      shaka,
+      avplay,
+    });
+    const session = new WatchObservingPlayerSession(
+      new PlayerSessionCoordinator(shaka, avplay),
+      watchObserver,
+      terminalBinder,
     );
     const view = new DomLiveTvView(deps.document);
     let controller: LiveTvController | null = null;
