@@ -7,6 +7,8 @@
 let avObject = null;
 let bufferingCallback = null;
 let errorCallback = null;
+let playbackTerminalCallback = null;
+let playbackToken = 0;
 let readyResolve = null;
 let readyTimer = null;
 let firstFrameSeen = false;
@@ -42,6 +44,14 @@ function resolveReady(ok) {
   if (cb) cb(ok);
 }
 
+function notifyPlaybackTerminal(event) {
+  try {
+    if (playbackTerminalCallback) playbackTerminalCallback(event);
+  } catch {
+    // Observation cannot take ownership of native playback behavior.
+  }
+}
+
 export function onBuffering(callback) {
   bufferingCallback = callback;
 }
@@ -50,10 +60,19 @@ export function onError(callback) {
   errorCallback = callback;
 }
 
+export function onPlaybackTerminal(callback) {
+  playbackTerminalCallback = callback;
+}
+
+export function getPlaybackToken() {
+  return playbackToken > 0 ? playbackToken : null;
+}
+
 // Opens url natively. Resolves true once the first frame plays, false on
 // error/timeout. Rejects never — always resolves.
 export function play(url, { userAgent, referer, timeoutMs = 15000 } = {}) {
   return new Promise((resolve) => {
+    const myToken = ++playbackToken;
     if (!isAvailable()) {
       resolve(false);
       return;
@@ -93,9 +112,11 @@ export function play(url, { userAgent, referer, timeoutMs = 15000 } = {}) {
         onerror: (type) => {
           if (errorCallback) errorCallback(type);
           resolveReady(false);
+          notifyPlaybackTerminal({ token: myToken, reason: 'error' });
         },
         onstreamcompleted: () => {
           resolveReady(true);
+          notifyPlaybackTerminal({ token: myToken, reason: 'ended' });
         },
       });
       avplay.open(url);
