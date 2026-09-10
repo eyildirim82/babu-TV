@@ -14,6 +14,31 @@ test('EPG-Q current lookup uses half-open intervals', async () => {
   assert.equal((await query.getCurrent('p1', 'c1', 200))?.title, 'B');
 });
 
+test('EPG-Q current lookup is isolated by provider even when channel IDs match', async () => {
+  const repo = new MemoryEpgProgramRepository();
+  await repo.replaceWindow('p1', { startMs: 0, endMs: 300 }, [
+    { channelId: 'c1', startMs: 100, endMs: 250, title: 'Provider 1', description: null },
+  ]);
+  await repo.replaceWindow('p2', { startMs: 0, endMs: 300 }, [
+    { channelId: 'c1', startMs: 100, endMs: 250, title: 'Provider 2', description: null },
+  ]);
+  const query = new RepositoryEpgQuery(repo, { lookBehindMs: 1000, lookAheadMs: 1000 });
+  assert.equal((await query.getCurrent('p1', 'c1', 150))?.title, 'Provider 1');
+  assert.equal((await query.getCurrent('p2', 'c1', 150))?.title, 'Provider 2');
+});
+
+test('EPG-Q current lookup selects overlapping programmes deterministically', async () => {
+  const repo = new MemoryEpgProgramRepository();
+  await repo.replaceWindow('p1', { startMs: 0, endMs: 500 }, [
+    { channelId: 'c1', startMs: 100, endMs: 400, title: 'Old', description: null },
+    { channelId: 'c1', startMs: 150, endMs: 300, title: 'Long', description: null },
+    { channelId: 'c1', startMs: 150, endMs: 250, title: 'B', description: null },
+    { channelId: 'c1', startMs: 150, endMs: 250, title: 'A', description: null },
+  ]);
+  const query = new RepositoryEpgQuery(repo, { lookBehindMs: 1000, lookAheadMs: 1000 });
+  assert.equal((await query.getCurrent('p1', 'c1', 220))?.title, 'A');
+});
+
 test('EPG-Q next lookup starts after the current programme ends', async () => {
   const repo = new MemoryEpgProgramRepository();
   await repo.replaceWindow('p1', { startMs: 0, endMs: 500 }, [
