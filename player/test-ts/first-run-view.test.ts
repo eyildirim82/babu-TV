@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 type FirstRunModule = typeof import('../src/first-run/first-run-view.js');
@@ -171,4 +172,14 @@ test('empty and error states use fixed safe Turkish copy while keeping provider 
   assert.equal(document.getElementById('first-run-status')?.textContent, 'Bağlantı ekranı şu anda açılamıyor. Lütfen yeniden deneyin.');
   assert.ok(document.getElementById('first-run-xtream'));
   assert.ok(document.getElementById('first-run-m3u'));
+});
+
+test('scoped stylesheet uses BabuşTV tokens, strong remote focus, and reduced-motion handling', async () => {
+  const css = await readFile(new URL('../src/ui/first-run.css', import.meta.url), 'utf8').catch(() => null);
+  assert.ok(css, 'FIRST-UI scoped stylesheet should exist');
+  assert.match(css, /var\(--babu-bg\)/);
+  assert.match(css, /var\(--babu-accent\)/);
+  assert.match(css, /:focus-visible/);
+  assert.match(css, /prefers-reduced-motion:\s*reduce/);
+  assert.doesNotMatch(css, /#ff8c00|orange/i);
 });
