@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-10  
 **Owner:** REVIEW / Integration Controller  
-**Status:** DESIGN APPROVED — PRODUCTION NOT STARTED  
+**Status:** RC-F0 CLOSED GREEN — WAVE 1 BASE FROZEN; BOUNDED ROLE PLANS PENDING  
 **Parent roadmap:** `docs/superpowers/plans/2026-09-10-babustv-v1-rc-roadmap.md`  
 **Execution design:** `docs/superpowers/specs/2026-09-10-babustv-v1-maximum-parallel-execution-design.md`
 
@@ -41,29 +41,34 @@ Recommended active concurrency: **8–12 workers**. The first-wave architecture 
 
 | ROLE | Branch | Status | Depends on | Ownership summary |
 | --- | --- | --- | --- | --- |
-| `RC-F0` | `foundation/v1-rc-contracts` | `WAITING-FOR-PLAN` | RC docs merged + GREEN main | shared EPG/user-state repository contracts, capability seams, test doubles; no feature behavior |
+| `RC-F0` | `foundation/v1-rc-contracts` | `CLOSED GREEN` | complete | shared EPG/user-state repository contracts, capability seams, test doubles; no feature behavior |
+
+RC-F0 worker head `8a216600b8244c58e7fabb8069f2320b906b21b4` passed its complete plan-required gate set and was squash-merged as PR #37. Resulting `main` is `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`; post-merge verify run `34487321835` is SUCCESS.
 
 Only RC-F0 may intentionally prepare shared contract seams before the first fan-out. RC-F0 must remain small.
 
 ## Wave 1 — independent core lanes
 
-All Wave 1 production branches start from the same exact GREEN post-RC-F0 `main` SHA unless controller records an exception.
+**Common exact Wave 1 implementation base:** `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`  
+**Post-RC-F0 main verification:** `34487321835` SUCCESS
+
+All Wave 1 production branches start from this same exact GREEN post-RC-F0 `main` SHA unless controller records an exception. The architectural role definitions exist, but a role remains closed until its own bounded implementation plan is approved.
 
 | ROLE | Branch | Status | Produces |
 | --- | --- | --- | --- |
-| `EPG-N` | `feature/epg-normalizer` | `BLOCKED-RC-F0` | common EPG normalization/time rules |
-| `EPG-X` | `feature/epg-xtream-adapter` | `BLOCKED-RC-F0` | Xtream EPG decoding/source boundary |
-| `EPG-XML` | `feature/epg-xmltv-parser` | `BLOCKED-RC-F0` | XMLTV parser primitives |
-| `EPG-MAP` | `feature/epg-channel-mapper` | `BLOCKED-RC-F0` | stable EPG↔channel reconciliation |
-| `EPG-Q` | `feature/epg-query-engine` | `BLOCKED-RC-F0` | current/next/detail query logic |
-| `FAV-D` | `feature/favorites-domain` | `BLOCKED-RC-F0` | Favorites domain/service + repository interface use |
-| `SRCH-C` | `feature/search-core` | `BLOCKED-RC-F0` | Turkish-safe local Search core |
-| `M3U-V` | `feature/m3u-entry-validation` | `BLOCKED-RC-F0` | modern M3U entry validation primitives |
-| `WATCH-R` | `feature/watch-state-domain` | `BLOCKED-RC-F0` | last-watched/watch-event domain |
-| `WATCH-S` | `feature/watch-score` | `BLOCKED-RC-F0` | pure frequently-watched scoring |
-| `PAIR-C` | `feature/pairing-crypto` | `BLOCKED-RC-F0` | pairing crypto primitives |
-| `PAIR-S` | `feature/pairing-session` | `BLOCKED-RC-F0` | TTL/single-use/replay session state |
-| `PAIR-R` | `feature/pairing-relay-contract` | `BLOCKED-RC-F0` | ciphertext-only relay contract/client |
+| `EPG-N` | `feature/epg-normalizer` | `WAITING-FOR-PLAN` | common EPG normalization/time rules |
+| `EPG-X` | `feature/epg-xtream-adapter` | `WAITING-FOR-PLAN` | Xtream EPG decoding/source boundary |
+| `EPG-XML` | `feature/epg-xmltv-parser` | `WAITING-FOR-PLAN` | XMLTV parser primitives |
+| `EPG-MAP` | `feature/epg-channel-mapper` | `WAITING-FOR-PLAN` | stable EPG↔channel reconciliation |
+| `EPG-Q` | `feature/epg-query-engine` | `WAITING-FOR-PLAN` | current/next/detail query logic |
+| `FAV-D` | `feature/favorites-domain` | `WAITING-FOR-PLAN` | Favorites domain/service + repository interface use |
+| `SRCH-C` | `feature/search-core` | `WAITING-FOR-PLAN` | Turkish-safe local Search core |
+| `M3U-V` | `feature/m3u-entry-validation` | `WAITING-FOR-PLAN` | modern M3U entry validation primitives |
+| `WATCH-R` | `feature/watch-state-domain` | `WAITING-FOR-PLAN` | last-watched/watch-event domain |
+| `WATCH-S` | `feature/watch-score` | `WAITING-FOR-PLAN` | pure frequently-watched scoring |
+| `PAIR-C` | `feature/pairing-crypto` | `WAITING-FOR-PLAN` | pairing crypto primitives |
+| `PAIR-S` | `feature/pairing-session` | `WAITING-FOR-PLAN` | TTL/single-use/replay session state |
+| `PAIR-R` | `feature/pairing-relay-contract` | `WAITING-FOR-PLAN` | ciphertext-only relay contract/client |
 | `PAIR-WEB` | `feature/pairing-phone-ui` | `BLOCKED-CONTRACT` | phone pairing UI using frozen pairing interfaces |
 
 Wave 1 workers must prefer new focused modules and memory/test doubles. They do not own IndexedDB schema migration, `main.js`, or shared Live TV composition.
@@ -197,15 +202,14 @@ Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=CONTROLLER.
 
 ## Current action
 
-Production implementation is **not started** by this documentation branch.
+RC-F0 is integrated and the common Wave 1 base is frozen at `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` with post-merge verify `34487321835` SUCCESS.
 
-Next repository gate after documentation approval/merge:
+Next repository gate:
 
-1. post-merge `main` must be exact GREEN;
-2. write/approve RC-F0 bounded implementation plan;
-3. implement and merge RC-F0;
-4. verify post-F0 `main` GREEN;
-5. controller records that exact SHA as Wave 1 base;
-6. open as many Wave 1 roles as review/CI capacity safely supports, recommended 8–12 concurrently.
+1. write and approve bounded implementation plans for the independent Wave 1 roles;
+2. mark only plan-backed roles `OPEN`;
+3. create those production branches from exact base `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`;
+4. activate up to 8–12 non-overlapping workers concurrently while controller/CI capacity remains healthy;
+5. keep `PAIR-WEB` blocked until the required pairing payload/session interfaces are frozen.
 
 Physical-TV evidence remains governed by the existing RC readiness/controller boards and is not changed by this parallelization design.
