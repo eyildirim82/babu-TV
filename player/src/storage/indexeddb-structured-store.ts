@@ -1,7 +1,7 @@
 import type { StructuredStore, StructuredStoreName } from './contracts.js';
 
 const DATABASE_NAME = 'babustv';
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 
 export class StorageUnavailableError extends Error {
   constructor() {
@@ -81,6 +81,11 @@ export class IndexedDbStructuredStore implements StructuredStore {
         }
         if (!database.objectStoreNames.contains('app_state')) {
           database.createObjectStore('app_state', { keyPath: 'key' });
+        }
+        if (!database.objectStoreNames.contains('epg_programs')) {
+          const programs = database.createObjectStore('epg_programs', { keyPath: 'key' });
+          programs.createIndex('providerId', 'providerId', { unique: false });
+          programs.createIndex('providerChannelKey', 'providerChannelKey', { unique: false });
         }
       };
       request.onsuccess = () => resolve(request.result);
