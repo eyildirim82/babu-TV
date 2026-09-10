@@ -24,6 +24,7 @@ export interface ChannelStreamResolver {
 
 export interface SessionSwitchRequest {
   intentId: number;
+  providerId?: ProviderId;
   targetChannelId: ChannelId;
   previousChannelId: ChannelId | null;
   initialRequest: StreamRequest;
@@ -31,6 +32,8 @@ export interface SessionSwitchRequest {
   resolvePrevious: (() => Promise<StreamRequest>) | null;
   isCurrent(): boolean;
   onRecovering(): void;
+  onHandoffStarted?(): void;
+  onRollbackRestored?(engine: 'shaka' | 'avplay'): void;
 }
 
 export type SessionSwitchResult =
