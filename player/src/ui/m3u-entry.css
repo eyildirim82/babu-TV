@@ -1,0 +1,93 @@
+.m3u-entry-page {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--babu-space-2xl);
+  background: var(--babu-bg);
+  color: var(--babu-text-primary);
+  font-family: var(--babu-font-family);
+}
+
+.m3u-entry-panel {
+  width: min(760px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--babu-space-lg);
+  padding: var(--babu-space-2xl);
+  border-radius: var(--babu-radius-lg);
+  background: var(--babu-surface-raised);
+}
+
+.m3u-entry-title {
+  margin: 0 0 var(--babu-space-sm);
+  font-size: var(--babu-font-size-xl);
+  line-height: var(--babu-line-height-tight);
+  font-weight: var(--babu-font-weight-semibold);
+}
+
+.m3u-entry-panel label {
+  color: var(--babu-text-secondary);
+  font-size: var(--babu-font-size-sm);
+  font-weight: var(--babu-font-weight-medium);
+}
+
+.m3u-entry-input,
+.m3u-entry-button {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 58px;
+  border: 0;
+  border-radius: var(--babu-radius-md);
+  padding: var(--babu-space-md) var(--babu-space-lg);
+  background: var(--babu-surface);
+  color: var(--babu-text-primary);
+  font: inherit;
+  font-size: var(--babu-font-size-base);
+  transition: background var(--babu-motion-fast), outline-color var(--babu-motion-fast);
+}
+
+.m3u-entry-input:focus,
+.m3u-entry-button:focus {
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: var(--babu-focus-offset);
+  background: var(--babu-surface-focus);
+  box-shadow: var(--babu-focus-shadow);
+}
+
+.m3u-entry-button {
+  cursor: pointer;
+  font-weight: var(--babu-font-weight-semibold);
+}
+
+#m3u-connect {
+  background: var(--babu-accent);
+}
+
+#m3u-connect:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.m3u-entry-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--babu-space-lg);
+  margin-top: var(--babu-space-md);
+}
+
+.m3u-entry-status {
+  min-height: calc(var(--babu-font-size-base) * var(--babu-line-height-base));
+  color: var(--babu-text-secondary);
+  font-size: var(--babu-font-size-base);
+  line-height: var(--babu-line-height-base);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m3u-entry-input,
+  .m3u-entry-button {
+    transition: none;
+  }
+}
