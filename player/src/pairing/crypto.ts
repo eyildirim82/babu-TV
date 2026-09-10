@@ -40,7 +40,7 @@ function toBase64Url(bytes: Uint8Array): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
-function fromBase64Url(value: string): Uint8Array {
+function fromBase64Url(value: string): Uint8Array<ArrayBuffer> {
   const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
   const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
   const binary = atob(padded);
@@ -49,6 +49,12 @@ function fromBase64Url(value: string): Uint8Array {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
+}
+
+function copyBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+  const copy = new Uint8Array(bytes.length);
+  copy.set(bytes);
+  return copy;
 }
 
 async function generateEcdhKeyPair(crypto: Crypto): Promise<CryptoKeyPair> {
@@ -103,7 +109,7 @@ export async function encryptForPairingTv(
   const encrypted = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv, additionalData: PAIRING_AAD },
     aesKey,
-    plaintext,
+    copyBytes(plaintext),
   );
   const senderPublicKey = await crypto.subtle.exportKey('jwk', senderKeyPair.publicKey);
 
