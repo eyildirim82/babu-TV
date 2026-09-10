@@ -77,3 +77,52 @@ export function decodeXmlText(value: string): string {
     },
   );
 }
+
+function parseQuotedAttributes(value: string): Record<string, string> {
+  const attributes: Record<string, string> = {};
+  const pattern = /([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(value)) !== null) {
+    const name = (match[1] ?? '').toLowerCase();
+    const rawValue = match[2] ?? match[3] ?? '';
+    if (name) attributes[name] = decodeXmlText(rawValue);
+  }
+
+  return attributes;
+}
+
+function extractElementText(body: string, tagName: string): string | null {
+  const pattern = new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}\\s*>`, 'i');
+  const match = body.match(pattern);
+  return match ? decodeXmlText(match[1] ?? '') : null;
+}
+
+export function parseXmltvPrograms(xml: string): readonly EpgSourceProgram[] {
+  const programs: EpgSourceProgram[] = [];
+  const programmePattern = /<programme\b([^>]*)>([\s\S]*?)<\/programme\s*>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = programmePattern.exec(xml)) !== null) {
+    const attrs = parseQuotedAttributes(match[1] ?? '');
+    const startMs = attrs.start ? parseXmltvTimestamp(attrs.start) : null;
+    const endMs = attrs.stop ? parseXmltvTimestamp(attrs.stop) : null;
+    const channel = attrs.channel?.trim() ?? '';
+    if (startMs === null || endMs === null || startMs >= endMs || !channel) continue;
+
+    const body = match[2] ?? '';
+    const title = extractElementText(body, 'title')?.trim() ?? '';
+    if (!title) continue;
+    const description = extractElementText(body, 'desc')?.trim() || null;
+
+    programs.push({
+      sourceChannel: { providerChannelId: null, tvgId: channel, name: null },
+      startMs,
+      endMs,
+      title,
+      description,
+    });
+  }
+
+  return programs;
+}
