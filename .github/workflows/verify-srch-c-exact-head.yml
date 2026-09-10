@@ -1,0 +1,57 @@
+name: verify-srch-c-exact-head
+
+on:
+  push:
+    branches:
+      - verification/srch-c-8813df4
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact SRCH-C production head
+        uses: actions/checkout@v4
+        with:
+          ref: 8813df4304622210e294e0b78bd516fc077c4ca6
+          fetch-depth: 0
+
+      - name: Confirm exact production head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "8813df4304622210e294e0b78bd516fc077c4ca6"
+          echo "exact_head=$(git rev-parse HEAD)"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Brand check
+        run: npm run brand:check
+
+      - name: Tizen build
+        run: npm run tizen:build
+
+      - name: Clean tracked diff
+        run: git diff --exit-code
+
+      - name: Frozen-base diff check
+        run: git diff --check aac531b15bad85f6e7ae42c6ff1a6b71eed289d1...HEAD
+
+      - name: Exact scope audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git diff --name-only aac531b15bad85f6e7ae42c6ff1a6b71eed289d1...HEAD | sort)"
+          expected="$(printf '%s\n' 'player/src/search/search-core.ts' 'player/test-ts/search-core.test.ts' | sort)"
+          printf 'changed files:\n%s\n' "$actual"
+          test "$actual" = "$expected"
