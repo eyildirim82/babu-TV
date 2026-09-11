@@ -1,9 +1,9 @@
 name: PROV-DEL-I exact-head canonical
 
 on:
-  push:
+  pull_request:
     branches:
-      - verify/prov-del-i-517c651
+      - main
   workflow_dispatch:
 
 permissions:
