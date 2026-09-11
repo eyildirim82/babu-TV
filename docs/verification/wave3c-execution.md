@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-11  
 **Repository:** `eyildirim82/babu-TV`  
-**Authority:** This overlay supersedes historical Wave 1 / Wave 3B statuses and the pre-approval status headers inside the Wave 3C design specs for the lanes listed here.
+**Authority:** This overlay supersedes historical Wave 1 / Wave 3B statuses and pre-approval status headers inside the Wave 3C design specs for the lanes listed here.
 
 ## 1. Current production baseline
 
@@ -28,46 +28,69 @@ No physical Samsung/Tizen runtime PASS is inferred from repository CI.
 
 ## 3. Human/Controller approval record
 
-On 2026-09-11 the user explicitly approved both Wave 3C architectural designs after review.
-
-Approved specs:
+On 2026-09-11 the user explicitly approved both original Wave 3C architectural designs and their implementation plans:
 
 - `docs/superpowers/specs/2026-09-11-wave3c-m5-app-composition-design.md`
-- `docs/superpowers/specs/2026-09-11-wave3c-pair-web-phone-ui-design.md`
-
-Approved implementation plans written after that approval:
-
 - `docs/superpowers/plans/2026-09-11-wave3c-m5-app-composition-final.md`
+- `docs/superpowers/specs/2026-09-11-wave3c-pair-web-phone-ui-design.md`
 - `docs/superpowers/plans/2026-09-11-wave3c-pair-web-phone-ui-final.md`
 
-Both plans freeze exact base `860d9efa8efac7c9872bf31f7f592ae12a414889`. If `main` advances before a worker actually starts, Controller must explicitly retarget/reapprove that worker rather than silently changing the frozen base.
+During M5 implementation audit, a cross-provider physical playback/session ownership ambiguity was discovered. Production implementation stopped before silently changing playback semantics. The user chose and approved decision **A**:
+
+> Provider selection/navigation does not stop or replace current playback. Cross-provider ownership handoff happens only on explicit playback for the newly browsed provider.
+
+The approved written amendment and implementation plan are:
+
+- `docs/superpowers/specs/2026-09-11-wave3c-m5-cross-provider-playback-handoff-design.md`
+- `docs/superpowers/plans/2026-09-11-wave3c-m5-cross-provider-playback-handoff.md`
+
+The amendment also explicitly authorizes three files omitted from the original M5 owned-file list:
+
+- `player/src/app/browser-app-dependencies.ts`
+- `player/src/live-tv/create-live-tv-runtime.ts`
+- `player/test/m3-live-tv-wiring.test.js`
+
+The amended final M5 scope is exactly fifteen files. Frozen production base remains `860d9efa8efac7c9872bf31f7f592ae12a414889`.
 
 ## 4. Open implementation lanes
 
 ### 4.1 M5-COMP
 
 **Branch:** `integration/m5-app-composition`  
-**Spec:** `docs/superpowers/specs/2026-09-11-wave3c-m5-app-composition-design.md`  
-**Plan:** `docs/superpowers/plans/2026-09-11-wave3c-m5-app-composition-final.md`  
+**Draft PR:** #78  
+**Original spec:** `docs/superpowers/specs/2026-09-11-wave3c-m5-app-composition-design.md`  
+**Original plan:** `docs/superpowers/plans/2026-09-11-wave3c-m5-app-composition-final.md`  
+**Approved amendment spec:** `docs/superpowers/specs/2026-09-11-wave3c-m5-cross-provider-playback-handoff-design.md`  
+**Approved amendment plan:** `docs/superpowers/plans/2026-09-11-wave3c-m5-cross-provider-playback-handoff.md`  
 **Frozen base:** `860d9efa8efac7c9872bf31f7f592ae12a414889`  
-**Status:** `DESIGN-APPROVED / PLAN-WRITTEN / IMPLEMENTATION-READY`
+**Current known implementation head before amendment execution:** `886941cb6c833119da604708a4a19d5b9742b70d`  
+**Last standard verify on that head:** `34599256214` — SUCCESS  
+**Status:** `AMENDMENT DESIGN-APPROVED / PLAN-WRITTEN / IMPLEMENTATION-RESUME-READY`
 
-Owned composition work is limited to the approved app/Home/M4 entry/runtime wiring scope. It must preserve provider and playback semantics and must not absorb either provider-gap lane below.
+The approved ownership model is one reusable browser Live TV runtime/session/coordinator for the application lifetime. Provider context re-entry changes only catalog/presentation state. Provider selection and browsing emit zero stop/play. Explicit cross-provider play reuses the existing shared `ChannelIntentCoordinator -> WatchObservingPlayerSession -> PlayerSessionCoordinator` handoff path.
 
-Final M5 Provider Management / V1 RC acceptance remains blocked on:
+Final M5 canonical evidence has not yet been claimed after the amendment. PR #78 remains Draft.
 
-- provider re-entry/edit transaction support;
-- provider-scoped Favorites/watch cleanup integration during provider deletion.
+Final M5 Provider Management / V1 RC acceptance remains independently blocked on:
+
+- provider re-entry/edit transaction support (`PROV-REENTRY`);
+- provider-scoped Favorites/watch cleanup integration during provider deletion (`PROV-DEL-I`).
 
 ### 4.2 PAIR-WEB
 
 **Branch:** `feature/pairing-phone-ui`  
+**Draft PR:** #79  
 **Spec:** `docs/superpowers/specs/2026-09-11-wave3c-pair-web-phone-ui-design.md`  
 **Plan:** `docs/superpowers/plans/2026-09-11-wave3c-pair-web-phone-ui-final.md`  
 **Frozen base:** `860d9efa8efac7c9872bf31f7f592ae12a414889`  
-**Status:** `DESIGN-APPROVED / PLAN-WRITTEN / IMPLEMENTATION-READY`
+**Exact production head verified:** `159edf58a8b0c8a3e87baacd544b9b09623e5142`  
+**Canonical run:** `34599276236` — SUCCESS  
+**Final branch-head standard verify:** `34599406885` — SUCCESS  
+**Status:** `WORKER-COMPLETE / CONTROLLER-AUDIT-READY / DRAFT`
 
-PAIR-WEB remains a browser-mountable phone UI contract only. It does not deploy a phone host or relay and does not implement TV QR/session/decrypt/onboarding integration.
+Final PR diff is exactly the approved six PAIR-WEB files. Verification-only workflow has no net production diff. Phone deployment and physical Samsung pairing runtime remain `NOT VERIFIED`.
+
+PAIR-I stays blocked until PAIR-WEB is actually merged/frozen by Controller.
 
 ## 5. Blocked/deferred lanes
 
@@ -105,19 +128,20 @@ This lane must integrate scoped cleanup without touching another provider and wi
 
 ## 6. Concurrency decision
 
-M5-COMP and PAIR-WEB may execute in parallel from the same frozen exact base because their approved production scopes are disjoint and neither needs the other's unmerged implementation semantics.
+PAIR-WEB worker implementation is complete and waiting for Controller audit. M5-COMP may resume only under the approved handoff amendment; no additional playback/session lane is authorized unless the bounded reusable-runtime design proves infeasible.
 
 ```text
 main@860d9efa... GREEN
-  ├─ M5-COMP implementation -> Draft PR -> Controller audit
-  │      └─ full M5 Provider Management acceptance still waits on PROV-REENTRY + PROV-DEL-I
-  └─ PAIR-WEB implementation -> Draft PR -> Controller audit
-         └─ after merge/freeze, PAIR-I design/plan may open
+  ├─ M5-COMP #78 Draft
+  │    └─ approved handoff amendment -> RED -> minimal fix -> GREEN -> canonical exact-head audit
+  │         └─ full M5 acceptance still waits on PROV-REENTRY + PROV-DEL-I
+  └─ PAIR-WEB #79 Draft
+       └─ worker-complete -> Controller audit -> merge/freeze required before PAIR-I opens
 
 PROV-REENTRY / PROV-DEL-I: design required before production branches open
 ```
 
-No Wave 3C production implementation has been started by this docs branch.
+The docs branch itself contains no production implementation.
 
 ## 7. Worker evidence contract
 
@@ -133,9 +157,11 @@ git diff --exit-code
 git diff --check 860d9efa8efac7c9872bf31f7f592ae12a414889...HEAD
 ```
 
-The Draft PR body records ROLE, branch, frozen base, final production head, exact changed files, RED evidence, focused GREEN evidence, canonical exact-head evidence, invariant/scope review, and physical runtime as `NOT VERIFIED` unless actually executed.
+M5 canonical evidence must additionally assert its exact amended fifteen-file scope. PAIR-WEB canonical evidence already asserted its exact six-file scope.
 
-Verification-only workflow files must not remain in the production diff.
+Draft PR bodies record ROLE, branch, frozen base, final production head, exact changed files, RED evidence, focused GREEN evidence, canonical exact-head evidence, invariant/scope review, and physical runtime as `NOT VERIFIED` unless actually executed.
+
+Verification-only workflow files must not remain in production diffs.
 
 ## 8. Controller merge policy
 
@@ -152,4 +178,6 @@ For each accepted production PR:
 
 ## 9. Immediate next action
 
-The design and planning gates for **M5-COMP** and **PAIR-WEB** are closed. They are ready to start as two parallel production workers from exact base `860d9efa8efac7c9872bf31f7f592ae12a414889` when the user authorizes implementation execution.
+Resume **M5-COMP #78** from its existing Draft branch using the approved cross-provider handoff plan. Execute fresh RED -> minimal implementation -> focused GREEN -> full gates -> exact fifteen-file scope audit -> canonical exact-production-head evidence. Do not Ready/merge from the worker lane.
+
+PAIR-WEB #79 can independently proceed to Controller audit; do not merge it from the worker lane.
