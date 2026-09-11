@@ -183,3 +183,55 @@ test('scoped stylesheet uses BabuşTV tokens, strong remote focus, and reduced-m
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.doesNotMatch(css, /#ff8c00|orange/i);
 });
+
+test('PAIR-I-WIRE absent pairing callback preserves the existing two-choice provider surface', async () => {
+  const firstRun = await loadFirstRun();
+  assert.ok(firstRun);
+  const document = new FakeDocument();
+  const view = new firstRun.FirstRunView(asDocument(document), {
+    onXtreamSelected() {},
+    onM3uSelected() {},
+    onBack() {},
+  });
+
+  view.show({ kind: 'empty' });
+  assert.equal(document.getElementById('first-run-pairing'), null);
+  assert.equal(document.activeElement?.id, 'first-run-xtream');
+  view.handleAction('right');
+  assert.equal(document.activeElement?.id, 'first-run-m3u');
+  view.handleAction('right');
+  assert.equal(document.activeElement?.id, 'first-run-m3u');
+});
+
+test('PAIR-I-WIRE optional Telefonla Ekle is a stable focus target activated only by Select', async () => {
+  const firstRun = await loadFirstRun();
+  assert.ok(firstRun);
+  const document = new FakeDocument();
+  let xtream = 0;
+  let m3u = 0;
+  let pairing = 0;
+  const callbacks = {
+    onXtreamSelected() { xtream += 1; },
+    onM3uSelected() { m3u += 1; },
+    onPairingSelected() { pairing += 1; },
+    onBack() {},
+  };
+  const view = new firstRun.FirstRunView(asDocument(document), callbacks);
+
+  view.show({ kind: 'empty' });
+  assert.equal(document.getElementById('first-run-pairing')?.textContent, 'Telefonla EkleTelefonunuzdan güvenli QR eşleştirmesi ile sağlayıcı ekleyin.');
+  assert.deepEqual({ xtream, m3u, pairing }, { xtream: 0, m3u: 0, pairing: 0 });
+
+  view.handleAction('right');
+  assert.equal(document.activeElement?.id, 'first-run-m3u');
+  view.handleAction('right');
+  assert.equal(document.activeElement?.id, 'first-run-pairing');
+  assert.deepEqual({ xtream, m3u, pairing }, { xtream: 0, m3u: 0, pairing: 0 });
+
+  view.handleAction('select');
+  assert.deepEqual({ xtream, m3u, pairing }, { xtream: 0, m3u: 0, pairing: 1 });
+  view.handleAction('down');
+  assert.equal(document.activeElement?.id, 'first-run-back');
+  view.handleAction('up');
+  assert.equal(document.activeElement?.id, 'first-run-pairing');
+});
