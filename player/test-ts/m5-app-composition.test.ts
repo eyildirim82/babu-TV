@@ -170,7 +170,7 @@ test('M5 Home intents keep navigation separate from explicit playback', async ()
 test('M5 same-provider Live TV re-entry reuses one runtime and one session owner', async () => {
   const events: string[] = [];
   const deps = makeDeps(events);
-  let rootBack: (() => void) | null = null;
+  let rootBack: () => void = () => assert.fail('Live TV root Back callback was not bound.');
   let starts = 0;
 
   deps.liveTv.start = async (onRootBack) => {
@@ -191,9 +191,8 @@ test('M5 same-provider Live TV re-entry reuses one runtime and one session owner
   await app.boot();
   await app.handleHomeIntent({ type: 'OPEN_LIVE_TV', providerId: 'p1', scope: 'all' });
   assert.equal(starts, 1);
-  assert.equal(rootBack === null, false);
 
-  (rootBack as () => void)();
+  rootBack();
   assert.deepEqual(app.route(), { kind: 'home' });
 
   await app.handleHomeIntent({ type: 'OPEN_LIVE_TV', providerId: 'p1', scope: 'favorites' });
