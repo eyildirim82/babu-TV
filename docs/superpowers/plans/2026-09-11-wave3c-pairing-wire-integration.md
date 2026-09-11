@@ -18,12 +18,22 @@ Do not branch until:
 - PROV-REENTRY-I and any other app-composition-changing integration chosen ahead of this lane has merged or been explicitly ordered by controller;
 - resulting exact `main` push verify is SUCCESS.
 
-At execution time replace `<PAIR_WIRE_BASE>` below with that controller-recorded exact GREEN main SHA. Do not use the historical closure base automatically.
+At execution start, after the controller identifies the exact GREEN `main`, run:
+
+```bash
+git fetch origin main
+PAIR_WIRE_BASE="$(git rev-parse origin/main)"
+printf '%s\n' "$PAIR_WIRE_BASE"
+git switch -c integration/pairing-onboarding "$PAIR_WIRE_BASE"
+test "$(git rev-parse HEAD)" = "$PAIR_WIRE_BASE"
+```
+
+Record the printed immutable SHA in the Draft PR body before implementation. All later diff checks in this plan use `$PAIR_WIRE_BASE`.
 
 ## Global Constraints
 
 - Branch: `integration/pairing-onboarding`.
-- Consume PAIR-I-CORE; do not rewrite PAIR-C/S/R algorithms.
+- Consume the controller-frozen PAIR-I-CORE head; do not rewrite PAIR-C/S/R algorithms.
 - No real provider credentials/endpoints, relay origin, or phone-host origin in source/tests.
 - Pairing is optional convenience; TV keyboard Xtream/M3U entry remains available when pairing config is absent.
 - QR/deep-link contains only public bootstrap data: `version`, `sessionId`, `expiresAtMs`, `tvPublicKey`, `relayBaseUrl`.
@@ -81,7 +91,7 @@ Encode bootstrap into the URL fragment, not query/user-info, so ordinary HTTP re
 <normalized https phoneBaseUrl>#pairing=<base64url(UTF-8 JSON bootstrap)>
 ```
 
-The JSON object must contain exactly the five bootstrap keys and no provider data/private key.
+The JSON object contains exactly the five bootstrap keys and no provider data/private key.
 
 - [ ] **Step 1: Write RED transport tests**
 
@@ -147,13 +157,17 @@ export interface PairingTvViewConfig {
   phoneBaseUrl: string;
   pollIntervalMs: number;
 }
+
+export interface PairingQrPort {
+  toDataUrl(value: string): Promise<string>;
+}
 ```
 
 `PairingTvView` owns a single timer while visible and cancels it on hide/back/completion.
 
 - [ ] **Step 1: Write RED TV view tests**
 
-Using fake timers/scheduler seam, prove:
+Using an injected scheduler seam, prove:
 
 ```text
 show -> core.start once
@@ -167,25 +181,27 @@ hide -> removes DOM + cancels timer
 repeated show cannot create overlapping poll loops
 ```
 
-Render QR through an injected test port:
-
-```ts
-interface PairingQrPort {
-  toDataUrl(value: string): Promise<string>;
-}
-```
-
-Production adapter may bind `QRCode.toDataURL(value, { errorCorrectionLevel: 'M', margin: 2, width: 360 })`.
-
 - [ ] **Step 2: Run view test and verify RED**
 
 ```bash
 node --import tsx --test player/test-ts/pairing-tv-view.test.ts
 ```
 
-- [ ] **Step 3: Implement view/CSS**
+- [ ] **Step 3: Implement view/CSS and production QR adapter binding contract**
 
 Use safe DOM creation, `textContent`, `<img src=data-url>` for QR, visible TV-distance focus, and reduced-motion handling. Never put bootstrap or credentials in `data-*` attributes.
+
+The browser composition in Task 5 binds the QR port exactly as:
+
+```ts
+{
+  toDataUrl: (value) => QRCode.toDataURL(value, {
+    errorCorrectionLevel: 'M',
+    margin: 2,
+    width: 360,
+  }),
+}
+```
 
 - [ ] **Step 4: Run view tests GREEN**
 
@@ -207,7 +223,7 @@ git commit -m "feat(pairing): add TV QR pairing surface"
 
 **Files:**
 - Modify: `player/src/first-run/first-run-view.ts`
-- Modify: `player/test-ts/first-run-view.test.ts` if present; otherwise modify the existing first-run focused test file.
+- Modify: `player/test-ts/first-run-view.test.ts`
 
 **Interfaces:**
 
@@ -236,16 +252,22 @@ Prove absent callback leaves existing two-choice surface unchanged and supplied 
 
 - [ ] **Step 2: Run focused test and verify RED**
 
-Run the repository's existing first-run test file with `node --import tsx --test ...`.
+```bash
+node --import tsx --test player/test-ts/first-run-view.test.ts
+```
 
 - [ ] **Step 3: Implement optional third action and run GREEN**
+
+```bash
+node --import tsx --test player/test-ts/first-run-view.test.ts
+```
 
 Do not add endpoint/config text to the view.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add player/src/first-run/first-run-view.ts player/test-ts/*first-run*.test.ts
+git add player/src/first-run/first-run-view.ts player/test-ts/first-run-view.test.ts
 git commit -m "feat(first-run): expose optional phone pairing action"
 ```
 
@@ -308,7 +330,7 @@ node --import tsx --test player/test-ts/m5-app-composition.test.ts
 
 - [ ] **Step 3: Implement route/view ownership**
 
-`hideModernViews()` must include pairing view hide when configured. Pairing completion calls `showHome()` only; onboarding has already selected/activated the provider according to existing services.
+`hideModernViews()` includes pairing view hide when configured. Pairing completion calls `showHome()` only; onboarding has already selected/activated the provider according to existing services.
 
 - [ ] **Step 4: Run composition tests GREEN and commit**
 
@@ -324,7 +346,7 @@ git commit -m "feat(app): add TV pairing route"
 
 **Files:**
 - Modify: `player/src/app/browser-app-dependencies.ts`
-- Create or modify focused browser dependency test.
+- Create: `player/test-ts/pairing-browser-app-dependencies.test.ts`
 
 **Interfaces:**
 
@@ -359,7 +381,7 @@ const pairingCore = createTvPairingCore({
 });
 ```
 
-Bind QR locally with `qrcode`; no external QR service.
+Bind `PairingQrPort` locally with the exact `QRCode.toDataURL` options from Task 2; no external QR service.
 
 - [ ] **Step 1: Write RED browser-wiring tests**
 
@@ -375,9 +397,13 @@ no provider payload in relay create/poll requests
 
 - [ ] **Step 2: Run focused tests RED**
 
+```bash
+node --import tsx --test player/test-ts/pairing-browser-app-dependencies.test.ts
+```
+
 - [ ] **Step 3: Implement conditional construction**
 
-Import `pairing-tv.css` only with the browser app bundle (static import is acceptable even when feature config is absent).
+Import `../ui/pairing-tv.css` with the browser app bundle; static import is acceptable when feature config is absent.
 
 - [ ] **Step 4: Run focused pairing + M5 tests GREEN**
 
@@ -388,13 +414,14 @@ node --import tsx --test \
   player/test-ts/pairing-browser-transport.test.ts \
   player/test-ts/pairing-bootstrap-link.test.ts \
   player/test-ts/pairing-tv-view.test.ts \
+  player/test-ts/pairing-browser-app-dependencies.test.ts \
   player/test-ts/m5-app-composition.test.ts
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add player/src/app/browser-app-dependencies.ts player/test-ts/*.test.ts
+git add player/src/app/browser-app-dependencies.ts player/test-ts/pairing-browser-app-dependencies.test.ts
 git commit -m "feat(app): wire secure TV pairing dependencies"
 ```
 
@@ -404,7 +431,7 @@ git commit -m "feat(app): wire secure TV pairing dependencies"
 
 **Files:**
 - Modify: `player/src/main.js`
-- Modify: `player/test/m3-live-tv-wiring.test.js` or add a focused JS wiring test if clearer.
+- Modify: `player/test/m3-live-tv-wiring.test.js`
 
 **Interfaces:**
 
@@ -414,7 +441,7 @@ Read only an optional public runtime object:
 const pairingConfig = window.__BABUSTV_PAIRING_CONFIG__ ?? null;
 ```
 
-Accepted keys must be copied explicitly into `createBrowserAppDependencies()` input:
+Accepted keys are copied explicitly into `createBrowserAppDependencies()` input:
 
 ```js
 pairing: pairingConfig && typeof pairingConfig === 'object'
@@ -456,12 +483,12 @@ git commit -m "feat(pairing): expose optional runtime pairing config"
 ### Task 7: Canonical verification, controller audit, and Wave 3C closeout
 
 **Files:**
-- Production scope must remain bounded to pairing UI/wiring plus package dependency changes.
+- Production scope remains bounded to pairing UI/wiring plus package dependency changes.
 - After production merge, controller/docs lane updates:
   - `docs/verification/v1-parallel-execution.md`
   - `docs/verification/parallel-development-control.md`
 
-- [ ] **Step 1: Run full gates against `<PAIR_WIRE_BASE>`**
+- [ ] **Step 1: Run full gates against the recorded `$PAIR_WIRE_BASE`**
 
 ```bash
 npm test
@@ -470,7 +497,7 @@ npm run brand:check
 npm run build
 npm run tizen:build
 git diff --exit-code
-git diff --check <PAIR_WIRE_BASE>...HEAD
+git diff --check "$PAIR_WIRE_BASE"...HEAD
 ```
 
 - [ ] **Step 2: Run source/privacy audit**
@@ -488,7 +515,7 @@ implicit playback from pairing navigation/completion
 
 - [ ] **Step 3: Capture exact-head canonical evidence**
 
-Verification-only workflow must explicitly checkout/assert production head, run all gates and exact scope assertion, then be absent from final production diff.
+Verification-only workflow explicitly checks out/asserts production head, runs all gates and exact scope assertion, then is absent from final production diff.
 
 - [ ] **Step 4: Open Draft PR**
 
@@ -498,7 +525,7 @@ PR title:
 PAIR-I-WIRE: integrate secure TV phone pairing
 ```
 
-Document exact base/head, PAIR-I-CORE consumed SHA, public runtime config boundary, QR/deep-link shape, relay transport, onboarding delegation, Back/focus/playback invariants, and physical phone/Samsung pairing `NOT VERIFIED`.
+Document the recorded exact base/head, PAIR-I-CORE consumed SHA, public runtime config boundary, QR/deep-link shape, relay transport, onboarding delegation, Back/focus/playback invariants, and physical phone/Samsung pairing `NOT VERIFIED`.
 
 - [ ] **Step 5: Controller merge and exact-main push verify**
 
