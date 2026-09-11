@@ -35,7 +35,7 @@ export interface ProviderReentryResult {
 
 export interface ProviderReentryDependencies {
   providers: Pick<ProviderRepository, 'getProvider'>;
-  credentials: Pick<CredentialStore, 'load' | 'save' | 'remove'>;
+  credentials: Pick<CredentialStore, 'isAvailable' | 'load' | 'save' | 'remove'>;
   adapters: ProviderAdapterFactory;
   sync: Pick<ProviderSyncService, 'refresh'>;
 }
@@ -102,7 +102,15 @@ export class ProviderReentryService {
       throw malformedCandidate();
     }
 
-    const candidate = await this.preflight(provider, input);
+    let credentialStoreAvailable: boolean;
+    try {
+      credentialStoreAvailable = this.deps.credentials.isAvailable();
+    } catch {
+      throw updateUnavailable();
+    }
+    if (!credentialStoreAvailable) {
+      throw updateUnavailable();
+    }
 
     let previousCredential: ProviderCredential | null;
     try {
@@ -110,6 +118,8 @@ export class ProviderReentryService {
     } catch {
       throw updateUnavailable();
     }
+
+    const candidate = await this.preflight(provider, input);
 
     try {
       await this.deps.credentials.save(provider.id, candidate);
