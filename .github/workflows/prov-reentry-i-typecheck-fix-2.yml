@@ -1,0 +1,125 @@
+name: prov-reentry-i-typecheck-fix-2
+
+on:
+  push:
+    branches:
+      - verification/prov-reentry-i-typecheck-fix-2
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact production revision
+        uses: actions/checkout@v4
+        with:
+          ref: 4e3b393fc643c9bb893776ff638b1023788b5e67
+          fetch-depth: 0
+
+      - name: Assert exact production SHA
+        run: test "$(git rev-parse HEAD)" = "4e3b393fc643c9bb893776ff638b1023788b5e67"
+
+      - name: Apply test-only typecheck fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app = Path('player/test-ts/m5-app-composition.test.ts')
+          text = app.read_text()
+          replacements = {
+              'requireBound(firstRunCallbacks,': 'requireBound<FirstRunCallbacks>(firstRunCallbacks,',
+              'requireBound(providerCallbacks,': 'requireBound<AppProviderManagementCallbacks>(providerCallbacks,',
+              'requireBound(xtreamCallbacks,': 'requireBound<XtreamEntryCallbacks>(xtreamCallbacks,',
+              'requireBound(m3uCallbacks,': 'requireBound<M3uEntryCallbacks>(m3uCallbacks,',
+          }
+          for old, new in replacements.items():
+              assert old in text, old
+              text = text.replace(old, new)
+          app.write_text(text)
+
+          browser = Path('player/test-ts/m5-browser-app-dependencies.test.ts')
+          text = browser.read_text()
+          assert text.count('/s,') == 2
+          browser.write_text(text.replace('/s,', '/,'))
+
+          surface = Path('player/test-ts/m5-provider-management-surface.test.ts')
+          text = surface.read_text()
+          marker = """  assert.equal(presenter.state.focusedId, 'provider:p1:edit');\n  assert.deepEqual(events, []);\n  await surface.handleAction('down');\n"""
+          replacement = """  assert.equal(presenter.state.focusedId, 'provider:p1:edit');\n  assert.equal(events.length, 0);\n  await surface.handleAction('down');\n"""
+          assert text.count(marker) == 1
+          surface.write_text(text.replace(marker, replacement))
+          PY
+
+      - name: Assert fix scope
+        shell: bash
+        run: |
+          actual="$(git diff --name-only | sort)"
+          expected="$(printf '%s\n' \
+            player/test-ts/m5-app-composition.test.ts \
+            player/test-ts/m5-browser-app-dependencies.test.ts \
+            player/test-ts/m5-provider-management-surface.test.ts | sort)"
+          printf '%s\n' "$actual"
+          test "$actual" = "$expected"
+          git diff --check
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck candidate fix
+        id: typecheck
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee typecheck-v2.log
+
+      - name: Upload typecheck diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-v2-diagnostics
+          path: typecheck-v2.log
+          if-no-files-found: error
+
+      - name: Run affected tests
+        if: steps.typecheck.outcome == 'success'
+        run: >-
+          node --import tsx --test
+          player/test-ts/m5-app-composition.test.ts
+          player/test-ts/m5-browser-app-dependencies.test.ts
+          player/test-ts/m5-provider-management-surface.test.ts
+
+      - name: Assert production branch has not moved
+        if: steps.typecheck.outcome == 'success'
+        shell: bash
+        run: |
+          remote_head="$(git ls-remote origin refs/heads/integration/provider-reentry | cut -f1)"
+          echo "$remote_head"
+          test "$remote_head" = "4e3b393fc643c9bb893776ff638b1023788b5e67"
+
+      - name: Commit verified test-only fix
+        if: steps.typecheck.outcome == 'success'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            player/test-ts/m5-app-composition.test.ts \
+            player/test-ts/m5-browser-app-dependencies.test.ts \
+            player/test-ts/m5-provider-management-surface.test.ts
+          git commit -m "test(app): fix provider re-entry integration typecheck"
+          git push origin HEAD:refs/heads/integration/provider-reentry
+
+      - name: Preserve typecheck failure
+        if: steps.typecheck.outcome != 'success'
+        run: exit 1
