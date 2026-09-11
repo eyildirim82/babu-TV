@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { PairingPhoneController, type PairingPhoneBootstrapV1 } from '../src/pairing/phone-controller.js';
-import type { PairingCiphertextV1 } from '../src/pairing/crypto.js';
+import { PairingCryptoError, type PairingCiphertextV1 } from '../src/pairing/crypto.js';
+import { PairingRelayError } from '../src/pairing/relay-client.js';
 import { PairingPhoneView } from '../src/pairing/phone-view.js';
 
 const validBootstrap: PairingPhoneBootstrapV1 = {
@@ -42,6 +44,51 @@ test('PAIR-WEB rejects malformed bootstrap before crypto or relay', async () => 
   assert.equal(relayCalls, 0);
 });
 
+test('PAIR-WEB treats expiresAtMs equality as expired and makes no external call', async () => {
+  let cryptoCalls = 0;
+  let relayCalls = 0;
+  const controller = new PairingPhoneController({ ...validBootstrap, expiresAtMs: 100 }, {
+    crypto: { async encryptForTv() { cryptoCalls += 1; return envelope; } },
+    relay: { async putCiphertext() { relayCalls += 1; } },
+    nowMs: () => 100,
+  });
+  controller.chooseProvider('m3u');
+  controller.updateM3u({ playlistUrl: 'https://playlist.example.invalid/a.m3u8' });
+  await controller.submit();
+  assert.deepEqual(controller.state(), { kind: 'expired' });
+  assert.equal(cryptoCalls, 0);
+  assert.equal(relayCalls, 0);
+});
+
+test('PAIR-WEB keeps Xtream required validation and M3U protocol validation local', async () => {
+  let cryptoCalls = 0;
+  let relayCalls = 0;
+  const deps = {
+    crypto: { async encryptForTv() { cryptoCalls += 1; return envelope; } },
+    relay: { async putCiphertext() { relayCalls += 1; } },
+    nowMs: () => 100,
+  };
+
+  const xtream = new PairingPhoneController(validBootstrap, deps);
+  xtream.chooseProvider('xtream');
+  xtream.updateXtream({ serverUrl: ' ', username: ' user ', password: ' secret ' });
+  await xtream.submit();
+  assert.deepEqual(xtream.state(), {
+    kind: 'xtream',
+    input: { serverUrl: ' ', username: ' user ', password: ' secret ' },
+    error: 'REQUIRED',
+  });
+
+  const m3u = new PairingPhoneController(validBootstrap, deps);
+  m3u.chooseProvider('m3u');
+  m3u.updateM3u({ playlistUrl: 'ftp://playlist.example.invalid/a.m3u8' });
+  await m3u.submit();
+  assert.equal(m3u.state().kind, 'm3u');
+  assert.equal(m3u.state().kind === 'm3u' ? m3u.state().error : null, 'UNSUPPORTED_PROTOCOL');
+  assert.equal(cryptoCalls, 0);
+  assert.equal(relayCalls, 0);
+});
+
 test('PAIR-WEB sends only serialized PAIR-C ciphertext to relay and clears secrets after success', async () => {
   const relayRequests: Array<{ sessionId: string; ciphertext: string }> = [];
   let plaintext: Uint8Array | null = null;
@@ -64,6 +111,8 @@ test('PAIR-WEB sends only serialized PAIR-C ciphertext to relay and clears secre
   await controller.submit();
 
   assert.ok(plaintext);
+  const plaintextJson = new TextDecoder().decode(plaintext);
+  assert.match(plaintextJson, /https:\/\/iptv\.example\.invalid/);
   assert.equal(relayRequests.length, 1);
   assert.deepEqual(relayRequests[0], {
     sessionId: 'session-1',
@@ -77,6 +126,42 @@ test('PAIR-WEB sends only serialized PAIR-C ciphertext to relay and clears secre
     input: { serverUrl: '', username: '', password: '' },
     error: null,
   });
+});
+
+test('PAIR-WEB maps crypto and relay failures to fixed sanitized codes and preserves retry input', async () => {
+  const invalidKey = new PairingPhoneController(validBootstrap, {
+    crypto: { async encryptForTv() { throw new PairingCryptoError('INVALID_KEY'); } },
+    relay: { async putCiphertext() { throw new Error('unexpected'); } },
+    nowMs: () => 100,
+  });
+  invalidKey.chooseProvider('xtream');
+  invalidKey.updateXtream({ serverUrl: 'https://iptv.example.invalid', username: 'user', password: 'secret' });
+  await invalidKey.submit();
+  assert.deepEqual(invalidKey.state(), { kind: 'error', providerKind: 'xtream', code: 'INVALID_TV_KEY' });
+
+  let relayAttempts = 0;
+  const network = new PairingPhoneController(validBootstrap, {
+    crypto: { async encryptForTv() { return envelope; } },
+    relay: {
+      async putCiphertext() {
+        relayAttempts += 1;
+        if (relayAttempts === 1) throw new PairingRelayError('NETWORK');
+      },
+    },
+    nowMs: () => 100,
+  });
+  network.chooseProvider('m3u');
+  network.updateM3u({ playlistUrl: 'https://playlist.example.invalid/a.m3u8' });
+  await network.submit();
+  assert.deepEqual(network.state(), { kind: 'error', providerKind: 'm3u', code: 'NETWORK' });
+  network.chooseProvider('m3u');
+  assert.deepEqual(network.state(), {
+    kind: 'm3u',
+    input: { playlistUrl: 'https://playlist.example.invalid/a.m3u8' },
+    error: null,
+  });
+  await network.submit();
+  assert.deepEqual(network.state(), { kind: 'success' });
 });
 
 test('PAIR-WEB suppresses duplicate submit while encryption is pending', async () => {
@@ -183,4 +268,39 @@ test('PAIR-WEB phone view renders accessible provider choice and form states wit
   assert.equal(document.getElementById('pairing-phone-password')?.type, 'password');
   assert.ok(document.getElementById('pairing-phone-submit'));
   assert.ok(document.getElementById('pairing-phone-back'));
+});
+
+test('PAIR-WEB success view removes credential fields and stylesheet is focus/reduced-motion safe', async () => {
+  const controller = new PairingPhoneController(validBootstrap, {
+    crypto: { async encryptForTv() { return envelope; } },
+    relay: { async putCiphertext() {} },
+    nowMs: () => 100,
+  });
+  const document = new FakeDocument();
+  const view = new PairingPhoneView(asDocument(document), controller);
+  view.show();
+  await document.getElementById('pairing-phone-m3u')?.dispatch('click');
+  const playlist = document.getElementById('pairing-phone-playlist-url');
+  assert.ok(playlist);
+  playlist.value = 'https://playlist.example.invalid/a.m3u8';
+  await playlist.dispatch('input');
+  await document.getElementById('pairing-phone-submit')?.dispatch('click');
+  assert.equal(document.getElementById('pairing-phone-playlist-url'), null);
+  assert.equal(document.getElementById('pairing-phone-submit'), null);
+  assert.match(document.getElementById('pairing-phone-status')?.textContent ?? '', /güvenli şekilde gönderildi/);
+
+  const css = await readFile(new URL('../src/ui/pairing-phone.css', import.meta.url), 'utf8');
+  assert.match(css, /var\(--babu-bg\)/);
+  assert.match(css, /var\(--babu-accent-strong\)/);
+  assert.match(css, /focus-visible/);
+  assert.match(css, /prefers-reduced-motion/);
+});
+
+test('PAIR-WEB source never introduces browser persistence or plaintext logging', async () => {
+  const [controllerSource, viewSource] = await Promise.all([
+    readFile(new URL('../src/pairing/phone-controller.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../src/pairing/phone-view.ts', import.meta.url), 'utf8'),
+  ]);
+  const source = `${controllerSource}\n${viewSource}`;
+  assert.doesNotMatch(source, /localStorage|sessionStorage|indexedDB|document\.cookie|console\.(?:log|warn|error)|location\.(?:search|hash)/);
 });
