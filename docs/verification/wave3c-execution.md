@@ -57,7 +57,7 @@ The user also explicitly approved the `PROV-REENTRY` architecture `write-free ca
 - `docs/superpowers/specs/2026-09-11-wave3c-provider-reentry-design.md`
 - `docs/superpowers/plans/2026-09-11-wave3c-provider-reentry.md`
 
-`PROV-REENTRY` production scope is exactly four files and its production branch must start from the same frozen base `860d9efa8efac7c9872bf31f7f592ae12a414889`. Planning documents stay on the docs branch and are read-only inputs to the production worker.
+`PROV-REENTRY` production scope is exactly four files and its production branch starts from the same frozen base `860d9efa8efac7c9872bf31f7f592ae12a414889`. Planning documents stay on the docs branch and are read-only inputs to the production worker.
 
 ## 4. Open implementation lanes
 
@@ -102,12 +102,17 @@ PAIR-I stays blocked until PAIR-WEB is actually merged/frozen by Controller.
 ### 4.3 PROV-REENTRY
 
 **Branch:** `feature/provider-reentry`  
+**Draft PR:** #81  
 **Spec:** `docs/superpowers/specs/2026-09-11-wave3c-provider-reentry-design.md`  
 **Plan:** `docs/superpowers/plans/2026-09-11-wave3c-provider-reentry.md`  
 **Frozen base:** `860d9efa8efac7c9872bf31f7f592ae12a414889`  
-**Status:** `DESIGN-APPROVED / PLAN-WRITTEN / IMPLEMENTATION-READY`
+**Exact production head verified:** `e096c62eb959aad59ef033f8e748682fc1eaba53`  
+**Canonical run:** `34608984593` — SUCCESS  
+**Current branch head after verification-workflow cleanup:** `6c8ab7eef1142a87248cd33c808f5d900a8487f8`  
+**Final branch-head standard verify:** `34609091028` — SUCCESS  
+**Status:** `WORKER-COMPLETE / CONTROLLER-AUDIT-READY / DRAFT`
 
-Approved transaction shape:
+Implemented transaction shape:
 
 ```text
 write-free candidate preflight
@@ -115,14 +120,20 @@ write-free candidate preflight
   -> non-destructive derived-cache refresh
 ```
 
-Delete+add is forbidden. Provider ID/kind, activation, Favorites/watch state, and existing usable cache failure semantics must be preserved. Production scope is exactly:
+Final net PR diff is exactly the approved four files:
 
 - `player/src/providers/provider-reentry-service.ts`
 - `player/src/provider-management/provider-management-presenter.ts`
 - `player/test-ts/provider-reentry-service.test.ts`
 - `player/test-ts/provider-management-presenter.test.ts`
 
-M5 routing/surface integration is explicitly outside this lane. Draft PR only; Controller audit is required before Ready/merge.
+TDD evidence includes service RED `34608074579`, service GREEN `34608277530`, presenter RED `34608395561`, presenter GREEN `34608500027`, and an additional raw edit-error sanitization RED `34608606813` before final production-head standard GREEN `34608788670`.
+
+Canonical `34608984593` pinned checkout to exact production head `e096c62eb959aad59ef033f8e748682fc1eaba53`, asserted the exact four-file scope, and passed `npm test`, `npm run typecheck`, `npm run brand:check`, `npm run build`, `npm run tizen:build`, `git diff --exit-code`, and frozen-base `git diff --check`. The temporary canonical workflow was then removed; it has no net PR diff.
+
+Delete+add is not used. Provider ID/kind, activation, Favorites/watch state, post-commit credential semantics, usable-cache failure semantics, same-provider duplicate-submit bounding, and secret-free result/presentation behavior are covered by the implementation/tests. M5 routing/surface integration is explicitly outside this lane. Physical Samsung/Tizen runtime remains `NOT VERIFIED`.
+
+PR #81 remains Draft. Controller audit is required before Ready/merge.
 
 ## 5. Blocked/deferred lanes
 
@@ -153,17 +164,17 @@ This lane must integrate scoped cleanup without touching another provider and wi
 
 ## 6. Concurrency decision
 
-PAIR-WEB worker implementation is complete and waiting for Controller audit. M5-COMP may resume only under the approved handoff amendment; no additional playback/session lane is authorized unless the bounded reusable-runtime design proves infeasible. `PROV-REENTRY` may now execute independently from exact frozen base under its approved four-file plan. `PROV-DEL-I` remains design-blocked.
+PAIR-WEB and PROV-REENTRY worker implementations are complete and waiting for Controller audit. M5-COMP may resume only under the approved handoff amendment; no additional playback/session lane is authorized unless the bounded reusable-runtime design proves infeasible. `PROV-DEL-I` remains design-blocked.
 
 ```text
 main@860d9efa... GREEN
   ├─ M5-COMP #78 Draft
   │    └─ approved handoff amendment -> RED -> minimal fix -> GREEN -> canonical exact-head audit
-  │         └─ full M5 acceptance still waits on PROV-REENTRY + PROV-DEL-I
+  │         └─ full M5 acceptance still waits on PROV-REENTRY merge/freeze + PROV-DEL-I
   ├─ PAIR-WEB #79 Draft
   │    └─ worker-complete -> Controller audit -> merge/freeze required before PAIR-I opens
-  └─ PROV-REENTRY
-       └─ design-approved/plan-written -> RED -> minimal implementation -> GREEN -> Draft PR -> Controller audit
+  └─ PROV-REENTRY #81 Draft
+       └─ worker-complete -> Controller audit -> merge/freeze
 
 PROV-DEL-I: design required before production branch opens
 ```
@@ -184,7 +195,7 @@ git diff --exit-code
 git diff --check 860d9efa8efac7c9872bf31f7f592ae12a414889...HEAD
 ```
 
-M5 canonical evidence must additionally assert its exact amended fifteen-file scope. PAIR-WEB canonical evidence already asserted its exact six-file scope. PROV-REENTRY canonical evidence must assert its exact four-file production/test scope.
+M5 canonical evidence must additionally assert its exact amended fifteen-file scope. PAIR-WEB canonical evidence asserted its exact six-file scope. PROV-REENTRY canonical evidence asserted its exact four-file production/test scope.
 
 Draft PR bodies record ROLE, branch, frozen base, final production head, exact changed files, RED evidence, focused GREEN evidence, canonical exact-head evidence, invariant/scope review, and physical runtime as `NOT VERIFIED` unless actually executed.
 
@@ -205,6 +216,6 @@ For each accepted production PR:
 
 ## 9. Immediate next action
 
-Execute **PROV-REENTRY** from exact frozen base under the approved spec/plan using RED -> minimal implementation -> focused GREEN -> full gates -> exact four-file scope audit -> Draft PR. Do not integrate M5 routing/surface, Ready, or merge from the worker lane.
+Controller-audit **PROV-REENTRY #81** against exact production head `e096c62eb959aad59ef033f8e748682fc1eaba53`, canonical run `34608984593`, and exact four-file scope. Keep it Draft until Controller acceptance; do not Ready/merge from the worker lane.
 
 M5-COMP #78 may independently continue under its approved playback-handoff amendment. PAIR-WEB #79 may independently proceed to Controller audit.
