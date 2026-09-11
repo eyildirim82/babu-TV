@@ -19,9 +19,9 @@ type HomeFocusKey =
   | 'home-favorites-view-all'
   | 'home-settings'
   | `home-provider:${string}`
-  | `home-last-watched:${string}`
-  | `home-favorite:${string}`
-  | `home-frequent:${string}`;
+  | `home-last-watched:${string}:${string}`
+  | `home-favorite:${string}:${string}`
+  | `home-frequent:${string}:${string}`;
 
 interface HomeFocusPosition {
   readonly row: number;
@@ -185,7 +185,7 @@ export class HomeView {
     if (model.lastWatched !== null) {
       const lastSection = appendSection(this.document, root, 'Son İzlenen');
       const lastRow = this.appendRow(lastSection);
-      const key: HomeFocusKey = `home-last-watched:${model.lastWatched.channelId}`;
+      const key: HomeFocusKey = `home-last-watched:${model.lastWatched.providerId}:${model.lastWatched.channelId}`;
       this.appendChannelAction(lastRow, key, model.lastWatched, model.lastWatched.intent);
       this.addFocusRow([key]);
     }
@@ -201,7 +201,7 @@ export class HomeView {
     const favoritesRow = this.appendRow(favoritesSection);
     const favoriteKeys: HomeFocusKey[] = [];
     for (const card of model.favorites.items) {
-      const key: HomeFocusKey = `home-favorite:${card.channelId}`;
+      const key: HomeFocusKey = `home-favorite:${card.providerId}:${card.channelId}`;
       this.appendChannelAction(favoritesRow, key, card, card.intent);
       favoriteKeys.push(key);
     }
@@ -220,7 +220,7 @@ export class HomeView {
     const frequentRow = this.appendRow(frequentSection);
     const frequentKeys: HomeFocusKey[] = [];
     for (const card of model.frequentlyWatched.items) {
-      const key: HomeFocusKey = `home-frequent:${card.channelId}`;
+      const key: HomeFocusKey = `home-frequent:${card.providerId}:${card.channelId}`;
       this.appendChannelAction(frequentRow, key, card, card.intent);
       frequentKeys.push(key);
     }
@@ -284,7 +284,9 @@ export class HomeView {
   private defaultFocusKey(model: HomeViewModel): HomeFocusKey | null {
     if (model.defaultFocus.kind === 'live-tv') return 'home-live-tv';
     if (model.defaultFocus.kind === 'last-watched') {
-      return `home-last-watched:${model.defaultFocus.channelId}`;
+      const lastWatched = model.lastWatched;
+      if (lastWatched === null || lastWatched.channelId !== model.defaultFocus.channelId) return null;
+      return `home-last-watched:${lastWatched.providerId}:${lastWatched.channelId}`;
     }
 
     const activeProviderId = model.providerSelector.activeProviderId;
