@@ -133,6 +133,7 @@ jobs:
           async function startLegacyPlayerShell() {
           '''
           new_block = init_prefix + modern_tail + legacy_inner + '\n}\n'
+          new_block = '\n'.join(line.rstrip() for line in new_block.splitlines()) + '\n'
           text = text[:start] + new_block + text[end:]
 
           path.write_text(text)
