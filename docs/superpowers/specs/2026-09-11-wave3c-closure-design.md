@@ -1,7 +1,7 @@
 # BabuşTV Wave 3C Closure Design
 
 Date: 2026-09-11  
-Status: APPROVED DESIGN — awaiting written-spec review before implementation planning  
+Status: APPROVED  
 Repository: `eyildirim82/babu-TV`  
 Frozen closure base: `92af4f5b9d445ced236a63f581716a55bf87ebeb`
 
