@@ -52,6 +52,13 @@ The amendment also explicitly authorizes three files omitted from the original M
 
 The amended final M5 scope is exactly fifteen files. Frozen production base remains `860d9efa8efac7c9872bf31f7f592ae12a414889`.
 
+The user also explicitly approved the `PROV-REENTRY` architecture `write-free candidate preflight -> credential commit point -> non-destructive derived-cache refresh`, including its compensation, concurrency, provider-identity, user-state, activation, privacy, and presenter invariants. The approved written artifacts are:
+
+- `docs/superpowers/specs/2026-09-11-wave3c-provider-reentry-design.md`
+- `docs/superpowers/plans/2026-09-11-wave3c-provider-reentry.md`
+
+`PROV-REENTRY` production scope is exactly four files and its production branch must start from the same frozen base `860d9efa8efac7c9872bf31f7f592ae12a414889`. Planning documents stay on the docs branch and are read-only inputs to the production worker.
+
 ## 4. Open implementation lanes
 
 ### 4.1 M5-COMP
@@ -92,6 +99,31 @@ Final PR diff is exactly the approved six PAIR-WEB files. Verification-only work
 
 PAIR-I stays blocked until PAIR-WEB is actually merged/frozen by Controller.
 
+### 4.3 PROV-REENTRY
+
+**Branch:** `feature/provider-reentry`  
+**Spec:** `docs/superpowers/specs/2026-09-11-wave3c-provider-reentry-design.md`  
+**Plan:** `docs/superpowers/plans/2026-09-11-wave3c-provider-reentry.md`  
+**Frozen base:** `860d9efa8efac7c9872bf31f7f592ae12a414889`  
+**Status:** `DESIGN-APPROVED / PLAN-WRITTEN / IMPLEMENTATION-READY`
+
+Approved transaction shape:
+
+```text
+write-free candidate preflight
+  -> credential commit point
+  -> non-destructive derived-cache refresh
+```
+
+Delete+add is forbidden. Provider ID/kind, activation, Favorites/watch state, and existing usable cache failure semantics must be preserved. Production scope is exactly:
+
+- `player/src/providers/provider-reentry-service.ts`
+- `player/src/provider-management/provider-management-presenter.ts`
+- `player/test-ts/provider-reentry-service.test.ts`
+- `player/test-ts/provider-management-presenter.test.ts`
+
+M5 routing/surface integration is explicitly outside this lane. Draft PR only; Controller audit is required before Ready/merge.
+
 ## 5. Blocked/deferred lanes
 
 ### 5.1 PAIR-I
@@ -106,14 +138,7 @@ Opening gates:
 3. TV QR/bootstrap is bounded to the approved PAIR-WEB bootstrap contract;
 4. existing Xtream/M3U onboarding transactions remain final.
 
-### 5.2 PROV-REENTRY
-
-**Suggested branch:** `feature/provider-reentry`  
-**Status:** `DESIGN-REQUIRED`
-
-Must define a safe existing-provider credential re-entry/edit transaction before UI implementation. Delete+add is not an approved substitute because provider-scoped user state must not be silently lost.
-
-### 5.3 PROV-DEL-I
+### 5.2 PROV-DEL-I
 
 **Suggested branch:** `integration/provider-user-state-cleanup`  
 **Status:** `DESIGN-REQUIRED`
@@ -128,17 +153,19 @@ This lane must integrate scoped cleanup without touching another provider and wi
 
 ## 6. Concurrency decision
 
-PAIR-WEB worker implementation is complete and waiting for Controller audit. M5-COMP may resume only under the approved handoff amendment; no additional playback/session lane is authorized unless the bounded reusable-runtime design proves infeasible.
+PAIR-WEB worker implementation is complete and waiting for Controller audit. M5-COMP may resume only under the approved handoff amendment; no additional playback/session lane is authorized unless the bounded reusable-runtime design proves infeasible. `PROV-REENTRY` may now execute independently from exact frozen base under its approved four-file plan. `PROV-DEL-I` remains design-blocked.
 
 ```text
 main@860d9efa... GREEN
   ├─ M5-COMP #78 Draft
   │    └─ approved handoff amendment -> RED -> minimal fix -> GREEN -> canonical exact-head audit
   │         └─ full M5 acceptance still waits on PROV-REENTRY + PROV-DEL-I
-  └─ PAIR-WEB #79 Draft
-       └─ worker-complete -> Controller audit -> merge/freeze required before PAIR-I opens
+  ├─ PAIR-WEB #79 Draft
+  │    └─ worker-complete -> Controller audit -> merge/freeze required before PAIR-I opens
+  └─ PROV-REENTRY
+       └─ design-approved/plan-written -> RED -> minimal implementation -> GREEN -> Draft PR -> Controller audit
 
-PROV-REENTRY / PROV-DEL-I: design required before production branches open
+PROV-DEL-I: design required before production branch opens
 ```
 
 The docs branch itself contains no production implementation.
@@ -157,7 +184,7 @@ git diff --exit-code
 git diff --check 860d9efa8efac7c9872bf31f7f592ae12a414889...HEAD
 ```
 
-M5 canonical evidence must additionally assert its exact amended fifteen-file scope. PAIR-WEB canonical evidence already asserted its exact six-file scope.
+M5 canonical evidence must additionally assert its exact amended fifteen-file scope. PAIR-WEB canonical evidence already asserted its exact six-file scope. PROV-REENTRY canonical evidence must assert its exact four-file production/test scope.
 
 Draft PR bodies record ROLE, branch, frozen base, final production head, exact changed files, RED evidence, focused GREEN evidence, canonical exact-head evidence, invariant/scope review, and physical runtime as `NOT VERIFIED` unless actually executed.
 
@@ -178,6 +205,6 @@ For each accepted production PR:
 
 ## 9. Immediate next action
 
-Resume **M5-COMP #78** from its existing Draft branch using the approved cross-provider handoff plan. Execute fresh RED -> minimal implementation -> focused GREEN -> full gates -> exact fifteen-file scope audit -> canonical exact-production-head evidence. Do not Ready/merge from the worker lane.
+Execute **PROV-REENTRY** from exact frozen base under the approved spec/plan using RED -> minimal implementation -> focused GREEN -> full gates -> exact four-file scope audit -> Draft PR. Do not integrate M5 routing/surface, Ready, or merge from the worker lane.
 
-PAIR-WEB #79 can independently proceed to Controller audit; do not merge it from the worker lane.
+M5-COMP #78 may independently continue under its approved playback-handoff amendment. PAIR-WEB #79 may independently proceed to Controller audit.
