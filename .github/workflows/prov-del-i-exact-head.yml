@@ -1,0 +1,70 @@
+name: PROV-DEL-I exact-head canonical
+
+on:
+  push:
+    branches:
+      - verify/prov-del-i-517c651
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  canonical:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact production head
+        uses: actions/checkout@v4
+        with:
+          ref: 517c6519efb9aa5e2b28aa67e4e5d675b36c4e94
+          fetch-depth: 0
+
+      - name: Assert exact production head
+        run: test "$(git rev-parse HEAD)" = "517c6519efb9aa5e2b28aa67e4e5d675b36c4e94"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Focused PROV-DEL-I tests
+        run: cd player && npx tsx --test test-ts/provider-user-state-cleanup.test.ts test-ts/provider-core-service.test.ts test-ts/provider-epg-runtime.test.ts
+
+      - name: npm test
+        run: npm test
+
+      - name: npm run typecheck
+        run: npm run typecheck
+
+      - name: npm run brand:check
+        run: npm run brand:check
+
+      - name: npm run build
+        run: npm run build
+
+      - name: npm run tizen:build
+        run: npm run tizen:build
+
+      - name: git diff --exit-code
+        run: git diff --exit-code
+
+      - name: Frozen-base diff check
+        run: git diff --check 92af4f5b9d445ced236a63f581716a55bf87ebeb...HEAD
+
+      - name: Exact scope assertion
+        shell: bash
+        run: |
+          actual="$(git diff --name-only 92af4f5b9d445ced236a63f581716a55bf87ebeb...HEAD | sort)"
+          expected="$(printf '%s\n' \
+            player/src/providers/create-browser-provider-runtime.ts \
+            player/src/providers/provider-core-service.ts \
+            player/src/providers/provider-user-state-cleanup.ts \
+            player/test-ts/provider-core-service.test.ts \
+            player/test-ts/provider-epg-runtime.test.ts \
+            player/test-ts/provider-user-state-cleanup.test.ts | sort)"
+          printf 'Actual production diff scope:\n%s\n' "$actual"
+          test "$actual" = "$expected"
