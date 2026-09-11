@@ -106,6 +106,10 @@ export interface AppProviderManagementPort {
   handleAction(action: ProviderManagementSurfaceAction): Promise<void>;
 }
 
+export interface AppProviderReentryPort {
+  reenter(input: ProviderReentryInput): Promise<unknown>;
+}
+
 export interface AppLiveTvControllerPort {
   openScope(scope: { kind: 'all' } | { kind: 'favorites' }): void;
   openChannel(channelId: ChannelId): void;
@@ -138,9 +142,7 @@ export interface AppCompositionDependencies {
     connectXtream(input: XtreamEntrySubmission): Promise<void>;
     connectM3u(input: M3uEntrySubmission): Promise<void>;
   };
-  reentry: {
-    reenter(input: ProviderReentryInput): Promise<void>;
-  };
+  reentry: AppProviderReentryPort;
   liveTv: {
     start(onRootBack: () => void): Promise<AppLiveTvStart>;
   };
