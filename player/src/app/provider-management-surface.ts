@@ -196,6 +196,13 @@ export class ProviderManagementSurface {
       appendButton(
         this.document,
         actions,
+        provider.editFocusId,
+        'Düzenle',
+        state.busyAction !== null,
+      );
+      appendButton(
+        this.document,
+        actions,
         provider.deleteFocusId,
         'Sil',
         state.busyAction !== null,
