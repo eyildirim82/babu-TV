@@ -59,12 +59,14 @@ Rules:
 
 - `version` must be exactly `1`;
 - `sessionId` is opaque, non-empty, and is never interpreted as credential data;
-- `expiresAtMs` must be finite and later than the controller clock when submission begins;
+- `expiresAtMs` must be finite;
 - `tvPublicKey` is public P-256 material consumed by PAIR-C; PAIR-WEB does not accept or retain a private key;
 - `relayBaseUrl` is a public relay endpoint and must pass the existing PAIR-R HTTPS/user-info normalization rules;
 - no provider credential, playlist URL, provider token, stream URL, or TV private key appears in bootstrap/QR data.
 
-PAIR-WEB may consume bootstrap as an injected object. This lane does not define how a hosted page parses QR/deep-link query parameters; PAIR-I/deployment composition must validate and construct the object before mounting the controller.
+The phone controller validates the object fail-closed before accepting provider submission. Invalid version/session/time/relay shape maps to `INVALID_BOOTSTRAP`; expiry maps to the dedicated `expired` state; malformed/invalid TV public key discovered by PAIR-C maps to `INVALID_TV_KEY`.
+
+PAIR-WEB consumes bootstrap as an injected object. This lane does not define how a hosted page parses QR/deep-link query parameters. A later host/PAIR-I composition may validate before constructing the object, but the phone controller still performs its own boundary validation and never trusts host parsing alone.
 
 ## 5. Exact provider plaintext payload
 
@@ -106,15 +108,15 @@ Encoding:
 4. encode the JSON as UTF-8 bytes with `TextEncoder`;
 5. pass those bytes to the PAIR-C encryption port.
 
+The decode helper must reject malformed JSON, unknown version, unknown provider kind, missing fields, non-string credential fields, and any extra keys at the top-level/credential level. It returns only the exact `PairingProviderPayloadV1` union. It exists for contract tests/future PAIR-I consumption; the phone UI itself does not decrypt.
+
 Relay ciphertext is a string containing the serialized PAIR-C envelope:
 
 ```ts
 JSON.stringify(pairingCiphertextV1)
 ```
 
-PAIR-WEB does not base64-wrap, compress, sign, encrypt again, or add provider/session fields to the relay body. PAIR-R still receives exactly `{ ciphertext: string }` plus the opaque session ID path/request field.
-
-The decode helper exists for contract tests/future PAIR-I consumption only; the phone UI itself does not decrypt.
+PAIR-WEB does not base64-wrap, compress, sign, encrypt again, or add provider/session fields to the relay body. PAIR-R still receives exactly `{ ciphertext: string }` plus the opaque session ID request field.
 
 ## 7. Local validation
 
@@ -153,13 +155,14 @@ type PairingPhoneState =
   | { kind: 'sending'; providerKind: 'xtream' | 'm3u' }
   | { kind: 'success' }
   | { kind: 'expired' }
-  | { kind: 'error'; providerKind: 'xtream' | 'm3u'; code: PairingPhoneErrorCode };
+  | { kind: 'error'; providerKind: 'xtream' | 'm3u' | null; code: PairingPhoneErrorCode };
 ```
 
 The exact public error-code set is fixed and sanitized:
 
 ```ts
 type PairingPhoneErrorCode =
+  | 'INVALID_BOOTSTRAP'
   | 'REQUIRED'
   | 'INVALID_URL'
   | 'UNSUPPORTED_PROTOCOL'
@@ -169,6 +172,8 @@ type PairingPhoneErrorCode =
   | 'NETWORK';
 ```
 
+`INVALID_BOOTSTRAP` is allowed with `providerKind: null` before the user has selected a provider.
+
 No native exception message, provider secret, endpoint query, session content, ciphertext, or decrypted/plaintext JSON is exposed in view state.
 
 ## 9. Submit flow
@@ -176,14 +181,15 @@ No native exception message, provider secret, endpoint query, session content, c
 For an explicit user submit:
 
 1. reject duplicate submit while state is `sending`;
-2. re-check `expiresAtMs` against injected `nowMs()`; expired -> `expired`, no crypto/relay call;
-3. validate/normalize provider input;
-4. encode exact `PairingProviderPayloadV1` to UTF-8 bytes;
-5. call injected PAIR-C encryption with TV public key;
-6. serialize the returned PAIR-C envelope to one ciphertext string;
-7. call injected PAIR-R `putCiphertext({ sessionId, ciphertext })`;
-8. on success, replace sensitive form state with `success` and clear references to plaintext inputs;
-9. on failure, return to a sanitized error state while retaining only the in-memory form values needed for user retry.
+2. validate bootstrap version/session/time/relay boundary; invalid -> `INVALID_BOOTSTRAP`, no crypto/relay call;
+3. re-check `expiresAtMs` against injected `nowMs()`; expired -> `expired`, no crypto/relay call;
+4. validate/normalize provider input;
+5. encode exact `PairingProviderPayloadV1` to UTF-8 bytes;
+6. call injected PAIR-C encryption with TV public key;
+7. serialize the returned PAIR-C envelope to one ciphertext string;
+8. call injected PAIR-R `putCiphertext({ sessionId, ciphertext })`;
+9. on success, replace sensitive form state with `success` and clear references to plaintext inputs;
+10. on failure, return to a sanitized error state while retaining only the in-memory form values needed for user retry.
 
 The phone never calls relay `createSession()`; the TV owns session creation and relay-session creation before the QR/bootstrap is presented.
 
@@ -209,6 +215,7 @@ After success, the controller drops its plaintext input state. The view clears/r
 
 Required flow:
 
+- invalid bootstrap -> sanitized unable-to-pair state without rendering raw bootstrap values;
 - provider choice: Xtream / M3U;
 - provider form with explicit labels;
 - submit action;
@@ -244,6 +251,8 @@ The production adapter can be a tiny factory that binds:
 
 - `encryptForPairingTv` from PAIR-C;
 - an already-constructed `PairingRelayClient` from PAIR-R.
+
+Bootstrap relay URL normalization must reuse `normalizePairingRelayBaseUrl()` or a production `PairingRelayClient` construction path that executes that exact validation; PAIR-WEB must not fork the HTTPS/user-info rule.
 
 The controller must not import CredentialStore, Provider Core, provider repositories, watch/Favorites storage, Live TV, `main.js`, or TV playback.
 
@@ -285,8 +294,10 @@ Forbidden:
 
 PAIR-WEB must prove:
 
-- bootstrap contains no provider data/private key;
+- valid bootstrap contains no provider data/private key;
+- invalid bootstrap version/session/time/relay fails closed with `INVALID_BOOTSTRAP` and zero crypto/relay calls;
 - exact Xtream and M3U payload key sets/version are deterministic;
+- strict decoder rejects extra/unknown keys and malformed/unknown payloads;
 - payload encodes to UTF-8 bytes and encrypts through the injected crypto port;
 - relay receives only session ID + serialized PAIR-C ciphertext envelope;
 - no plaintext server URL/username/password/M3U URL appears in relay body, public controller error, console calls, or persistent browser storage;
@@ -326,7 +337,7 @@ PAIR-I remains blocked until:
 - final Xtream/M3U onboarding transaction contracts remain available;
 - the TV-side QR/bootstrap representation is bounded to `PairingPhoneBootstrapV1` or an explicitly version-compatible equivalent.
 
-PAIR-I then owns TV session -> QR/bootstrap -> relay poll -> envelope parse -> PAIR-C decrypt -> `PairingProviderPayloadV1` parse -> existing Xtream/M3U onboarding handoff -> single-use completion.
+PAIR-I then owns TV session -> QR/bootstrap -> relay poll -> envelope parse -> PAIR-C decrypt -> strict `PairingProviderPayloadV1` parse -> existing Xtream/M3U onboarding handoff -> single-use completion.
 
 ## 18. Non-goals
 
