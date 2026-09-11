@@ -1,0 +1,30 @@
+name: prov-reentry-i-task2-green
+
+on:
+  push:
+    branches:
+      - verification/prov-reentry-i-task2-green
+
+permissions:
+  contents: read
+
+jobs:
+  focused-green:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact Task 2 revision
+        uses: actions/checkout@v4
+        with:
+          ref: 6fdebec7e2a9a11ca38dd7ba4abdfcbea93d257d
+      - name: Assert exact Task 2 SHA
+        run: test "$(git rev-parse HEAD)" = "6fdebec7e2a9a11ca38dd7ba4abdfcbea93d257d"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run Task 2 focused GREEN test
+        run: node --import tsx --test player/test-ts/m5-provider-management-surface.test.ts
