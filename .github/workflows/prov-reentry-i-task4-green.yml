@@ -1,0 +1,36 @@
+name: prov-reentry-i-task4-green
+
+on:
+  push:
+    branches:
+      - verification/prov-reentry-i-task4-green
+
+permissions:
+  contents: read
+
+jobs:
+  focused-green:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact Task 4 revision
+        uses: actions/checkout@v4
+        with:
+          ref: 4e3b393fc643c9bb893776ff638b1023788b5e67
+      - name: Assert exact Task 4 SHA
+        run: test "$(git rev-parse HEAD)" = "4e3b393fc643c9bb893776ff638b1023788b5e67"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run Task 4 focused GREEN tests
+        run: >-
+          node --import tsx --test
+          player/test-ts/provider-reentry-service.test.ts
+          player/test-ts/provider-management-presenter.test.ts
+          player/test-ts/m5-provider-management-surface.test.ts
+          player/test-ts/m5-app-composition.test.ts
+          player/test-ts/m5-browser-app-dependencies.test.ts
