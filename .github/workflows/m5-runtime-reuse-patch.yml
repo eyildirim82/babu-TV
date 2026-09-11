@@ -1,0 +1,59 @@
+name: m5-runtime-reuse-patch
+
+on:
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-runtime-reuse:
+    if: github.event.pull_request.head.ref == 'integration/m5-app-composition'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: integration/m5-app-composition
+      - name: Apply same-provider runtime reuse patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('player/src/app/app-composition.ts')
+          text = path.read_text()
+
+          if 'private liveTvProviderId: ProviderId | null = null;' in text:
+              raise SystemExit(0)
+
+          old_fields = "  private liveTvController: AppLiveTvControllerPort | null = null;\n  private liveTvMode: 'm3' | 'legacy' | null = null;\n  private firstRunReturnTo: 'legacy' | 'provider-management' = 'legacy';\n"
+          new_fields = "  private liveTvController: AppLiveTvControllerPort | null = null;\n  private liveTvMode: 'm3' | 'legacy' | null = null;\n  private liveTvProviderId: ProviderId | null = null;\n  private firstRunReturnTo: 'legacy' | 'provider-management' = 'legacy';\n"
+          assert text.count(old_fields) == 1
+          text = text.replace(old_fields, new_fields, 1)
+
+          old_home = "    this.deps.legacy.hidePlayerShell();\n    this.liveTvController = null;\n    this.liveTvMode = null;\n    this.currentRoute = { kind: 'home' };\n"
+          new_home = "    this.deps.legacy.hidePlayerShell();\n    this.currentRoute = { kind: 'home' };\n"
+          assert text.count(old_home) == 1
+          text = text.replace(old_home, new_home, 1)
+
+          old_open = """  private async openLiveTv(\n    providerId: ProviderId,\n    activate: (controller: AppLiveTvControllerPort) => void | Promise<void>,\n  ): Promise<void> {\n    await this.ensureProvider(providerId);\n    this.hideModernViews();\n    this.deps.legacy.hideSettings();\n    this.deps.legacy.showPlayerShell?.();\n    this.currentRoute = { kind: 'live-tv' };\n\n    const runtime = await this.deps.liveTv.start(() => {\n      void this.showHome();\n    });\n    this.liveTvMode = runtime.mode;\n    if (runtime.mode === 'legacy') {\n      this.liveTvController = null;\n      this.deps.legacy.openPlayer();\n      return;\n    }\n\n    this.liveTvController = runtime.controller;\n    await activate(runtime.controller);\n  }\n"""
+          new_open = """  private async openLiveTv(\n    providerId: ProviderId,\n    activate: (controller: AppLiveTvControllerPort) => void | Promise<void>,\n  ): Promise<void> {\n    await this.ensureProvider(providerId);\n    this.hideModernViews();\n    this.deps.legacy.hideSettings();\n    this.deps.legacy.showPlayerShell?.();\n    this.currentRoute = { kind: 'live-tv' };\n\n    if (\n      this.liveTvMode === 'm3'\n      && this.liveTvController !== null\n      && this.liveTvProviderId === providerId\n    ) {\n      await activate(this.liveTvController);\n      return;\n    }\n\n    const runtime = await this.deps.liveTv.start(() => {\n      void this.showHome();\n    });\n    this.liveTvMode = runtime.mode;\n    this.liveTvProviderId = providerId;\n    if (runtime.mode === 'legacy') {\n      this.liveTvController = null;\n      this.deps.legacy.openPlayer();\n      return;\n    }\n\n    this.liveTvController = runtime.controller;\n    await activate(runtime.controller);\n  }\n"""
+          assert text.count(old_open) == 1
+          text = text.replace(old_open, new_open, 1)
+
+          old_legacy = "    this.liveTvMode = 'legacy';\n    this.liveTvController = null;\n    this.deps.legacy.openPlayer();\n"
+          new_legacy = "    this.liveTvMode = 'legacy';\n    this.liveTvController = null;\n    this.liveTvProviderId = null;\n    this.deps.legacy.openPlayer();\n"
+          assert text.count(old_legacy) == 1
+          text = text.replace(old_legacy, new_legacy, 1)
+
+          path.write_text(text)
+          PY
+          git diff --check
+      - name: Commit bounded runtime reuse patch
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add player/src/app/app-composition.ts
+          git commit -m 'fix(m5): reuse same-provider Live TV runtime'
+          git push origin HEAD:integration/m5-app-composition
