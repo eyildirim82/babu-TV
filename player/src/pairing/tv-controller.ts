@@ -64,24 +64,37 @@ export interface PairingTvControllerDependencies {
   relayBaseUrl: string;
 }
 
+export class PairingTvError extends Error {
+  readonly code = 'UNAVAILABLE' as const;
+
+  constructor() {
+    super('TV pairing is unavailable.');
+    this.name = 'PairingTvError';
+  }
+}
+
 export class PairingTvController {
   constructor(private readonly deps: PairingTvControllerDependencies) {}
 
   async start(): Promise<PairingTvBootstrapV1> {
-    const keyPair = await this.deps.crypto.generateTvKeyPair();
-    const session = this.deps.sessions.create({ privateKey: keyPair.privateKey });
-    await this.deps.relay.createSession({
-      sessionId: session.sessionId,
-      expiresAtMs: session.expiresAtMs,
-    });
+    try {
+      const keyPair = await this.deps.crypto.generateTvKeyPair();
+      const session = this.deps.sessions.create({ privateKey: keyPair.privateKey });
+      await this.deps.relay.createSession({
+        sessionId: session.sessionId,
+        expiresAtMs: session.expiresAtMs,
+      });
 
-    return {
-      version: 1,
-      sessionId: session.sessionId,
-      expiresAtMs: session.expiresAtMs,
-      tvPublicKey: keyPair.publicKey,
-      relayBaseUrl: this.deps.relayBaseUrl,
-    };
+      return {
+        version: 1,
+        sessionId: session.sessionId,
+        expiresAtMs: session.expiresAtMs,
+        tvPublicKey: keyPair.publicKey,
+        relayBaseUrl: this.deps.relayBaseUrl,
+      };
+    } catch {
+      throw new PairingTvError();
+    }
   }
 
   async poll(sessionId: string): Promise<PairingTvPollResult> {
