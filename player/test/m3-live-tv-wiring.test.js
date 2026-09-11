@@ -6,36 +6,36 @@ const mainUrl = new URL('../src/main.js', import.meta.url);
 const indexUrl = new URL('../index.html', import.meta.url);
 const m3StylesUrl = new URL('../src/m3-live-tv.css', import.meta.url);
 
-void test('main starts M3 before the inherited legacy remote and playlist path', async () => {
+void test('main boots the M5 application composition instead of short-circuiting into M3', async () => {
   const source = await readFile(mainUrl, 'utf8');
-  const m3Start = source.indexOf('await tryStartM3LiveTv()');
-  const legacyRemote = source.indexOf('remote.init(handleRemoteAction)');
-  const legacyPlaylist = source.indexOf('const activePlaylist = getActivePlaylist()');
 
-  assert.notEqual(m3Start, -1);
-  assert.notEqual(legacyRemote, -1);
-  assert.notEqual(legacyPlaylist, -1);
-  assert.ok(m3Start < legacyRemote);
-  assert.ok(m3Start < legacyPlaylist);
-  assert.match(source, /if \(await tryStartM3LiveTv\(\)\) \{\s*return;\s*\}/);
+  assert.match(source, /import \{ createAppComposition \} from '\.\/app\/app-composition\.ts';/);
+  assert.match(source, /const appComposition = createAppComposition\(/);
+  assert.match(source, /await appComposition\.boot\(\)/);
+  assert.doesNotMatch(source, /if \(await tryStartM3LiveTv\(\)\) \{\s*return;\s*\}/);
+  assert.match(source, /new HomeView\(document,/);
+  assert.match(source, /new FirstRunView\(document,/);
+  assert.match(source, /new M3uEntryView\(document,/);
 });
 
-void test('M3 remote path uses digit mode and gates numeric key registration by capability', async () => {
+void test('M5 remote ownership preserves M3 digit mode and legacy buffered number mode', async () => {
   const source = await readFile(mainUrl, 'utf8');
 
-  assert.match(source, /remote\.init\(handleM3RemoteAction, \{ numericMode: 'digits' \}\)/);
+  assert.match(source, /function setAppRemoteNumericMode\(mode\)/);
+  assert.match(source, /remote\.destroy\(\)/);
+  assert.match(source, /numericMode: mode === 'digits' \? 'digits' : 'buffered'/);
   assert.match(source, /platform\.capabilities\(\)\.numericKeys/);
   assert.match(source, /platform\.registerOptionalKeys\(M3_NUMERIC_TIZEN_KEYS\)/);
-  assert.match(source, /case 'digit':[\s\S]*type: 'DIGIT'/);
-  assert.match(source, /channelUp: 'CHANNEL_UP'/);
-  assert.match(source, /channelDown: 'CHANNEL_DOWN'/);
+  assert.match(source, /setAppRemoteNumericMode\('digits'\)/);
+  assert.match(source, /setAppRemoteNumericMode\('buffered'\)/);
 });
 
-void test('M3 startup keeps inherited legacy initialization available as fallback', async () => {
+void test('M5 keeps inherited legacy initialization available only as an injected fallback', async () => {
   const source = await readFile(mainUrl, 'utf8');
 
-  assert.match(source, /remote\.init\(handleRemoteAction\)/);
+  assert.match(source, /handleRemote: \(action, value\) => handleRemoteAction\(action, value\)/);
   assert.match(source, /platform\.registerOptionalKeys\(LEGACY_OPTIONAL_TIZEN_KEYS\)/);
+  assert.match(source, /openPlayer: \(\) => startLegacyPlayerShell\(\)/);
   assert.match(source, /ui\.showConfirmDialog\('Uygulamadan çıkılsın mı\?'/);
 });
 
