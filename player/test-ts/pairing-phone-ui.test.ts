@@ -44,6 +44,39 @@ test('PAIR-WEB rejects malformed bootstrap before crypto or relay', async () => 
   assert.equal(relayCalls, 0);
 });
 
+test('PAIR-WEB rejects bootstrap with unknown top-level key before crypto or relay', async () => {
+  let cryptoCalls = 0;
+  let relayCalls = 0;
+  const controller = new PairingPhoneController({ ...validBootstrap, extra: 'forbidden' }, {
+    crypto: { async encryptForTv() { cryptoCalls += 1; return envelope; } },
+    relay: { async putCiphertext() { relayCalls += 1; } },
+    nowMs: () => 100,
+  });
+  controller.chooseProvider('m3u');
+  controller.updateM3u({ playlistUrl: 'https://playlist.example.invalid/a.m3u8' });
+  await controller.submit();
+  assert.deepEqual(controller.state(), { kind: 'error', providerKind: 'm3u', code: 'INVALID_BOOTSTRAP' });
+  assert.equal(cryptoCalls, 0);
+  assert.equal(relayCalls, 0);
+});
+
+test('PAIR-WEB rejects bootstrap with a missing top-level key before crypto or relay', async () => {
+  let cryptoCalls = 0;
+  let relayCalls = 0;
+  const { tvPublicKey: _missingTvPublicKey, ...missingTvPublicKey } = validBootstrap;
+  const controller = new PairingPhoneController(missingTvPublicKey as unknown as PairingPhoneBootstrapV1, {
+    crypto: { async encryptForTv() { cryptoCalls += 1; return envelope; } },
+    relay: { async putCiphertext() { relayCalls += 1; } },
+    nowMs: () => 100,
+  });
+  controller.chooseProvider('m3u');
+  controller.updateM3u({ playlistUrl: 'https://playlist.example.invalid/a.m3u8' });
+  await controller.submit();
+  assert.deepEqual(controller.state(), { kind: 'error', providerKind: 'm3u', code: 'INVALID_BOOTSTRAP' });
+  assert.equal(cryptoCalls, 0);
+  assert.equal(relayCalls, 0);
+});
+
 test('PAIR-WEB treats expiresAtMs equality as expired and makes no external call', async () => {
   let cryptoCalls = 0;
   let relayCalls = 0;
