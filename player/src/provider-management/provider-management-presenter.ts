@@ -8,6 +8,7 @@ export interface ProviderManagementSnapshot {
 export interface ProviderManagementOperations {
   load(): Promise<ProviderManagementSnapshot>;
   switchProvider(providerId: ProviderId): Promise<void>;
+  requestEditProvider(providerId: ProviderId, kind: ProviderKind): void | Promise<void>;
   deleteProvider(providerId: ProviderId): Promise<void>;
   requestAddProvider(): void | Promise<void>;
 }
@@ -22,6 +23,7 @@ export interface ProviderManagementProviderItem {
   name: string;
   isActive: boolean;
   switchFocusId: string;
+  editFocusId: string;
   deleteFocusId: string;
 }
 
@@ -48,6 +50,10 @@ const DELETE_CONFIRMATION_FOCUS_ORDER = [CANCEL_DELETE_FOCUS_ID, CONFIRM_DELETE_
 
 function switchFocusId(providerId: ProviderId): string {
   return `provider:${providerId}:switch`;
+}
+
+function editFocusId(providerId: ProviderId): string {
+  return `provider:${providerId}:edit`;
 }
 
 function deleteFocusId(providerId: ProviderId): string {
@@ -102,9 +108,14 @@ export class ProviderManagementPresenter {
         name: provider.name,
         isActive: provider.id === snapshot.activeProviderId,
         switchFocusId: switchFocusId(provider.id),
+        editFocusId: editFocusId(provider.id),
         deleteFocusId: deleteFocusId(provider.id),
       }));
-      const focusOrder = providers.flatMap((provider) => [provider.switchFocusId, provider.deleteFocusId]);
+      const focusOrder = providers.flatMap((provider) => [
+        provider.switchFocusId,
+        provider.editFocusId,
+        provider.deleteFocusId,
+      ]);
       focusOrder.push(ADD_PROVIDER_FOCUS_ID);
 
       const activeFocusId = snapshot.activeProviderId === null
@@ -170,6 +181,24 @@ export class ProviderManagementPresenter {
     const switchTarget = this.view.providers.find((provider) => provider.switchFocusId === this.view.focusedId);
     if (switchTarget !== undefined) {
       await this.switchProvider(switchTarget.id);
+      return;
+    }
+
+    const editTarget = this.view.providers.find((provider) => provider.editFocusId === this.view.focusedId);
+    if (editTarget !== undefined) {
+      try {
+        await this.operations.requestEditProvider(editTarget.id, editTarget.kind);
+        this.view = {
+          ...this.view,
+          errorMessage: null,
+        };
+      } catch {
+        this.view = {
+          ...this.view,
+          focusedId: editTarget.editFocusId,
+          errorMessage: 'Sağlayıcı düzenleme açılamadı.',
+        };
+      }
       return;
     }
 
