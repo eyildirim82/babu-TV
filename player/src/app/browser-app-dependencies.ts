@@ -154,7 +154,11 @@ export function createBrowserAppDependencies(
         });
         input.setRemoteNumericMode(result.mode === 'm3' ? 'digits' : 'buffered');
         return result.mode === 'm3'
-          ? { mode: 'm3', controller: result.controller }
+          ? {
+              mode: 'm3',
+              controller: result.controller,
+              enterProvider: result.enterProvider,
+            }
           : { mode: 'legacy' };
       },
     },
