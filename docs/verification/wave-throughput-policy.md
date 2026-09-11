@@ -4,6 +4,8 @@ Date: 2026-09-11
 Owner: REVIEW / Integration Controller  
 Status: APPROVED PROCESS DECISION
 
+This document is a normative amendment to `docs/verification/parallel-development-control.md`. Where older wording could be read as serializing otherwise independent work inside a wave, this policy governs: wave boundaries stay, but independent production lanes run concurrently and wait only at real dependency edges.
+
 ## Decision
 
 Wave boundaries remain part of the BabuşTV development process, but a wave is a synchronization and integration boundary, not a requirement to execute every task serially.
