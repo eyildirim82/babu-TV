@@ -219,7 +219,10 @@ test('PAIR-I-WIRE optional Telefonla Ekle is a stable focus target activated onl
   const view = new firstRun.FirstRunView(asDocument(document), callbacks);
 
   view.show({ kind: 'empty' });
-  assert.equal(document.getElementById('first-run-pairing')?.textContent, 'Telefonla EkleTelefonunuzdan güvenli QR eşleştirmesi ile sağlayıcı ekleyin.');
+  const pairingButton = document.getElementById('first-run-pairing');
+  assert.ok(pairingButton);
+  assert.equal(pairingButton.children[0]?.textContent, 'Telefonla Ekle');
+  assert.equal(pairingButton.children[1]?.textContent, 'Telefonunuzdan güvenli QR eşleştirmesi ile sağlayıcı ekleyin.');
   assert.deepEqual({ xtream, m3u, pairing }, { xtream: 0, m3u: 0, pairing: 0 });
 
   view.handleAction('right');

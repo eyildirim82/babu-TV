@@ -9,12 +9,14 @@ export type FirstRunPresentationState =
 export interface FirstRunCallbacks {
   onXtreamSelected(): void;
   onM3uSelected(): void;
+  onPairingSelected?(): void;
   onBack(): void;
 }
 
 export const FIRST_RUN_FOCUS_IDS = Object.freeze([
   'first-run-xtream',
   'first-run-m3u',
+  'first-run-pairing',
   'first-run-back',
 ] as const);
 
@@ -29,6 +31,8 @@ const COPY = Object.freeze({
   xtreamDetail: 'Sunucu adresi, kullanıcı adı ve şifre ile bağlanın.',
   m3uTitle: 'M3U',
   m3uDetail: 'M3U veya M3U8 oynatma listesi bağlantısı ile ekleyin.',
+  pairingTitle: 'Telefonla Ekle',
+  pairingDetail: 'Telefonunuzdan güvenli QR eşleştirmesi ile sağlayıcı ekleyin.',
   empty: 'Henüz bir sağlayıcı eklenmedi. Başlamak için bir bağlantı türü seçin.',
   handoffUnavailable: 'Bağlantı ekranı şu anda açılamıyor. Lütfen yeniden deneyin.',
   privacy: 'Bağlantı bilgileri bu seçim ekranında tutulmaz veya kaydedilmez.',
@@ -135,6 +139,9 @@ export class FirstRunView {
     panel.appendChild(providerGrid);
     appendProviderButton(this.document, providerGrid, 'first-run-xtream', COPY.xtreamTitle, COPY.xtreamDetail);
     appendProviderButton(this.document, providerGrid, 'first-run-m3u', COPY.m3uTitle, COPY.m3uDetail);
+    if (this.callbacks.onPairingSelected) {
+      appendProviderButton(this.document, providerGrid, 'first-run-pairing', COPY.pairingTitle, COPY.pairingDetail);
+    }
 
     const status = this.document.createElement('div');
     status.id = 'first-run-status';
@@ -184,11 +191,15 @@ export class FirstRunView {
 
     if (action === 'left') {
       if (this.focusId === 'first-run-m3u') this.setProviderFocus('first-run-xtream');
+      else if (this.focusId === 'first-run-pairing') this.setProviderFocus('first-run-m3u');
       return;
     }
 
     if (action === 'right') {
       if (this.focusId === 'first-run-xtream') this.setProviderFocus('first-run-m3u');
+      else if (this.focusId === 'first-run-m3u' && this.callbacks.onPairingSelected) {
+        this.setProviderFocus('first-run-pairing');
+      }
       return;
     }
 
@@ -216,6 +227,10 @@ export class FirstRunView {
     }
     if (this.focusId === 'first-run-m3u') {
       this.callbacks.onM3uSelected();
+      return;
+    }
+    if (this.focusId === 'first-run-pairing') {
+      this.callbacks.onPairingSelected?.();
       return;
     }
     this.callbacks.onBack();
