@@ -141,7 +141,7 @@ export function createBrowserAppDependencies(
       },
     },
     reentry: {
-      reenter: (entry) => providerReentry.reenter(entry),
+      reenter: (input) => providerReentry.reenter(input),
     },
     liveTv: {
       start: async (onRootBack) => {
