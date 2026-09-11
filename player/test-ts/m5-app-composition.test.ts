@@ -167,6 +167,40 @@ test('M5 Home intents keep navigation separate from explicit playback', async ()
   assert.equal(events.some((event) => event.startsWith('play:')), false);
 });
 
+test('M5 same-provider Live TV re-entry reuses one runtime and one session owner', async () => {
+  const events: string[] = [];
+  const deps = makeDeps(events);
+  let rootBack: (() => void) | null = null;
+  let starts = 0;
+
+  deps.liveTv.start = async (onRootBack) => {
+    starts += 1;
+    rootBack = onRootBack;
+    return {
+      mode: 'm3' as const,
+      controller: {
+        openScope(scope) { events.push(`scope:${scope.kind}`); },
+        openChannel(channelId) { events.push(`focus:${channelId}`); },
+        async playChannel(channelId) { events.push(`play:${channelId}`); },
+        async handleInput() {},
+      },
+    };
+  };
+
+  const app = createAppComposition(deps);
+  await app.boot();
+  await app.handleHomeIntent({ type: 'OPEN_LIVE_TV', providerId: 'p1', scope: 'all' });
+  assert.equal(starts, 1);
+  assert.equal(rootBack === null, false);
+
+  (rootBack as () => void)();
+  assert.deepEqual(app.route(), { kind: 'home' });
+
+  await app.handleHomeIntent({ type: 'OPEN_LIVE_TV', providerId: 'p1', scope: 'favorites' });
+  assert.equal(starts, 1);
+  assert.equal(events.filter((event) => event === 'scope:favorites').length, 1);
+});
+
 test('M5 application Back preserves one-layer ownership at app routes', async () => {
   const events: string[] = [];
   const app = createAppComposition(makeDeps(events));
