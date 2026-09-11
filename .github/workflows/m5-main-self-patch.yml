@@ -1,0 +1,148 @@
+name: m5-main-self-patch
+
+on:
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-main:
+    if: github.event.pull_request.head.ref == 'integration/m5-app-composition'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: integration/m5-app-composition
+          fetch-depth: 0
+      - name: Apply bounded M5 bootstrap patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('player/src/main.js')
+          text = path.read_text()
+
+          import_marker = "import { createBrowserLiveTvRuntime } from './live-tv/create-live-tv-runtime.ts';\n"
+          app_imports = (
+              "import { createAppComposition } from './app/app-composition.ts';\n"
+              "import { createBrowserAppDependencies } from './app/browser-app-dependencies.ts';\n"
+          )
+          assert text.count(import_marker) == 1
+          assert "createAppComposition } from './app/app-composition.ts'" not in text
+          text = text.replace(import_marker, import_marker + app_imports, 1)
+
+          state_marker = "let m3Controller = null;\n"
+          app_remote = r'''
+          let activeAppComposition = null;
+
+          function handleAppRemoteAction(action, value) {
+            if (!activeAppComposition) return;
+            void activeAppComposition.handleRemote(action, value);
+          }
+
+          function setAppRemoteNumericMode(mode) {
+            remote.destroy();
+            remote.init(handleAppRemoteAction, {
+              numericMode: mode === 'digits' ? 'digits' : 'buffered',
+            });
+            if (mode === 'digits' && platform.capabilities().numericKeys) {
+              platform.registerOptionalKeys(M3_NUMERIC_TIZEN_KEYS);
+            }
+          }
+          '''.lstrip('\n')
+          assert text.count(state_marker) == 1
+          text = text.replace(state_marker, state_marker + app_remote, 1)
+
+          start = text.index('async function init() {')
+          end = text.index('\n\nfunction cleanupEventListeners()', start)
+          old = text[start:end]
+          split_marker = "\n\n  if (await tryStartM3LiveTv()) {\n    return;\n  }\n\n"
+          assert split_marker in old
+          init_prefix, old_legacy = old.split(split_marker, 1)
+
+          listener = """\n\n  document.addEventListener('tizenhwkey', (e) => {\n    if (e.keyName === 'back') {\n      e.preventDefault();\n      handleRemoteAction('back');\n    }\n  });\n"""
+          assert listener in old_legacy
+          old_legacy = old_legacy.replace(listener, '\n', 1)
+          assert '  remote.init(handleRemoteAction);' in old_legacy
+          old_legacy = old_legacy.replace(
+              '  remote.init(handleRemoteAction);',
+              "  setAppRemoteNumericMode('buffered');",
+              1,
+          )
+          assert old_legacy.rstrip().endswith('}')
+          legacy_inner = old_legacy.rstrip()[:-1].rstrip()
+
+          modern_tail = r'''
+
+            platform.registerOptionalKeys(LEGACY_OPTIONAL_TIZEN_KEYS);
+            setAppRemoteNumericMode('buffered');
+            settings.init(document.getElementById('settings-page'), {
+              onPlaylistFetched: (newChannels) => {
+                sortChannels(newChannels);
+                applyProxyOverrides(newChannels);
+                channels = newChannels;
+                settings.hide();
+                showPlayer();
+              },
+              onXtreamRequested: showXtreamEntry,
+              onClose: () => {
+                settings.hide();
+                if (activeAppComposition) {
+                  void activeAppComposition.handleRemote('back');
+                }
+              },
+            });
+
+            document.addEventListener('tizenhwkey', (e) => {
+              if (e.keyName === 'back') {
+                e.preventDefault();
+                handleAppRemoteAction('back');
+              }
+            });
+
+            const appComposition = createAppComposition(createBrowserAppDependencies({
+              indexedDb: window.indexedDB || null,
+              widgetData: window.webapis && window.webapis.widgetdata
+                ? window.webapis.widgetdata
+                : null,
+              fetchImpl: window.fetch.bind(window),
+              platform,
+              document,
+              setRemoteNumericMode: setAppRemoteNumericMode,
+              legacy: {
+                hidePlayerShell: () => hidePlayer(),
+                showPlayerShell: () => showPlayer(),
+                openPlayer: () => startLegacyPlayerShell(),
+                showSettings: () => showSettingsPage(),
+                hideSettings: () => settings.hide(),
+                handleRemote: (action, value) => handleRemoteAction(action, value),
+              },
+              exitApp: () => {
+                ui.showConfirmDialog('Uygulamadan çıkılsın mı?', (confirmed) => {
+                  if (confirmed) platform.exitApp();
+                });
+              },
+            }));
+            activeAppComposition = appComposition;
+            await appComposition.boot();
+            hideBootSplash();
+          }
+
+          async function startLegacyPlayerShell() {
+          '''
+          new_block = init_prefix + modern_tail + legacy_inner + '\n}\n'
+          text = text[:start] + new_block + text[end:]
+
+          path.write_text(text)
+          PY
+          git diff --check
+          git diff -- player/src/main.js
+      - name: Commit bounded main bootstrap patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add player/src/main.js
+          git commit -m 'feat(m5): bind application composition in main bootstrap'
+          git push origin HEAD:integration/m5-app-composition
