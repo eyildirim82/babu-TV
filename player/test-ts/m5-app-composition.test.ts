@@ -553,3 +553,149 @@ test('M5 application Back preserves one-layer ownership at app routes', async ()
   await app.handleRemote('back');
   assert.ok(events.includes('app:exit'));
 });
+
+test('PAIR-I-WIRE pairing unavailable keeps provider chooser keyboard-only', async () => {
+  const events: string[] = [];
+  const deps = makeDeps(events, 0);
+  let firstRunCallbacks: FirstRunCallbacks | null = null;
+  deps.views.firstRun = (callbacks) => {
+    firstRunCallbacks = callbacks;
+    return {
+      show() { events.push('first-run:show'); },
+      hide() { events.push('first-run:hide'); },
+      handleAction() {},
+    };
+  };
+
+  const app = createAppComposition(deps);
+  await app.boot();
+
+  assert.deepEqual(app.route(), { kind: 'first-run' });
+  assert.equal(requireBound<FirstRunCallbacks>(firstRunCallbacks, 'first-run callbacks').onPairingSelected, undefined);
+  assert.equal(events.some((event) => event.startsWith('pairing:')), false);
+});
+
+test('PAIR-I-WIRE first-run pairing route owns Back and completion without provider writes or playback', async () => {
+  const events: string[] = [];
+  const deps = makeDeps(events, 0);
+  let firstRunCallbacks: FirstRunCallbacks | null = null;
+  let pairingCallbacks: { onBack(): void; onCompleted(providerId: string): void } | null = null;
+  let pairingHandleBack = 0;
+
+  deps.views.firstRun = (callbacks) => {
+    firstRunCallbacks = callbacks;
+    return {
+      show() { events.push('first-run:show'); },
+      hide() { events.push('first-run:hide'); },
+      handleAction() {},
+    };
+  };
+  (deps as AppCompositionDependencies & {
+    pairing: {
+      view(callbacks: { onBack(): void; onCompleted(providerId: string): void }): {
+        show(): Promise<void>;
+        hide(): void;
+        handleBack(): void;
+      };
+    };
+  }).pairing = {
+    view(callbacks) {
+      pairingCallbacks = callbacks;
+      return {
+        async show() { events.push('pairing:show'); },
+        hide() { events.push('pairing:hide'); },
+        handleBack() { pairingHandleBack += 1; callbacks.onBack(); },
+      };
+    },
+  };
+
+  const app = createAppComposition(deps);
+  await app.boot();
+  events.length = 0;
+  requireBound<FirstRunCallbacks>(firstRunCallbacks, 'first-run callbacks').onPairingSelected?.();
+  await Promise.resolve();
+
+  assert.deepEqual(app.route(), { kind: 'pairing', returnTo: 'first-run' });
+  assert.equal(events.filter((event) => event === 'pairing:show').length, 1);
+  assert.ok(events.includes('first-run:hide'));
+  assert.equal(events.some((event) => event.startsWith('switch:')), false);
+  assert.equal(events.some((event) => event.startsWith('play:')), false);
+
+  events.length = 0;
+  await app.handleRemote('back');
+  await Promise.resolve();
+  assert.equal(pairingHandleBack, 1);
+  assert.deepEqual(app.route(), { kind: 'first-run' });
+  assert.equal(events.some((event) => event.startsWith('switch:')), false);
+  assert.equal(events.some((event) => event.includes(':connect')), false);
+
+  requireBound<FirstRunCallbacks>(firstRunCallbacks, 'first-run callbacks').onPairingSelected?.();
+  await Promise.resolve();
+  events.length = 0;
+  requireBound(pairingCallbacks, 'pairing callbacks').onCompleted('paired-provider');
+  await Promise.resolve();
+  assert.deepEqual(app.route(), { kind: 'home' });
+  assert.ok(events.includes('home:load'));
+  assert.equal(events.some((event) => event.startsWith('play:')), false);
+  assert.equal(events.some((event) => event.startsWith('live:')), false);
+});
+
+test('PAIR-I-WIRE provider-management add pairing returns to management on Back', async () => {
+  const events: string[] = [];
+  const deps = makeDeps(events);
+  let providerCallbacks: AppProviderManagementCallbacks | null = null;
+  let firstRunCallbacks: FirstRunCallbacks | null = null;
+  let pairingCallbacks: { onBack(): void; onCompleted(providerId: string): void } | null = null;
+
+  deps.views.providerManagement = (callbacks) => {
+    providerCallbacks = callbacks;
+    return {
+      async show() { events.push('providers:show'); },
+      hide() { events.push('providers:hide'); },
+      async handleAction() {},
+    };
+  };
+  deps.views.firstRun = (callbacks) => {
+    firstRunCallbacks = callbacks;
+    return {
+      show() { events.push('first-run:show'); },
+      hide() { events.push('first-run:hide'); },
+      handleAction() {},
+    };
+  };
+  (deps as AppCompositionDependencies & {
+    pairing: {
+      view(callbacks: { onBack(): void; onCompleted(providerId: string): void }): {
+        show(): Promise<void>;
+        hide(): void;
+        handleBack(): void;
+      };
+    };
+  }).pairing = {
+    view(callbacks) {
+      pairingCallbacks = callbacks;
+      return {
+        async show() { events.push('pairing:show'); },
+        hide() { events.push('pairing:hide'); },
+        handleBack() { callbacks.onBack(); },
+      };
+    },
+  };
+
+  const app = createAppComposition(deps);
+  await app.boot();
+  await app.handleHomeIntent({ type: 'OPEN_SETTINGS' });
+  requireBound<AppProviderManagementCallbacks>(providerCallbacks, 'provider callbacks').onAddProvider();
+  requireBound<FirstRunCallbacks>(firstRunCallbacks, 'first-run callbacks').onPairingSelected?.();
+  await Promise.resolve();
+
+  assert.deepEqual(app.route(), { kind: 'pairing', returnTo: 'provider-management' });
+  events.length = 0;
+  requireBound(pairingCallbacks, 'pairing callbacks').onBack();
+  await Promise.resolve();
+  assert.deepEqual(app.route(), { kind: 'provider-management' });
+  assert.equal(events.filter((event) => event === 'providers:show').length, 1);
+  assert.equal(events.some((event) => event.startsWith('switch:')), false);
+  assert.equal(events.some((event) => event.includes(':connect')), false);
+  assert.equal(events.some((event) => event.startsWith('play:')), false);
+});
