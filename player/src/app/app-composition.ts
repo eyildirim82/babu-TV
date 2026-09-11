@@ -100,7 +100,11 @@ export interface AppLiveTvControllerPort {
 }
 
 export type AppLiveTvStart =
-  | { mode: 'm3'; controller: AppLiveTvControllerPort }
+  | {
+      mode: 'm3';
+      controller: AppLiveTvControllerPort;
+      enterProvider(providerId: ProviderId): Promise<void>;
+    }
   | { mode: 'legacy' };
 
 export interface AppCompositionDependencies {
@@ -163,6 +167,8 @@ const M3_ACTIONS = {
   prev: 'CHANNEL_UP',
 } as const;
 
+type AppM3LiveTvRuntime = Extract<AppLiveTvStart, { mode: 'm3' }>;
+
 export class AppComposition {
   private currentRoute: AppRoute = { kind: 'first-run' };
   private readonly homeView: AppHomeViewPort;
@@ -170,7 +176,7 @@ export class AppComposition {
   private readonly xtreamView: AppEntryViewPort<XtreamEntryAction>;
   private readonly m3uView: AppEntryViewPort<M3uEntryAction>;
   private readonly providerView: AppProviderManagementPort;
-  private liveTvController: AppLiveTvControllerPort | null = null;
+  private liveTvRuntime: AppM3LiveTvRuntime | null = null;
   private liveTvMode: 'm3' | 'legacy' | null = null;
   private liveTvProviderId: ProviderId | null = null;
   private firstRunReturnTo: 'legacy' | 'provider-management' = 'legacy';
@@ -281,7 +287,7 @@ export class AppComposition {
         this.deps.legacy.handleRemote(action, value);
         return;
       case 'live-tv':
-        if (this.liveTvMode === 'legacy' || this.liveTvController === null) {
+        if (this.liveTvMode === 'legacy' || this.liveTvRuntime === null) {
           this.deps.legacy.handleRemote(action, value);
           return;
         }
@@ -354,32 +360,37 @@ export class AppComposition {
     activate: (controller: AppLiveTvControllerPort) => void | Promise<void>,
   ): Promise<void> {
     await this.ensureProvider(providerId);
+
+    let runtime = this.liveTvRuntime;
+    if (runtime === null) {
+      const started = await this.deps.liveTv.start(() => {
+        void this.showHome();
+      });
+      this.liveTvMode = started.mode;
+      this.liveTvProviderId = providerId;
+      if (started.mode === 'legacy') {
+        this.hideModernViews();
+        this.deps.legacy.hideSettings();
+        this.deps.legacy.showPlayerShell?.();
+        this.currentRoute = { kind: 'live-tv' };
+        this.deps.legacy.openPlayer();
+        return;
+      }
+      this.liveTvRuntime = started;
+      runtime = started;
+    } else if (this.liveTvProviderId !== providerId) {
+      try {
+        await runtime.enterProvider(providerId);
+      } catch {
+        return;
+      }
+      this.liveTvProviderId = providerId;
+    }
+
     this.hideModernViews();
     this.deps.legacy.hideSettings();
     this.deps.legacy.showPlayerShell?.();
     this.currentRoute = { kind: 'live-tv' };
-
-    if (
-      this.liveTvMode === 'm3'
-      && this.liveTvController !== null
-      && this.liveTvProviderId === providerId
-    ) {
-      await activate(this.liveTvController);
-      return;
-    }
-
-    const runtime = await this.deps.liveTv.start(() => {
-      void this.showHome();
-    });
-    this.liveTvMode = runtime.mode;
-    this.liveTvProviderId = providerId;
-    if (runtime.mode === 'legacy') {
-      this.liveTvController = null;
-      this.deps.legacy.openPlayer();
-      return;
-    }
-
-    this.liveTvController = runtime.controller;
     await activate(runtime.controller);
   }
 
@@ -410,11 +421,11 @@ export class AppComposition {
         await this.handleFirstRunBack();
         return;
       case 'live-tv':
-        if (this.liveTvMode === 'legacy' || this.liveTvController === null) {
+        if (this.liveTvMode === 'legacy' || this.liveTvRuntime === null) {
           this.deps.legacy.handleRemote('back');
           return;
         }
-        await this.liveTvController.handleInput({ type: 'ACTION', action: 'BACK' });
+        await this.liveTvRuntime.controller.handleInput({ type: 'ACTION', action: 'BACK' });
     }
   }
 
@@ -427,7 +438,7 @@ export class AppComposition {
     this.deps.legacy.showPlayerShell?.();
     this.currentRoute = { kind: 'live-tv' };
     this.liveTvMode = 'legacy';
-    this.liveTvController = null;
+    this.liveTvRuntime = null;
     this.liveTvProviderId = null;
     this.deps.legacy.openPlayer();
   }
@@ -449,16 +460,16 @@ export class AppComposition {
   }
 
   private async handleM3Remote(action: AppRemoteAction, value?: number): Promise<void> {
-    if (this.liveTvController === null) return;
+    if (this.liveTvRuntime === null) return;
     if (action === 'digit') {
       if (Number.isInteger(value) && value !== undefined && value >= 0 && value <= 9) {
-        await this.liveTvController.handleInput({ type: 'DIGIT', digit: value });
+        await this.liveTvRuntime.controller.handleInput({ type: 'DIGIT', digit: value });
       }
       return;
     }
     const logicalAction = M3_ACTIONS[action as keyof typeof M3_ACTIONS];
     if (logicalAction !== undefined) {
-      await this.liveTvController.handleInput({ type: 'ACTION', action: logicalAction });
+      await this.liveTvRuntime.controller.handleInput({ type: 'ACTION', action: logicalAction });
     }
   }
 
