@@ -1,5 +1,6 @@
 import type { Platform } from '../platform/contracts.js';
 import { createBrowserProviderRuntime } from '../providers/create-browser-provider-runtime.js';
+import { ProviderReentryService } from '../providers/provider-reentry-service.js';
 import { XtreamOnboardingService } from '../providers/xtream-onboarding-service.js';
 import { M3uOnboardingService } from '../providers/m3u/m3u-onboarding-service.js';
 import { ProviderError } from '../providers/errors.js';
@@ -91,6 +92,12 @@ export function createBrowserAppDependencies(
     createProviderId: () => createProviderId('m3u', nowMs),
     now: nowMs,
   });
+  const providerReentry = new ProviderReentryService({
+    providers: runtime.providers,
+    credentials: runtime.credentials,
+    adapters: runtime.adapters,
+    sync: runtime.sync,
+  });
 
   return {
     providers: runtime.providers,
@@ -110,6 +117,7 @@ export function createBrowserAppDependencies(
           switchProvider: (providerId) => runtime.core.switchActiveProvider(providerId),
           deleteProvider: (providerId) => runtime.core.deleteProvider(providerId),
           requestAddProvider: () => callbacks.onAddProvider(),
+          requestEditProvider: (providerId, kind) => callbacks.onEditProvider(providerId, kind),
         });
         return new ProviderManagementSurface(input.document, presenter, {
           onBack: callbacks.onBack,
@@ -131,6 +139,9 @@ export function createBrowserAppDependencies(
           );
         }
       },
+    },
+    reentry: {
+      reenter: (input) => providerReentry.reenter(input),
     },
     liveTv: {
       start: async (onRootBack) => {

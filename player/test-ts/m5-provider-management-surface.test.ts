@@ -59,6 +59,48 @@ function asDocument(document: FakeDocument): Document {
   return document as unknown as Document;
 }
 
+test('M5 provider surface exposes edit between switch and delete and focus alone has no side effect', async () => {
+  const events: string[] = [];
+  const presenter = new ProviderManagementPresenter({
+    async load() {
+      return {
+        providers: [{ id: 'p1', kind: 'xtream' as const, name: 'One' }],
+        activeProviderId: 'p1',
+      };
+    },
+    async switchProvider(providerId) { events.push(`switch:${providerId}`); },
+    requestEditProvider(providerId, kind) { events.push(`edit:${providerId}:${kind}`); },
+    async deleteProvider(providerId) { events.push(`delete:${providerId}`); },
+    requestAddProvider() { events.push('add'); },
+  });
+  const document = new FakeDocument();
+  const surface = new ProviderManagementSurface(asDocument(document), presenter, {
+    onBack: () => events.push('back'),
+    onOpenLegacySettings: () => events.push('legacy-settings'),
+  });
+
+  await surface.show();
+  const switchButton = document.getElementById('provider:p1:switch');
+  const editButton = document.getElementById('provider:p1:edit');
+  const deleteButton = document.getElementById('provider:p1:delete');
+  assert.ok(switchButton);
+  assert.ok(editButton);
+  assert.ok(deleteButton);
+  assert.deepEqual(
+    switchButton.parentElement?.children.map((child) => child.id),
+    ['provider:p1:switch', 'provider:p1:edit', 'provider:p1:delete'],
+  );
+
+  await surface.handleAction('down');
+  assert.equal(presenter.state.focusedId, 'provider:p1:edit');
+  assert.equal(document.activeElement?.id, 'provider:p1:edit');
+  assert.deepEqual(events, []);
+
+  await surface.handleAction('select');
+  assert.deepEqual(events, ['edit:p1:xtream']);
+  assert.equal(presenter.state.activeProviderId, 'p1');
+});
+
 test('M5 provider surface cancels delete confirmation before leaving the route', async () => {
   const events: string[] = [];
   const presenter = new ProviderManagementPresenter({
@@ -69,6 +111,7 @@ test('M5 provider surface cancels delete confirmation before leaving the route',
       };
     },
     async switchProvider() { events.push('switch'); },
+    requestEditProvider() { events.push('edit'); },
     async deleteProvider() { events.push('delete'); },
     requestAddProvider() { events.push('add'); },
   });
@@ -82,6 +125,9 @@ test('M5 provider surface cancels delete confirmation before leaving the route',
   assert.ok(document.getElementById('provider-management-page'));
   assert.equal(presenter.state.focusedId, 'provider:p1:switch');
 
+  await surface.handleAction('down');
+  assert.equal(presenter.state.focusedId, 'provider:p1:edit');
+  assert.equal(events.length, 0);
   await surface.handleAction('down');
   assert.equal(presenter.state.focusedId, 'provider:p1:delete');
   await surface.handleAction('select');
@@ -100,6 +146,7 @@ test('M5 provider surface exposes existing app settings as a separate trailing a
   const presenter = new ProviderManagementPresenter({
     async load() { return { providers: [], activeProviderId: null }; },
     async switchProvider() {},
+    requestEditProvider() {},
     async deleteProvider() {},
     requestAddProvider() { events.push('add'); },
   });
