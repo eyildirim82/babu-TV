@@ -17,11 +17,11 @@ test('browser app dependencies construct ProviderReentryService from the same pr
   );
   assert.match(
     source,
-    /const providerReentry = new ProviderReentryService\(\{\s*providers: runtime\.providers,\s*credentials: runtime\.credentials,\s*adapters: runtime\.adapters,\s*sync: runtime\.sync,\s*\}\);/s,
+    /const providerReentry = new ProviderReentryService\(\{\s*providers: runtime\.providers,\s*credentials: runtime\.credentials,\s*adapters: runtime\.adapters,\s*sync: runtime\.sync,\s*\}\);/,
   );
   assert.match(
     source,
-    /reentry:\s*\{\s*reenter:\s*\(input\)\s*=>\s*providerReentry\.reenter\(input\),\s*\},/s,
+    /reentry:\s*\{\s*reenter:\s*\(input\)\s*=>\s*providerReentry\.reenter\(input\),\s*\},/,
   );
 });
 

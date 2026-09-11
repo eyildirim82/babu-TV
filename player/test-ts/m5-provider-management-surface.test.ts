@@ -127,7 +127,7 @@ test('M5 provider surface cancels delete confirmation before leaving the route',
 
   await surface.handleAction('down');
   assert.equal(presenter.state.focusedId, 'provider:p1:edit');
-  assert.deepEqual(events, []);
+  assert.equal(events.length, 0);
   await surface.handleAction('down');
   assert.equal(presenter.state.focusedId, 'provider:p1:delete');
   await surface.handleAction('select');

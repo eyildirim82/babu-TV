@@ -354,14 +354,14 @@ test('M5 add-provider Xtream flow stays explicit add mode and uses onboarding on
 
   const app = createAppComposition(deps);
   await app.boot();
-  requireBound(firstRunCallbacks, 'first-run callbacks').onXtreamSelected();
+  requireBound<FirstRunCallbacks>(firstRunCallbacks, 'first-run callbacks').onXtreamSelected();
   assert.deepEqual(app.route(), {
     kind: 'xtream-entry',
     returnTo: 'first-run',
     mode: { kind: 'add' },
   });
 
-  await requireBound(xtreamCallbacks, 'Xtream callbacks').onSubmit({
+  await requireBound<XtreamEntryCallbacks>(xtreamCallbacks, 'Xtream callbacks').onSubmit({
     serverUrl: 'https://add.example',
     username: 'add-user',
     password: 'add-pass',
@@ -402,7 +402,7 @@ test('M5 Xtream edit uses same providerId, no prefill payload, no switch/playbac
   await app.handleHomeIntent({ type: 'OPEN_SETTINGS' });
   events.length = 0;
 
-  requireBound(providerCallbacks, 'provider callbacks').onEditProvider('p1', 'xtream');
+  requireBound<AppProviderManagementCallbacks>(providerCallbacks, 'provider callbacks').onEditProvider('p1', 'xtream');
   assert.deepEqual(app.route(), {
     kind: 'xtream-entry',
     returnTo: 'provider-management',
@@ -415,7 +415,7 @@ test('M5 Xtream edit uses same providerId, no prefill payload, no switch/playbac
   assert.equal(events.some((event) => event.startsWith('switch:')), false);
   assert.equal(events.some((event) => event.startsWith('play:')), false);
 
-  await requireBound(xtreamCallbacks, 'Xtream callbacks').onSubmit({
+  await requireBound<XtreamEntryCallbacks>(xtreamCallbacks, 'Xtream callbacks').onSubmit({
     serverUrl: 'https://candidate.example',
     username: 'candidate-user',
     password: 'candidate-pass',
@@ -464,7 +464,7 @@ test('M5 M3U edit uses same providerId and returns to refreshed provider managem
   await app.handleHomeIntent({ type: 'OPEN_SETTINGS' });
   events.length = 0;
 
-  requireBound(providerCallbacks, 'provider callbacks').onEditProvider('p1', 'm3u');
+  requireBound<AppProviderManagementCallbacks>(providerCallbacks, 'provider callbacks').onEditProvider('p1', 'm3u');
   assert.deepEqual(app.route(), {
     kind: 'm3u-entry',
     returnTo: 'provider-management',
@@ -473,7 +473,7 @@ test('M5 M3U edit uses same providerId and returns to refreshed provider managem
   assert.equal(m3uShowArgCount, 0);
   assert.equal(JSON.stringify(app.route()).includes('playlistUrl'), false);
 
-  await requireBound(m3uCallbacks, 'M3U callbacks').onSubmit({
+  await requireBound<M3uEntryCallbacks>(m3uCallbacks, 'M3U callbacks').onSubmit({
     playlistUrl: 'https://candidate.example/list.m3u',
   });
   assert.deepEqual(reentries, [{
@@ -518,9 +518,9 @@ test('M5 edit failure stays on entry and Back returns without another write', as
   await app.boot();
   await app.handleHomeIntent({ type: 'OPEN_SETTINGS' });
   events.length = 0;
-  requireBound(providerCallbacks, 'provider callbacks').onEditProvider('p1', 'xtream');
+  requireBound<AppProviderManagementCallbacks>(providerCallbacks, 'provider callbacks').onEditProvider('p1', 'xtream');
 
-  await assert.rejects(() => requireBound(xtreamCallbacks, 'Xtream callbacks').onSubmit({
+  await assert.rejects(() => requireBound<XtreamEntryCallbacks>(xtreamCallbacks, 'Xtream callbacks').onSubmit({
     serverUrl: 'https://candidate.example',
     username: 'candidate-user',
     password: 'candidate-pass',
