@@ -23,6 +23,7 @@ export class DomLiveTvView implements LiveTvView {
   private readonly channelName: HTMLElement;
   private readonly status: HTMLElement;
   private readonly numeric: HTMLElement;
+  private readonly featureRoot: HTMLElement;
 
   constructor(private readonly document: Document) {
     this.sidebar = required(document, 'sidebar');
@@ -31,6 +32,11 @@ export class DomLiveTvView implements LiveTvView {
     this.channelName = required(document, 'channel-name');
     this.status = required(document, 'live-tv-status');
     this.numeric = required(document, 'numeric-zap');
+    this.featureRoot = document.createElement('div');
+    this.featureRoot.className = 'live-tv-feature-root';
+    this.featureRoot.dataset.featureRoot = 'm4';
+    this.featureRoot.classList.add('hidden');
+    this.sidebar.append(this.featureRoot);
   }
 
   render(state: LiveTvState, model: LiveTvViewModel): void {
@@ -38,6 +44,7 @@ export class DomLiveTvView implements LiveTvView {
     this.sidebar.classList.toggle('closed', !state.overlayOpen);
     this.renderChannels(state, model);
     this.renderCategories(state, model);
+    this.renderFeatures(model);
     this.renderNowPlaying(state, model);
     this.renderPlaybackStatus(state);
     this.renderNumeric(state.numericInput);
@@ -49,10 +56,17 @@ export class DomLiveTvView implements LiveTvView {
       const highlighted = channel.id === state.highlightedChannelId;
       const focused = highlighted && state.overlayZone === 'CHANNEL';
       const playing = channel.id === state.playingChannelId;
+      const epgCurrent = model.features?.epg.channelContext.find(
+        (entry) => entry.channelId === channel.id,
+      )?.current;
+      const labelParts = [channelLabel(channel)];
+      if (epgCurrent?.status === 'available') {
+        labelParts.push(`${epgCurrent.title} ${epgCurrent.timeLabel}`);
+      }
 
       item.className = 'channel-item';
       item.dataset.channelId = channel.id;
-      item.textContent = channelLabel(channel);
+      item.textContent = labelParts.join(' · ');
       item.classList.toggle('highlighted', highlighted);
       item.classList.toggle('focused', focused);
       item.classList.toggle('playing', playing);
@@ -75,8 +89,15 @@ export class DomLiveTvView implements LiveTvView {
 
   private renderCategories(state: LiveTvState, model: LiveTvViewModel): void {
     const activeKey = scopeKey(state.activeScope);
+    const favoriteEntry = model.features === undefined
+      ? []
+      : [{
+          key: model.features.favorites.categoryKey,
+          name: model.features.favorites.categoryLabel,
+        }];
     const entries = [
       { key: 'all', name: 'Tümü' },
+      ...favoriteEntry,
       ...model.categories.map((category) => ({
         key: `category:${category.id}`,
         name: category.name,
@@ -99,6 +120,113 @@ export class DomLiveTvView implements LiveTvView {
     this.groupList.replaceChildren(...items);
     this.groupList.classList.toggle('hidden', false);
     this.groupList.classList.toggle('zone-active', state.overlayZone === 'CATEGORY');
+  }
+
+  private renderFeatures(model: LiveTvViewModel): void {
+    const features = model.features;
+    if (features === undefined) {
+      this.featureRoot.replaceChildren();
+      this.featureRoot.classList.add('hidden');
+      return;
+    }
+
+    const sections: HTMLElement[] = [];
+    const selected = features.epg.selected;
+    if (selected !== null) {
+      const section = this.document.createElement('div');
+      section.className = 'live-tv-selected-epg';
+      section.dataset.featureSection = 'selected-epg';
+      const copy: string[] = [];
+      if (selected.current.status === 'available') {
+        copy.push(`Şimdi: ${selected.current.title} ${selected.current.timeLabel}`);
+      }
+      if (selected.next.status === 'available') {
+        copy.push(`Sonraki: ${selected.next.title} ${selected.next.timeLabel}`);
+      }
+      section.textContent = copy.join(' · ');
+      sections.push(section);
+    }
+
+    const favorites = this.document.createElement('div');
+    favorites.className = 'live-tv-favorites';
+    favorites.dataset.featureSection = 'favorites';
+    favorites.dataset.categoryKey = features.favorites.categoryKey;
+    favorites.dataset.presentationState = features.favorites.status;
+    if (features.favorites.status === 'empty') {
+      const empty = features.favorites.emptyState;
+      favorites.textContent = empty === null
+        ? features.favorites.categoryLabel
+        : `${features.favorites.categoryLabel} · ${empty.title} · ${empty.message}`;
+    } else {
+      favorites.textContent = `${features.favorites.categoryLabel} · ${features.favorites.channels
+        .map((channel) => channel.name)
+        .join(' · ')}`;
+    }
+    sections.push(favorites);
+
+    if (features.layer === 'search') {
+      const search = this.document.createElement('div');
+      search.className = 'live-tv-search';
+      search.dataset.featureSection = 'search';
+      search.dataset.presentationState = features.search.status;
+
+      const input = this.document.createElement('input');
+      input.className = 'live-tv-search-input';
+      input.type = 'search';
+      input.value = features.search.query;
+      input.dataset.presentationState = features.search.focusZone === 'input' ? 'focused' : 'idle';
+      search.append(input);
+
+      for (const item of features.search.items) {
+        const result = this.document.createElement('div');
+        result.className = 'live-tv-search-result';
+        result.dataset.resultKey = item.key;
+        result.dataset.presentationState = item.key === features.search.focusedResultKey
+          ? 'focused'
+          : 'idle';
+        result.textContent = item.numberText === null
+          ? item.primaryText
+          : `${item.numberText} ${item.primaryText}`;
+        search.append(result);
+      }
+      sections.push(search);
+    }
+
+    if (
+      features.actions !== null
+      && (features.layer === 'actions' || features.layer === 'program-info')
+    ) {
+      const actions = this.document.createElement('div');
+      actions.className = 'live-tv-actions';
+      actions.dataset.featureSection = 'actions';
+      for (const item of features.actions.items) {
+        const action = this.document.createElement('button');
+        action.className = 'live-tv-action';
+        action.dataset.actionId = item.id;
+        action.dataset.presentationState = item.id === features.actions.state.focusedActionId
+          ? 'focused'
+          : 'idle';
+        action.textContent = item.label;
+        actions.append(action);
+      }
+      sections.push(actions);
+    }
+
+    if (features.layer === 'program-info' && features.programInfo !== null) {
+      const programInfo = this.document.createElement('div');
+      programInfo.className = 'live-tv-program-info';
+      programInfo.dataset.featureSection = 'program-info';
+      programInfo.textContent = [
+        features.programInfo.title,
+        features.programInfo.timeLabel,
+        features.programInfo.description,
+      ].filter((part): part is string => part !== null && part.length > 0).join(' · ');
+      sections.push(programInfo);
+    }
+
+    this.featureRoot.replaceChildren(...sections);
+    this.featureRoot.classList.remove('hidden');
+    this.featureRoot.dataset.activeLayer = features.layer;
   }
 
   private renderNowPlaying(state: LiveTvState, model: LiveTvViewModel): void {

@@ -19,6 +19,10 @@ import {
 import { WatchStateService } from '../watch/service.js';
 import { ChannelIntentCoordinator } from './channel-intent-coordinator.js';
 import { DomLiveTvView } from './dom-live-tv-view.js';
+import {
+  createLiveTvFeatureComposition,
+  type LiveTvFeaturePorts,
+} from './live-tv-feature-composition.js';
 import { LiveTvController } from './live-tv-controller.js';
 import { ProviderStreamResolver } from './provider-stream-resolver.js';
 
@@ -57,6 +61,7 @@ export interface BrowserLiveTvRuntimeDependencies {
   document: Document;
   legacyPlayer: ConstructorParameters<typeof ShakaAdapter>[0];
   legacyAvplay: ConstructorParameters<typeof AvplayAdapter>[0];
+  featurePorts?: LiveTvFeaturePorts;
 }
 
 export async function createLiveTvRuntime(
@@ -139,6 +144,9 @@ export async function createBrowserLiveTvRuntime(
       terminalBinder,
     );
     const view = new DomLiveTvView(deps.document);
+    const features = deps.featurePorts === undefined
+      ? undefined
+      : createLiveTvFeatureComposition(deps.featurePorts);
     let controller: LiveTvController | null = null;
     const intent = new ChannelIntentCoordinator(
       resolver,
@@ -149,6 +157,7 @@ export async function createBrowserLiveTvRuntime(
       intent,
       platform: deps.platform,
       view,
+      ...(features === undefined ? {} : { features }),
     });
 
     return await createLiveTvRuntime({

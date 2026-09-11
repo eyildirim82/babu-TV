@@ -2,16 +2,26 @@ import type { Channel, ChannelId, ProviderId } from '../domain/models.js';
 import type { LiveTvAction, LiveTvScope, LiveTvState } from './contracts.js';
 
 export function scopeKey(scope: LiveTvScope): string {
-  return scope.kind === 'all' ? 'all' : `category:${scope.categoryId}`;
+  if (scope.kind === 'all') return 'all';
+  if (scope.kind === 'favorites') return 'virtual:favorites';
+  return `category:${scope.categoryId}`;
 }
 
 export function channelsForScope(
   channels: readonly Channel[],
   scope: LiveTvScope,
+  favoriteChannelIds: readonly ChannelId[] = [],
 ): readonly Channel[] {
-  return scope.kind === 'all'
-    ? channels
-    : channels.filter((channel) => channel.categoryId === scope.categoryId);
+  if (scope.kind === 'all') return channels;
+  if (scope.kind === 'category') {
+    return channels.filter((channel) => channel.categoryId === scope.categoryId);
+  }
+
+  const channelById = new Map(channels.map((channel) => [channel.id, channel]));
+  return favoriteChannelIds.flatMap((channelId) => {
+    const channel = channelById.get(channelId);
+    return channel === undefined ? [] : [channel];
+  });
 }
 
 function firstExisting(
@@ -35,8 +45,16 @@ function withRestore(
   };
 }
 
-function visibleIds(channels: readonly Channel[], scope: LiveTvScope): readonly ChannelId[] {
-  return channelsForScope(channels, scope).map((channel) => channel.id);
+function visibleIds(
+  channels: readonly Channel[],
+  scope: LiveTvScope,
+  favoriteChannelIds: readonly ChannelId[],
+): readonly ChannelId[] {
+  return channelsForScope(channels, scope, favoriteChannelIds).map((channel) => channel.id);
+}
+
+function favoriteIds(state: LiveTvState): readonly ChannelId[] {
+  return state.favoriteChannelIds ?? [];
 }
 
 export function createInitialLiveTvState(providerId: ProviderId): LiveTvState {
@@ -45,6 +63,7 @@ export function createInitialLiveTvState(providerId: ProviderId): LiveTvState {
     playingChannelId: null,
     highlightedChannelId: null,
     activeScope: { kind: 'all' },
+    favoriteChannelIds: [],
     restoreChannelIdByScope: {},
     overlayOpen: false,
     overlayZone: 'CHANNEL',
@@ -58,7 +77,7 @@ export function createInitialLiveTvState(providerId: ProviderId): LiveTvState {
 export function reduceLiveTv(state: LiveTvState, action: LiveTvAction): LiveTvState {
   switch (action.type) {
     case 'ENTER': {
-      const ids = visibleIds(action.channels, state.activeScope);
+      const ids = visibleIds(action.channels, state.activeScope, favoriteIds(state));
       const restore = state.restoreChannelIdByScope[scopeKey(state.activeScope)] ?? null;
       const highlightedChannelId = firstExisting(
         [state.playingChannelId, restore, state.highlightedChannelId],
@@ -73,7 +92,7 @@ export function reduceLiveTv(state: LiveTvState, action: LiveTvAction): LiveTvSt
     }
 
     case 'OPEN_OVERLAY': {
-      const ids = visibleIds(action.channels, state.activeScope);
+      const ids = visibleIds(action.channels, state.activeScope, favoriteIds(state));
       const restore = state.restoreChannelIdByScope[scopeKey(state.activeScope)] ?? null;
       const highlightedChannelId = firstExisting(
         [state.playingChannelId, restore, state.highlightedChannelId],
@@ -91,7 +110,7 @@ export function reduceLiveTv(state: LiveTvState, action: LiveTvAction): LiveTvSt
       return { ...state, overlayOpen: false };
 
     case 'SET_SCOPE': {
-      const ids = visibleIds(action.channels, action.scope);
+      const ids = visibleIds(action.channels, action.scope, favoriteIds(state));
       const restore = state.restoreChannelIdByScope[scopeKey(action.scope)] ?? null;
       const highlightedChannelId = firstExisting(
         [state.playingChannelId, restore, state.highlightedChannelId],
@@ -106,7 +125,7 @@ export function reduceLiveTv(state: LiveTvState, action: LiveTvAction): LiveTvSt
     }
 
     case 'MOVE_HIGHLIGHT': {
-      const ids = visibleIds(action.channels, state.activeScope);
+      const ids = visibleIds(action.channels, state.activeScope, favoriteIds(state));
       if (ids.length === 0) {
         return {
           ...state,
@@ -133,7 +152,7 @@ export function reduceLiveTv(state: LiveTvState, action: LiveTvAction): LiveTvSt
     }
 
     case 'SYNC_CHANNELS': {
-      const ids = visibleIds(action.channels, state.activeScope);
+      const ids = visibleIds(action.channels, state.activeScope, favoriteIds(state));
       const restore = state.restoreChannelIdByScope[scopeKey(state.activeScope)] ?? null;
       const highlightedChannelId = firstExisting(
         [state.highlightedChannelId, restore, state.playingChannelId],
@@ -141,6 +160,26 @@ export function reduceLiveTv(state: LiveTvState, action: LiveTvAction): LiveTvSt
       );
       return {
         ...state,
+        highlightedChannelId,
+        restoreChannelIdByScope: withRestore(state, state.activeScope, highlightedChannelId),
+      };
+    }
+
+    case 'SYNC_FAVORITES': {
+      const favoriteChannelIds = [...action.channelIds];
+      if (state.activeScope.kind !== 'favorites') {
+        return { ...state, favoriteChannelIds };
+      }
+
+      const ids = visibleIds(action.channels, state.activeScope, favoriteChannelIds);
+      const restore = state.restoreChannelIdByScope[scopeKey(state.activeScope)] ?? null;
+      const highlightedChannelId = firstExisting(
+        [state.highlightedChannelId, restore, state.playingChannelId],
+        ids,
+      );
+      return {
+        ...state,
+        favoriteChannelIds,
         highlightedChannelId,
         restoreChannelIdByScope: withRestore(state, state.activeScope, highlightedChannelId),
       };
