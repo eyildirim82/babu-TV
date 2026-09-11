@@ -1,5 +1,6 @@
 import type { ProviderId } from '../domain/models.js';
 import type { PairingCiphertextV1, PairingTvKeyPair } from './crypto.js';
+import { decodePairingProviderPayload } from './phone-payload.js';
 import type { PairingSessionDescriptor } from './session.js';
 
 const PAIRING_CIPHERTEXT_KEYS = [
@@ -168,12 +169,39 @@ export class PairingTvController {
       return { status: 'error', code: 'INVALID_PAYLOAD' };
     }
 
+    let plaintext: Uint8Array;
     try {
-      await this.deps.crypto.decrypt(session.value.privateKey, envelope);
+      plaintext = await this.deps.crypto.decrypt(session.value.privateKey, envelope);
     } catch {
       return { status: 'error', code: 'INVALID_PAYLOAD' };
     }
 
-    return { status: 'error', code: 'INVALID_PAYLOAD' };
+    let payload: ReturnType<typeof decodePairingProviderPayload>;
+    try {
+      payload = decodePairingProviderPayload(plaintext);
+    } catch {
+      return { status: 'error', code: 'INVALID_PAYLOAD' };
+    }
+
+    try {
+      if (payload.credential.kind === 'xtream') {
+        const result = await this.deps.onboarding.connectXtream({
+          serverUrl: payload.credential.serverUrl,
+          username: payload.credential.username,
+          password: payload.credential.password,
+        });
+        return { status: 'completed', providerId: result.providerId };
+      }
+
+      const result = await this.deps.onboarding.connectM3u({
+        playlistUrl: payload.credential.playlistUrl,
+      });
+      if (!result.ok) {
+        return { status: 'error', code: 'UNAVAILABLE' };
+      }
+      return { status: 'completed', providerId: result.providerId };
+    } catch {
+      return { status: 'error', code: 'UNAVAILABLE' };
+    }
   }
 }
