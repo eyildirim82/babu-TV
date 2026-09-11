@@ -3,6 +3,8 @@ import * as legacyPlayer from './player.js';
 import * as legacyAvplay from './avplay.js';
 import { createPlaybackService } from './playback/playback-service.ts';
 import { createBrowserLiveTvRuntime } from './live-tv/create-live-tv-runtime.ts';
+import { createAppComposition } from './app/app-composition.ts';
+import { createBrowserAppDependencies } from './app/browser-app-dependencies.ts';
 import * as ui from './ui.js';
 import * as remote from './remote.js';
 import * as settings from './settings.js';
@@ -67,6 +69,22 @@ let bufferingActive = false;
 let cleanupListeners = [];
 let pendingPreview = null;
 let m3Controller = null;
+let activeAppComposition = null;
+
+function handleAppRemoteAction(action, value) {
+  if (!activeAppComposition) return;
+  void activeAppComposition.handleRemote(action, value);
+}
+
+function setAppRemoteNumericMode(mode) {
+  remote.destroy();
+  remote.init(handleAppRemoteAction, {
+    numericMode: mode === 'digits' ? 'digits' : 'buffered',
+  });
+  if (mode === 'digits' && platform.capabilities().numericKeys) {
+    platform.registerOptionalKeys(M3_NUMERIC_TIZEN_KEYS);
+  }
+}
 
 const actionMap = {
   up: 'UP',
@@ -332,22 +350,68 @@ async function init() {
     return;
   }
 
-  if (await tryStartM3LiveTv()) {
-    return;
-  }
-
-  remote.init(handleRemoteAction);
-  
-
-
   platform.registerOptionalKeys(LEGACY_OPTIONAL_TIZEN_KEYS);
+  setAppRemoteNumericMode('buffered');
+  settings.init(document.getElementById('settings-page'), {
+    onPlaylistFetched: (newChannels) => {
+      sortChannels(newChannels);
+      applyProxyOverrides(newChannels);
+      channels = newChannels;
+      settings.hide();
+      showPlayer();
+    },
+    onXtreamRequested: showXtreamEntry,
+    onClose: () => {
+      settings.hide();
+      if (activeAppComposition) {
+        void activeAppComposition.handleRemote('back');
+      }
+    },
+  });
 
   document.addEventListener('tizenhwkey', (e) => {
     if (e.keyName === 'back') {
       e.preventDefault();
-      handleRemoteAction('back');
+      handleAppRemoteAction('back');
     }
   });
+
+  const appComposition = createAppComposition(createBrowserAppDependencies({
+    indexedDb: window.indexedDB || null,
+    widgetData: window.webapis && window.webapis.widgetdata
+      ? window.webapis.widgetdata
+      : null,
+    fetchImpl: window.fetch.bind(window),
+    platform,
+    document,
+    legacyPlayer,
+    legacyAvplay,
+    setRemoteNumericMode: setAppRemoteNumericMode,
+    legacy: {
+      hidePlayerShell: () => hidePlayer(),
+      showPlayerShell: () => showPlayer(),
+      openPlayer: () => startLegacyPlayerShell(),
+      showSettings: () => showSettingsPage(),
+      hideSettings: () => settings.hide(),
+      handleRemote: (action, value) => handleRemoteAction(action, value),
+    },
+    exitApp: () => {
+      ui.showConfirmDialog('Uygulamadan çıkılsın mı?', (confirmed) => {
+        if (confirmed) platform.exitApp();
+      });
+    },
+  }));
+  activeAppComposition = appComposition;
+  await appComposition.boot();
+  hideBootSplash();
+}
+
+async function startLegacyPlayerShell() {
+  setAppRemoteNumericMode('buffered');
+
+
+
+  platform.registerOptionalKeys(LEGACY_OPTIONAL_TIZEN_KEYS);
 
   const s = getSettings();
   const activePlaylist = getActivePlaylist();
@@ -403,9 +467,8 @@ async function init() {
   } else {
     showFirstLaunch();
   }
-
-
 }
+
 
 function cleanupEventListeners() {
   cleanupListeners.forEach(({ element, event, handler }) => {

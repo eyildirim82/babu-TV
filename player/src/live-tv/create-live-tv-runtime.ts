@@ -49,8 +49,24 @@ export interface LiveTvRuntimeDependencies {
   controller: LiveTvController;
 }
 
+export interface LiveTvProviderEntryDependencies {
+  providers: Pick<ProviderRepository, 'getProvider'>;
+  credentials: LiveTvRuntimeCredentialPort;
+  core: LiveTvRuntimeCorePort;
+  controller: LiveTvController;
+}
+
 export type LiveTvRuntimeStart =
   | { mode: 'm3'; controller: LiveTvController; refresh: Promise<void> }
+  | { mode: 'legacy' };
+
+export type BrowserLiveTvRuntimeStart =
+  | {
+      mode: 'm3';
+      controller: LiveTvController;
+      refresh: Promise<void>;
+      enterProvider(providerId: ProviderId): Promise<void>;
+    }
   | { mode: 'legacy' };
 
 export interface BrowserLiveTvRuntimeDependencies {
@@ -62,6 +78,32 @@ export interface BrowserLiveTvRuntimeDependencies {
   legacyPlayer: ConstructorParameters<typeof ShakaAdapter>[0];
   legacyAvplay: ConstructorParameters<typeof AvplayAdapter>[0];
   featurePorts?: LiveTvFeaturePorts;
+}
+
+export function createLiveTvProviderEntry(
+  deps: LiveTvProviderEntryDependencies,
+): (providerId: ProviderId) => Promise<void> {
+  return async (providerId) => {
+    if (await deps.providers.getProvider(providerId) === null) {
+      throw new Error('LIVE_TV_PROVIDER_UNAVAILABLE');
+    }
+    if (!deps.credentials.isAvailable()) {
+      throw new Error('LIVE_TV_CREDENTIAL_UNAVAILABLE');
+    }
+    if (await deps.credentials.load(providerId) === null) {
+      throw new Error('LIVE_TV_CREDENTIAL_UNAVAILABLE');
+    }
+
+    const cacheFirst = await deps.core.loadCacheFirst(providerId);
+    deps.controller.enter(cacheFirst.cached);
+
+    void cacheFirst.refresh.then(async () => {
+      const refreshed = await deps.core.loadCached(providerId);
+      deps.controller.syncCatalog(refreshed);
+    }).catch(() => {
+      // Cache-first Live TV remains usable when background refresh fails.
+    });
+  };
 }
 
 export async function createLiveTvRuntime(
@@ -111,7 +153,7 @@ export async function createLiveTvRuntime(
 
 export async function createBrowserLiveTvRuntime(
   deps: BrowserLiveTvRuntimeDependencies,
-): Promise<LiveTvRuntimeStart> {
+): Promise<BrowserLiveTvRuntimeStart> {
   try {
     const {
       providers,
@@ -160,12 +202,25 @@ export async function createBrowserLiveTvRuntime(
       ...(features === undefined ? {} : { features }),
     });
 
-    return await createLiveTvRuntime({
+    const initial = await createLiveTvRuntime({
       providers,
       credentials,
       core,
       controller,
     });
+    if (initial.mode === 'legacy') return initial;
+
+    const enterProvider = createLiveTvProviderEntry({
+      providers,
+      credentials,
+      core,
+      controller: initial.controller,
+    });
+
+    return {
+      ...initial,
+      enterProvider,
+    };
   } catch {
     return { mode: 'legacy' };
   }

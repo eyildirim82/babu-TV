@@ -164,6 +164,31 @@ export class LiveTvController {
     return this.current;
   }
 
+  openScope(scope: { kind: 'all' } | { kind: 'favorites' }): void {
+    if (this.current === null || this.snapshot === null) return;
+    this.current = reduceLiveTv(this.current, {
+      type: 'SET_SCOPE',
+      scope,
+      channels: this.snapshot.channels,
+    });
+    this.current = {
+      ...this.current,
+      overlayOpen: true,
+      overlayZone: 'CHANNEL',
+    };
+    this.render();
+    this.refreshFeatures();
+  }
+
+  openChannel(channelId: ChannelId): void {
+    this.focusChannelInAllScope(channelId);
+  }
+
+  async playChannel(channelId: ChannelId): Promise<void> {
+    if (!this.focusChannelInAllScope(channelId)) return;
+    await this.requestPlayback(channelId);
+  }
+
   openSearch(query = ''): void {
     const input = this.featureInput();
     if (input === null || this.deps.features === undefined || this.featureState === null) return;
@@ -492,13 +517,17 @@ export class LiveTvController {
     this.render();
   }
 
-  private applySearchActivation(activation: LiveTvSearchActivation): void {
-    if (this.current === null || this.snapshot === null) return;
-    if (activation.providerId !== this.current.providerId) return;
-    const target = this.snapshot.channels.find(
-      (channel) => channel.providerId === activation.providerId && channel.id === activation.channelId,
-    );
-    if (target === undefined) return;
+  private activeChannel(channelId: ChannelId): Channel | null {
+    if (this.current === null || this.snapshot === null) return null;
+    return this.snapshot.channels.find(
+      (channel) => channel.providerId === this.current?.providerId && channel.id === channelId,
+    ) ?? null;
+  }
+
+  private focusChannelInAllScope(channelId: ChannelId): boolean {
+    if (this.current === null || this.snapshot === null) return false;
+    const target = this.activeChannel(channelId);
+    if (target === null) return false;
 
     const allScope = { kind: 'all' as const };
     this.current = reduceLiveTv(this.current, {
@@ -518,6 +547,13 @@ export class LiveTvController {
     };
     this.render();
     this.refreshFeatures();
+    return true;
+  }
+
+  private applySearchActivation(activation: LiveTvSearchActivation): void {
+    if (this.current === null) return;
+    if (activation.providerId !== this.current.providerId) return;
+    this.focusChannelInAllScope(activation.channelId);
   }
 
   private render(): void {
