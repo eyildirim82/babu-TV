@@ -1,14 +1,15 @@
 import type { LogicalInput } from '../domain/actions.js';
 import type { ChannelId, ProviderId } from '../domain/models.js';
+import type { HomeActionIntent } from '../home/home-domain.js';
 import type {
-  HomeActionIntent,
+  HomeInputAction,
   HomePresentationState,
-} from '../home/home-domain.js';
-import type { HomeInputAction, HomeViewCallbacks } from '../home/home-view.js';
+  HomeViewCallbacks,
+} from '../home/home-view.js';
 import type {
-  FirstRunInputAction,
-  FirstRunState,
-  FirstRunViewCallbacks,
+  FirstRunAction,
+  FirstRunCallbacks,
+  FirstRunPresentationState,
 } from '../first-run/first-run-view.js';
 import type {
   XtreamEntryAction,
@@ -70,9 +71,9 @@ export interface AppHomeViewPort {
 }
 
 export interface AppFirstRunViewPort {
-  show(state?: FirstRunState): void;
+  show(state?: FirstRunPresentationState): void;
   hide(): void;
-  handleAction(action: FirstRunInputAction): void;
+  handleAction(action: FirstRunAction): void;
 }
 
 export interface AppEntryViewPort<Action extends string> {
@@ -110,7 +111,7 @@ export interface AppCompositionDependencies {
   homeData: HomeDataSource;
   views: {
     home(callbacks: HomeViewCallbacks): AppHomeViewPort;
-    firstRun(callbacks: FirstRunViewCallbacks): AppFirstRunViewPort;
+    firstRun(callbacks: FirstRunCallbacks): AppFirstRunViewPort;
     xtream(callbacks: XtreamEntryCallbacks): AppEntryViewPort<XtreamEntryAction>;
     m3u(callbacks: M3uEntryCallbacks): AppEntryViewPort<M3uEntryAction>;
     providerManagement(callbacks: AppProviderManagementCallbacks): AppProviderManagementPort;
@@ -256,8 +257,8 @@ export class AppComposition {
         }
         return;
       case 'first-run':
-        if (HOME_ACTIONS.has(action as FirstRunInputAction)) {
-          this.firstRunView.handleAction(action as FirstRunInputAction);
+        if (HOME_ACTIONS.has(action as FirstRunAction)) {
+          this.firstRunView.handleAction(action as FirstRunAction);
         }
         return;
       case 'xtream-entry':
