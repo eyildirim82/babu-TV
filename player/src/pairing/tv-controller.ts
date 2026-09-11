@@ -2,6 +2,50 @@ import type { ProviderId } from '../domain/models.js';
 import type { PairingCiphertextV1, PairingTvKeyPair } from './crypto.js';
 import type { PairingSessionDescriptor } from './session.js';
 
+const PAIRING_CIPHERTEXT_KEYS = [
+  'version',
+  'algorithm',
+  'senderPublicKey',
+  'iv',
+  'ciphertext',
+] as const;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasExactKeys(
+  value: Record<string, unknown>,
+  keys: readonly string[],
+): boolean {
+  const actualKeys = Object.keys(value);
+  return actualKeys.length === keys.length
+    && keys.every((key) => Object.prototype.hasOwnProperty.call(value, key));
+}
+
+function decodeCiphertextEnvelope(serialized: string): PairingCiphertextV1 {
+  const value: unknown = JSON.parse(serialized);
+  if (
+    !isRecord(value)
+    || !hasExactKeys(value, PAIRING_CIPHERTEXT_KEYS)
+    || value.version !== 1
+    || value.algorithm !== 'ECDH-P256+A256GCM'
+    || !isRecord(value.senderPublicKey)
+    || typeof value.iv !== 'string'
+    || typeof value.ciphertext !== 'string'
+  ) {
+    throw new Error('INVALID_PAYLOAD');
+  }
+
+  return {
+    version: 1,
+    algorithm: 'ECDH-P256+A256GCM',
+    senderPublicKey: value.senderPublicKey as JsonWebKey,
+    iv: value.iv,
+    ciphertext: value.ciphertext,
+  };
+}
+
 export interface PairingTvCryptoPort {
   generateTvKeyPair(): Promise<PairingTvKeyPair>;
   decrypt(privateKey: CryptoKey, envelope: PairingCiphertextV1): Promise<Uint8Array>;
@@ -119,7 +163,7 @@ export class PairingTvController {
 
     let envelope: PairingCiphertextV1;
     try {
-      envelope = JSON.parse(relayResult.ciphertext) as PairingCiphertextV1;
+      envelope = decodeCiphertextEnvelope(relayResult.ciphertext);
     } catch {
       return { status: 'error', code: 'INVALID_PAYLOAD' };
     }
