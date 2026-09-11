@@ -29,3 +29,40 @@ test('PAIR-WEB encodes exact M3U payload as UTF-8 JSON', () => {
   };
   assert.deepEqual(decodePairingProviderPayload(encodePairingProviderPayload(payload)), payload);
 });
+
+test('PAIR-WEB rejects malformed or widened provider payloads with one sanitized error', () => {
+  const invalidValues: unknown[] = [
+    { version: 2, credential: { kind: 'm3u', playlistUrl: 'https://x.invalid/a.m3u8' } },
+    { version: 1, credential: { kind: 'unknown' } },
+    { version: 1, credential: { kind: 'm3u', playlistUrl: 'x', extra: true } },
+    { version: 1, credential: { kind: 'xtream', serverUrl: 'x', username: 'u' } },
+    {
+      version: 1,
+      credential: {
+        kind: 'xtream',
+        serverUrl: 'x',
+        username: 'u',
+        password: 'p',
+        playlistUrl: 'x',
+      },
+    },
+    { version: 1, credential: { kind: 'm3u', playlistUrl: 7 } },
+    { version: 1, credential: { kind: 'm3u', playlistUrl: 'x' }, extra: true },
+  ];
+
+  for (const value of invalidValues) {
+    assert.throws(
+      () => decodePairingProviderPayload(new TextEncoder().encode(JSON.stringify(value))),
+      /^Error: Pairing provider payload is invalid\.$/,
+    );
+  }
+
+  assert.throws(
+    () => decodePairingProviderPayload(new TextEncoder().encode('{')),
+    /^Error: Pairing provider payload is invalid\.$/,
+  );
+  assert.throws(
+    () => decodePairingProviderPayload(new Uint8Array([0xff])),
+    /^Error: Pairing provider payload is invalid\.$/,
+  );
+});
