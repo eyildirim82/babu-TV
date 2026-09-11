@@ -18,6 +18,7 @@ function createOperations(options: {
   activeProviderId?: string | null;
   loadError?: Error;
   switchError?: Error;
+  editError?: Error;
   deleteError?: Error;
 } = {}) {
   const events: string[] = [];
@@ -41,6 +42,10 @@ function createOperations(options: {
         if (options.switchError) throw options.switchError;
         activeProviderId = providerId;
       },
+      requestEditProvider(providerId: string, kind: 'xtream' | 'm3u') {
+        events.push(`edit:${providerId}:${kind}`);
+        if (options.editError) throw options.editError;
+      },
       async deleteProvider(providerId: string) {
         events.push(`delete:${providerId}`);
         if (options.deleteError) throw options.deleteError;
@@ -54,7 +59,7 @@ function createOperations(options: {
   };
 }
 
-test('projects configured providers and active state without secret-bearing fields', async () => {
+test('projects configured providers and active state with stable switch edit delete focus order and no secret-bearing fields', async () => {
   const { ProviderManagementPresenter } = await loadPresenterModule();
   const fixture = createOperations();
   const presenter = new ProviderManagementPresenter(fixture.operations);
@@ -63,24 +68,98 @@ test('projects configured providers and active state without secret-bearing fiel
   const state = presenter.state;
 
   assert.equal(state.status, 'ready');
-  assert.deepEqual(state.providers.map((item: any) => ({ id: item.id, name: item.name, kind: item.kind, isActive: item.isActive })), [
-    { id: 'provider-a', name: 'Salon', kind: 'xtream', isActive: true },
-    { id: 'provider-b', name: 'Mutfak', kind: 'm3u', isActive: false },
+  assert.deepEqual(state.providers.map((item: any) => ({
+    id: item.id,
+    name: item.name,
+    kind: item.kind,
+    isActive: item.isActive,
+    editFocusId: item.editFocusId,
+  })), [
+    { id: 'provider-a', name: 'Salon', kind: 'xtream', isActive: true, editFocusId: 'provider:provider-a:edit' },
+    { id: 'provider-b', name: 'Mutfak', kind: 'm3u', isActive: false, editFocusId: 'provider:provider-b:edit' },
+  ]);
+  assert.deepEqual(state.focusOrder, [
+    'provider:provider-a:switch',
+    'provider:provider-a:edit',
+    'provider:provider-a:delete',
+    'provider:provider-b:switch',
+    'provider:provider-b:edit',
+    'provider:provider-b:delete',
+    'add-provider',
   ]);
   assert.equal(JSON.stringify(state).includes('url'), false);
   assert.equal(state.focusedId, 'provider:provider-a:switch');
 });
 
-test('moving focus never switches or deletes a provider', async () => {
+test('moving focus across switch edit and delete never invokes an operation', async () => {
   const { ProviderManagementPresenter } = await loadPresenterModule();
   const fixture = createOperations();
   const presenter = new ProviderManagementPresenter(fixture.operations);
   await presenter.load();
 
   presenter.moveFocus('next');
+  assert.equal(presenter.state.focusedId, 'provider:provider-a:edit');
+  presenter.moveFocus('next');
+  assert.equal(presenter.state.focusedId, 'provider:provider-a:delete');
   presenter.moveFocus('next');
 
   assert.equal(presenter.state.focusedId, 'provider:provider-b:switch');
+  assert.deepEqual(fixture.events, ['load']);
+});
+
+test('edit activation emits only the injected provider edit intent and preserves activation state', async () => {
+  const { ProviderManagementPresenter } = await loadPresenterModule();
+  const fixture = createOperations();
+  const presenter = new ProviderManagementPresenter(fixture.operations);
+  await presenter.load();
+  presenter.moveFocus('next');
+
+  await presenter.activateFocused();
+
+  assert.deepEqual(fixture.events, ['load', 'edit:provider-a:xtream']);
+  assert.equal(presenter.state.activeProviderId, 'provider-a');
+  assert.equal(presenter.state.confirmation, null);
+  assert.equal(presenter.state.focusedId, 'provider:provider-a:edit');
+});
+
+test('edit activation failure is sanitized and keeps edit focus stable', async () => {
+  const { ProviderManagementPresenter } = await loadPresenterModule();
+  const fixture = createOperations({
+    editError: new Error('https://secret.example/edit?token=TOP_SECRET'),
+  });
+  const presenter = new ProviderManagementPresenter(fixture.operations);
+  await presenter.load();
+  presenter.moveFocus('next');
+
+  await assert.doesNotReject(async () => presenter.activateFocused());
+
+  assert.deepEqual(fixture.events, ['load', 'edit:provider-a:xtream']);
+  assert.equal(presenter.state.focusedId, 'provider:provider-a:edit');
+  assert.equal(presenter.state.activeProviderId, 'provider-a');
+  assert.equal(presenter.state.confirmation, null);
+  assert.equal(presenter.state.errorMessage, 'Sağlayıcı düzenleme açılamadı.');
+  const serialized = JSON.stringify(presenter.state);
+  assert.equal(serialized.includes('secret.example'), false);
+  assert.equal(serialized.includes('TOP_SECRET'), false);
+});
+
+test('presenter state never prefills stored credential or URL-shaped edit data', async () => {
+  const { ProviderManagementPresenter } = await loadPresenterModule();
+  const fixture = createOperations();
+  const presenter = new ProviderManagementPresenter(fixture.operations);
+  await presenter.load();
+
+  const serialized = JSON.stringify(presenter.state);
+  for (const forbidden of [
+    'serverUrl',
+    'playlistUrl',
+    'username',
+    'password',
+    'https://credential.example.invalid',
+    'secret-password',
+  ]) {
+    assert.equal(serialized.includes(forbidden), false);
+  }
   assert.deepEqual(fixture.events, ['load']);
 });
 
@@ -89,6 +168,7 @@ test('explicit switch action delegates then reloads authoritative provider state
   const fixture = createOperations();
   const presenter = new ProviderManagementPresenter(fixture.operations);
   await presenter.load();
+  presenter.moveFocus('next');
   presenter.moveFocus('next');
   presenter.moveFocus('next');
 
@@ -118,6 +198,7 @@ test('delete action opens confirmation and does not delete before explicit confi
   const presenter = new ProviderManagementPresenter(fixture.operations);
   await presenter.load();
   presenter.moveFocus('next');
+  presenter.moveFocus('next');
 
   await presenter.activateFocused();
 
@@ -131,6 +212,7 @@ test('cancelling delete closes one layer and restores the delete action focus', 
   const fixture = createOperations();
   const presenter = new ProviderManagementPresenter(fixture.operations);
   await presenter.load();
+  presenter.moveFocus('next');
   presenter.moveFocus('next');
   await presenter.activateFocused();
 
@@ -146,6 +228,7 @@ test('confirmed delete delegates once then reloads and restores focus to a survi
   const fixture = createOperations();
   const presenter = new ProviderManagementPresenter(fixture.operations);
   await presenter.load();
+  presenter.moveFocus('next');
   presenter.moveFocus('next');
   await presenter.activateFocused();
   presenter.moveFocus('next');
@@ -178,6 +261,7 @@ test('switch and delete failures stay sanitized and keep the focused presentatio
   await switchPresenter.load();
   switchPresenter.moveFocus('next');
   switchPresenter.moveFocus('next');
+  switchPresenter.moveFocus('next');
   await switchPresenter.activateFocused();
   assert.equal(switchPresenter.state.errorMessage, 'Sağlayıcı değiştirilemedi.');
   assert.equal(switchPresenter.state.focusedId, 'provider:provider-b:switch');
@@ -186,6 +270,7 @@ test('switch and delete failures stay sanitized and keep the focused presentatio
   const deleteFixture = createOperations({ deleteError: new Error('https://secret.example/delete') });
   const deletePresenter = new ProviderManagementPresenter(deleteFixture.operations);
   await deletePresenter.load();
+  deletePresenter.moveFocus('next');
   deletePresenter.moveFocus('next');
   await deletePresenter.activateFocused();
   deletePresenter.moveFocus('next');
