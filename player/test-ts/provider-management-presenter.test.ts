@@ -18,6 +18,7 @@ function createOperations(options: {
   activeProviderId?: string | null;
   loadError?: Error;
   switchError?: Error;
+  editError?: Error;
   deleteError?: Error;
 } = {}) {
   const events: string[] = [];
@@ -43,6 +44,7 @@ function createOperations(options: {
       },
       requestEditProvider(providerId: string, kind: 'xtream' | 'm3u') {
         events.push(`edit:${providerId}:${kind}`);
+        if (options.editError) throw options.editError;
       },
       async deleteProvider(providerId: string) {
         events.push(`delete:${providerId}`);
@@ -118,6 +120,27 @@ test('edit activation emits only the injected provider edit intent and preserves
   assert.equal(presenter.state.activeProviderId, 'provider-a');
   assert.equal(presenter.state.confirmation, null);
   assert.equal(presenter.state.focusedId, 'provider:provider-a:edit');
+});
+
+test('edit activation failure is sanitized and keeps edit focus stable', async () => {
+  const { ProviderManagementPresenter } = await loadPresenterModule();
+  const fixture = createOperations({
+    editError: new Error('https://secret.example/edit?token=TOP_SECRET'),
+  });
+  const presenter = new ProviderManagementPresenter(fixture.operations);
+  await presenter.load();
+  presenter.moveFocus('next');
+
+  await assert.doesNotReject(async () => presenter.activateFocused());
+
+  assert.deepEqual(fixture.events, ['load', 'edit:provider-a:xtream']);
+  assert.equal(presenter.state.focusedId, 'provider:provider-a:edit');
+  assert.equal(presenter.state.activeProviderId, 'provider-a');
+  assert.equal(presenter.state.confirmation, null);
+  assert.equal(presenter.state.errorMessage, 'Sağlayıcı düzenleme açılamadı.');
+  const serialized = JSON.stringify(presenter.state);
+  assert.equal(serialized.includes('secret.example'), false);
+  assert.equal(serialized.includes('TOP_SECRET'), false);
 });
 
 test('presenter state never prefills stored credential or URL-shaped edit data', async () => {
