@@ -77,6 +77,8 @@ function deferred(): {
 function createHarness(options: {
   provider?: ProviderRecord | null;
   previousCredential?: ProviderCredential | null;
+  credentialAvailable?: boolean;
+  credentialLoadError?: unknown;
   profile?: ProviderProfile;
   profileError?: unknown;
   channels?: readonly Channel[];
@@ -95,6 +97,8 @@ function createHarness(options: {
   const saveCalls: ProviderCredential[] = [];
   let removeCalls = 0;
   let adapterCreates = 0;
+  let profileCalls = 0;
+  let channelCalls = 0;
   let refreshCalls = 0;
 
   const deps = {
@@ -105,8 +109,13 @@ function createHarness(options: {
       },
     },
     credentials: {
+      isAvailable() {
+        events.push('credential:isAvailable');
+        return options.credentialAvailable !== false;
+      },
       async load(providerId: ProviderId) {
         events.push(`credential:load:${providerId}`);
+        if (options.credentialLoadError) throw options.credentialLoadError;
         return storedCredential;
       },
       async save(providerId: ProviderId, credential: ProviderCredential) {
@@ -137,6 +146,7 @@ function createHarness(options: {
           providerId: record.id,
           kind: credential.kind,
           async getProfile() {
+            profileCalls += 1;
             events.push('adapter:profile');
             if (options.profileError) throw options.profileError;
             return options.profile ?? {
@@ -151,6 +161,7 @@ function createHarness(options: {
             return [];
           },
           async listChannels() {
+            channelCalls += 1;
             events.push('adapter:channels');
             options.holdChannels?.entered();
             if (options.holdChannels) await options.holdChannels.wait;
@@ -186,6 +197,12 @@ function createHarness(options: {
     get adapterCreates() {
       return adapterCreates;
     },
+    get profileCalls() {
+      return profileCalls;
+    },
+    get channelCalls() {
+      return channelCalls;
+    },
     get refreshCalls() {
       return refreshCalls;
     },
@@ -206,7 +223,48 @@ async function rejection(
   assert.fail(`expected ${code} rejection`);
 }
 
-test('provider re-entry preserves provider identity and commits Xtream only after profile plus channel preflight', async () => {
+test('provider re-entry rejects unavailable credential store before adapter or network preflight', async () => {
+  const fixture = createHarness({ credentialAvailable: false });
+
+  const error = await rejection(fixture.service.reenter(xtreamInput), 'UNAVAILABLE');
+
+  assert.equal(fixture.adapterCreates, 0);
+  assert.equal(fixture.profileCalls, 0);
+  assert.equal(fixture.channelCalls, 0);
+  assert.equal(fixture.saveCalls.length, 0);
+  assert.equal(fixture.removeCalls, 0);
+  assert.equal(fixture.refreshCalls, 0);
+  assert.deepEqual(fixture.events, [
+    'provider:get:provider-a',
+    'credential:isAvailable',
+  ]);
+  assert.equal(error.message.includes('new-password'), false);
+  assert.equal(error.message.includes('new.example.invalid'), false);
+});
+
+test('provider re-entry rejects credential snapshot failure before adapter or network preflight', async () => {
+  const fixture = createHarness({
+    credentialLoadError: new Error('load leaked old-password https://old.example.invalid'),
+  });
+
+  const error = await rejection(fixture.service.reenter(xtreamInput), 'UNAVAILABLE');
+
+  assert.equal(fixture.adapterCreates, 0);
+  assert.equal(fixture.profileCalls, 0);
+  assert.equal(fixture.channelCalls, 0);
+  assert.equal(fixture.saveCalls.length, 0);
+  assert.equal(fixture.removeCalls, 0);
+  assert.equal(fixture.refreshCalls, 0);
+  assert.deepEqual(fixture.events, [
+    'provider:get:provider-a',
+    'credential:isAvailable',
+    'credential:load:provider-a',
+  ]);
+  assert.equal(error.message.includes('old-password'), false);
+  assert.equal(error.message.includes('old.example.invalid'), false);
+});
+
+test('provider re-entry preserves provider identity and commits Xtream only after credential snapshot plus complete preflight', async () => {
   const fixture = createHarness();
 
   const result = await fixture.service.reenter(xtreamInput);
@@ -224,10 +282,11 @@ test('provider re-entry preserves provider identity and commits Xtream only afte
   }]);
   assert.deepEqual(fixture.events, [
     'provider:get:provider-a',
+    'credential:isAvailable',
+    'credential:load:provider-a',
     'adapter:create:provider-a:xtream',
     'adapter:profile',
     'adapter:channels',
-    'credential:load:provider-a',
     'credential:save:provider-a:xtream',
     'sync:provider-a',
   ]);
@@ -325,9 +384,10 @@ test('provider re-entry M3U success normalizes credential and requires a usable 
   }]);
   assert.deepEqual(fixture.events, [
     'provider:get:provider-a',
+    'credential:isAvailable',
+    'credential:load:provider-a',
     'adapter:create:provider-a:m3u',
     'adapter:channels',
-    'credential:load:provider-a',
     'credential:save:provider-a:m3u',
     'sync:provider-a',
   ]);
