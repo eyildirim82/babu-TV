@@ -4,6 +4,7 @@ import { MemoryCredentialStore } from '../src/credentials/memory-credential-stor
 import type { ProviderCredential } from '../src/credentials/contracts.js';
 import type { Category, Channel, ProviderRecord } from '../src/domain/models.js';
 import { ProviderCoreService } from '../src/providers/provider-core-service.js';
+import { ProviderUserStateCleanup } from '../src/providers/provider-user-state-cleanup.js';
 import type { ProviderSyncReport } from '../src/providers/provider-sync-service.js';
 import { ProviderError } from '../src/providers/errors.js';
 import { StructuredCatalogRepository } from '../src/repository/structured-catalog-repository.js';
@@ -39,6 +40,13 @@ function report(providerId: string): ProviderSyncReport {
     channels: { status: 'success', count: 1 },
     completedAtMs: 123,
   };
+}
+
+function noOpUserStateCleanup(): ProviderUserStateCleanup {
+  return new ProviderUserStateCleanup(
+    { async deleteProvider() {} },
+    { async deleteProvider() {} },
+  );
 }
 
 class DeferredSync {
@@ -79,7 +87,15 @@ async function setup(sync = new DeferredSync()) {
   await catalog.replaceCategories('provider-b', [category('provider-b', 'b-cat')]);
   await catalog.replaceChannels('provider-b', [channel('provider-b', 'b-channel')]);
 
-  const service = new ProviderCoreService(providers, catalog, credentials, sync);
+  const service = new ProviderCoreService(
+    providers,
+    catalog,
+    credentials,
+    sync,
+    null,
+    null,
+    noOpUserStateCleanup(),
+  );
   return { service, providers, catalog, credentials, sync };
 }
 
@@ -154,6 +170,208 @@ void test('delete inactive provider preserves active provider and its local stat
   assert.ok(await credentials.load('provider-a'));
   assert.deepEqual((await catalog.listChannels('provider-a')).map((item) => item.id), ['a-channel']);
   assert.equal(await providers.getProvider('provider-b'), null);
+});
+
+void test('delete fails closed before destructive work when user-state cleanup is unavailable', async () => {
+  const { providers, catalog, credentials, sync } = await setup();
+  const events: string[] = [];
+  const originalCredentialRemove = credentials.remove.bind(credentials);
+  const originalCatalogRemove = catalog.removeProviderCatalog.bind(catalog);
+  const originalProviderRemove = providers.removeProvider.bind(providers);
+
+  credentials.remove = async (providerId) => {
+    events.push('credentials');
+    await originalCredentialRemove(providerId);
+  };
+  catalog.removeProviderCatalog = async (providerId) => {
+    events.push('catalog');
+    await originalCatalogRemove(providerId);
+  };
+  providers.removeProvider = async (providerId) => {
+    events.push('provider');
+    await originalProviderRemove(providerId);
+  };
+
+  const service = new ProviderCoreService(
+    providers,
+    catalog,
+    credentials,
+    sync,
+    null,
+    { async deleteProvider() { events.push('epg'); } },
+  );
+
+  await assert.rejects(service.deleteProvider('provider-a'), (error: unknown) => {
+    assert.ok(error instanceof ProviderError);
+    assert.equal(error.code, 'UNAVAILABLE');
+    assert.equal(error.message, 'Provider data is unavailable.');
+    return true;
+  });
+
+  assert.deepEqual(events, []);
+  assert.ok(await providers.getProvider('provider-a'));
+  assert.ok(await credentials.load('provider-a'));
+  assert.deepEqual((await catalog.listChannels('provider-a')).map((item) => item.id), ['a-channel']);
+});
+
+void test('delete runs credentials catalog EPG watch favorites and provider metadata in exact order', async () => {
+  const { providers, catalog, credentials, sync } = await setup();
+  const events: string[] = [];
+  const originalCredentialRemove = credentials.remove.bind(credentials);
+  const originalCatalogRemove = catalog.removeProviderCatalog.bind(catalog);
+  const originalProviderRemove = providers.removeProvider.bind(providers);
+
+  credentials.remove = async (providerId) => {
+    events.push('credentials');
+    await originalCredentialRemove(providerId);
+  };
+  catalog.removeProviderCatalog = async (providerId) => {
+    events.push('catalog');
+    await originalCatalogRemove(providerId);
+  };
+  providers.removeProvider = async (providerId) => {
+    events.push('provider');
+    await originalProviderRemove(providerId);
+  };
+
+  const cleanup = new ProviderUserStateCleanup(
+    { async deleteProvider(providerId) { events.push(`watch:${providerId}`); } },
+    { async deleteProvider(providerId) { events.push(`favorites:${providerId}`); } },
+  );
+  const service = new ProviderCoreService(
+    providers,
+    catalog,
+    credentials,
+    sync,
+    null,
+    { async deleteProvider(providerId) { events.push(`epg:${providerId}`); } },
+    cleanup,
+  );
+
+  await service.deleteProvider('provider-a');
+
+  assert.deepEqual(events, [
+    'credentials',
+    'catalog',
+    'epg:provider-a',
+    'watch:provider-a',
+    'favorites:provider-a',
+    'provider',
+  ]);
+});
+
+void test('EPG cleanup failure remains best-effort and strict user-state cleanup still completes', async () => {
+  const { providers, catalog, credentials, sync } = await setup();
+  const events: string[] = [];
+  const cleanup = new ProviderUserStateCleanup(
+    { async deleteProvider(providerId) { events.push(`watch:${providerId}`); } },
+    { async deleteProvider(providerId) { events.push(`favorites:${providerId}`); } },
+  );
+  const service = new ProviderCoreService(
+    providers,
+    catalog,
+    credentials,
+    sync,
+    null,
+    {
+      async deleteProvider(providerId) {
+        events.push(`epg:${providerId}`);
+        throw new Error('synthetic EPG failure');
+      },
+    },
+    cleanup,
+  );
+
+  await service.deleteProvider('provider-a');
+
+  assert.deepEqual(events, ['epg:provider-a', 'watch:provider-a', 'favorites:provider-a']);
+  assert.equal(await providers.getProvider('provider-a'), null);
+});
+
+void test('watch cleanup failure is sanitized and blocks favorites and provider metadata removal', async () => {
+  const { providers, catalog, credentials, sync } = await setup();
+  const events: string[] = [];
+  const cleanup = new ProviderUserStateCleanup(
+    {
+      async deleteProvider(providerId) {
+        events.push(`watch:${providerId}`);
+        throw new Error('raw watch storage detail');
+      },
+    },
+    { async deleteProvider(providerId) { events.push(`favorites:${providerId}`); } },
+  );
+  const service = new ProviderCoreService(providers, catalog, credentials, sync, null, null, cleanup);
+
+  await assert.rejects(service.deleteProvider('provider-a'), (error: unknown) => {
+    assert.ok(error instanceof ProviderError);
+    assert.equal(error.code, 'UNAVAILABLE');
+    assert.equal(error.message, 'Provider data is unavailable.');
+    assert.equal(error.message.includes('raw watch'), false);
+    return true;
+  });
+
+  assert.deepEqual(events, ['watch:provider-a']);
+  assert.ok(await providers.getProvider('provider-a'));
+});
+
+void test('favorites cleanup failure is sanitized after watch and blocks provider metadata removal', async () => {
+  const { providers, catalog, credentials, sync } = await setup();
+  const events: string[] = [];
+  const cleanup = new ProviderUserStateCleanup(
+    { async deleteProvider(providerId) { events.push(`watch:${providerId}`); } },
+    {
+      async deleteProvider(providerId) {
+        events.push(`favorites:${providerId}`);
+        throw new Error('raw favorites storage detail');
+      },
+    },
+  );
+  const service = new ProviderCoreService(providers, catalog, credentials, sync, null, null, cleanup);
+
+  await assert.rejects(service.deleteProvider('provider-a'), (error: unknown) => {
+    assert.ok(error instanceof ProviderError);
+    assert.equal(error.code, 'UNAVAILABLE');
+    assert.equal(error.message, 'Provider data is unavailable.');
+    assert.equal(error.message.includes('raw favorites'), false);
+    return true;
+  });
+
+  assert.deepEqual(events, ['watch:provider-a', 'favorites:provider-a']);
+  assert.ok(await providers.getProvider('provider-a'));
+});
+
+void test('retry after strict cleanup failure converges without touching another provider partition', async () => {
+  const { providers, catalog, credentials, sync } = await setup();
+  const events: string[] = [];
+  let watchAttempts = 0;
+  const cleanup = new ProviderUserStateCleanup(
+    {
+      async deleteProvider(providerId) {
+        events.push(`watch:${providerId}`);
+        watchAttempts += 1;
+        if (watchAttempts === 1) throw new Error('first attempt unavailable');
+      },
+    },
+    { async deleteProvider(providerId) { events.push(`favorites:${providerId}`); } },
+  );
+  const service = new ProviderCoreService(providers, catalog, credentials, sync, null, null, cleanup);
+
+  await assert.rejects(
+    service.deleteProvider('provider-a'),
+    (error: unknown) => error instanceof ProviderError && error.code === 'UNAVAILABLE',
+  );
+  assert.ok(await providers.getProvider('provider-a'));
+  assert.ok(await providers.getProvider('provider-b'));
+  assert.ok(await credentials.load('provider-b'));
+  assert.deepEqual((await catalog.listChannels('provider-b')).map((item) => item.id), ['b-channel']);
+
+  await service.deleteProvider('provider-a');
+
+  assert.equal(await providers.getProvider('provider-a'), null);
+  assert.ok(await providers.getProvider('provider-b'));
+  assert.ok(await credentials.load('provider-b'));
+  assert.deepEqual((await catalog.listChannels('provider-b')).map((item) => item.id), ['b-channel']);
+  assert.deepEqual(events, ['watch:provider-a', 'watch:provider-a', 'favorites:provider-a']);
 });
 
 void test('cache-first load rejects missing provider without starting refresh', async () => {

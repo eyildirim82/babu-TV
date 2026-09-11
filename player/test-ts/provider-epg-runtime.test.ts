@@ -6,9 +6,12 @@ import { StructuredEpgProgramRepository } from '../src/epg/structured-epg-progra
 import { createBrowserProviderRuntime } from '../src/providers/create-browser-provider-runtime.js';
 import { ProviderAdapterFactoryImpl } from '../src/providers/provider-adapter-factory.js';
 import { ProviderCoreService } from '../src/providers/provider-core-service.js';
+import { ProviderUserStateCleanup } from '../src/providers/provider-user-state-cleanup.js';
 import type { ProviderSyncReport } from '../src/providers/provider-sync-service.js';
 import { StructuredCatalogRepository } from '../src/repository/structured-catalog-repository.js';
+import { StructuredFavoriteRepository } from '../src/repository/structured-favorite-repository.js';
 import { StructuredProviderRepository } from '../src/repository/structured-provider-repository.js';
+import { StructuredWatchStateRepository } from '../src/repository/structured-watch-state-repository.js';
 import { MemoryStructuredStore } from '../src/storage/memory-structured-store.js';
 
 function provider(id: string): ProviderRecord {
@@ -25,6 +28,13 @@ function report(providerId: string): ProviderSyncReport {
   };
 }
 
+function noOpUserStateCleanup(): ProviderUserStateCleanup {
+  return new ProviderUserStateCleanup(
+    { async deleteProvider() {} },
+    { async deleteProvider() {} },
+  );
+}
+
 test('EPG-PI browser provider runtime composes structured EPG persistence and refresh orchestration', () => {
   const runtime = createBrowserProviderRuntime({
     indexedDb: null,
@@ -35,6 +45,24 @@ test('EPG-PI browser provider runtime composes structured EPG persistence and re
   assert.ok(runtime.epgRepository instanceof StructuredEpgProgramRepository);
   assert.equal(typeof runtime.epg.refresh, 'function');
   assert.equal(typeof runtime.epg.refreshInBackground, 'function');
+});
+
+test('PROV-DEL-I browser provider runtime wires structured Watch and Favorites cleanup into Provider Core', () => {
+  const runtime = createBrowserProviderRuntime({
+    indexedDb: null,
+    widgetData: null,
+    fetchImpl: (async () => { throw new Error('not called'); }) as typeof fetch,
+  });
+
+  const coreWithCleanup = runtime.core as unknown as { userStateCleanup: unknown };
+  assert.ok(coreWithCleanup.userStateCleanup instanceof ProviderUserStateCleanup);
+
+  const cleanup = coreWithCleanup.userStateCleanup as unknown as {
+    watch: unknown;
+    favorites: unknown;
+  };
+  assert.ok(cleanup.watch instanceof StructuredWatchStateRepository);
+  assert.ok(cleanup.favorites instanceof StructuredFavoriteRepository);
 });
 
 test('EPG-PI Provider Core deletion cleans only the target EPG partition', async () => {
@@ -67,6 +95,7 @@ test('EPG-PI Provider Core deletion cleans only the target EPG partition', async
     sync,
     null,
     { deleteProvider: (providerId) => epgRepository.deleteProvider(providerId) },
+    noOpUserStateCleanup(),
   );
 
   await core.deleteProvider('p1');
@@ -96,6 +125,7 @@ test('EPG-PI EPG cleanup failure never blocks normal Provider Core removal', asy
     sync,
     null,
     { async deleteProvider() { throw new Error('EPG storage unavailable'); } },
+    noOpUserStateCleanup(),
   );
 
   await core.deleteProvider('p1');

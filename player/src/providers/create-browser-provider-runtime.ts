@@ -13,6 +13,7 @@ import { ProviderAdapterFactoryImpl } from './provider-adapter-factory.js';
 import { ProviderCoreService } from './provider-core-service.js';
 import { ProviderEpgService } from './provider-epg-service.js';
 import { ProviderSyncService } from './provider-sync-service.js';
+import { ProviderUserStateCleanup } from './provider-user-state-cleanup.js';
 
 export interface BrowserProviderRuntimeDependencies {
   indexedDb: IDBFactory | null;
@@ -26,13 +27,22 @@ export function createBrowserProviderRuntime(deps: BrowserProviderRuntimeDepende
   const catalog = new StructuredCatalogRepository(store);
   const watchState = new StructuredWatchStateRepository(store);
   const favorites = new StructuredFavoriteRepository(store);
+  const userStateCleanup = new ProviderUserStateCleanup(watchState, favorites);
   const credentials = new SamsungWidgetDataCredentialStore(deps.widgetData);
   const http = new FetchProviderHttpClient(deps.fetchImpl);
   const adapters = new ProviderAdapterFactoryImpl(http);
   const epgRepository = new StructuredEpgProgramRepository(store);
   const epg = new ProviderEpgService({ providers, catalog, credentials, adapters, repository: epgRepository });
   const sync = new ProviderSyncService(providers, catalog, credentials, adapters);
-  const core = new ProviderCoreService(providers, catalog, credentials, sync, adapters, epg);
+  const core = new ProviderCoreService(
+    providers,
+    catalog,
+    credentials,
+    sync,
+    adapters,
+    epg,
+    userStateCleanup,
+  );
 
   return {
     providers,
