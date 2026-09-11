@@ -126,7 +126,10 @@ export function createBrowserAppDependencies(
         const routePlatform: Platform = {
           capabilities: () => input.platform.capabilities(),
           registerOptionalKeys: (keys) => input.platform.registerOptionalKeys(keys),
-          exitApp: onRootBack,
+          exitApp: () => {
+            input.setRemoteNumericMode('buffered');
+            onRootBack();
+          },
         };
         const result = await createBrowserLiveTvRuntime({
           indexedDb: input.indexedDb,
