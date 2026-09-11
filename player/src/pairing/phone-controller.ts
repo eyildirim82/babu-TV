@@ -63,6 +63,47 @@ export interface PairingPhoneControllerDependencies {
   nowMs(): number;
 }
 
+const PAIRING_PHONE_BOOTSTRAP_KEYS = new Set([
+  'version',
+  'sessionId',
+  'expiresAtMs',
+  'tvPublicKey',
+  'relayBaseUrl',
+]);
+
+function decodePairingPhoneBootstrap(value: unknown): PairingPhoneBootstrapV1 | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+
+  const candidate = value as Record<string, unknown>;
+  const keys = Object.keys(candidate);
+  if (
+    keys.length !== PAIRING_PHONE_BOOTSTRAP_KEYS.size
+    || keys.some((key) => !PAIRING_PHONE_BOOTSTRAP_KEYS.has(key))
+    || candidate.version !== 1
+    || typeof candidate.sessionId !== 'string'
+    || candidate.sessionId.trim().length === 0
+    || typeof candidate.expiresAtMs !== 'number'
+    || !Number.isFinite(candidate.expiresAtMs)
+    || typeof candidate.relayBaseUrl !== 'string'
+  ) {
+    return null;
+  }
+
+  try {
+    normalizePairingRelayBaseUrl(candidate.relayBaseUrl);
+  } catch {
+    return null;
+  }
+
+  return {
+    version: 1,
+    sessionId: candidate.sessionId,
+    expiresAtMs: candidate.expiresAtMs,
+    tvPublicKey: candidate.tvPublicKey as JsonWebKey,
+    relayBaseUrl: candidate.relayBaseUrl,
+  };
+}
+
 function cryptoErrorCode(error: unknown): PairingPhoneErrorCode {
   if (error instanceof PairingCryptoError && error.code === 'INVALID_KEY') {
     return 'INVALID_TV_KEY';
@@ -80,11 +121,13 @@ export class PairingPhoneController {
   private xtreamDraft: XtreamPhoneInput = { serverUrl: '', username: '', password: '' };
   private m3uDraft: M3uPhoneInput = { playlistUrl: '' };
   private view: PairingPhoneState = { kind: 'choose-provider' };
+  private readonly bootstrap: PairingPhoneBootstrapV1 | null;
+  private readonly deps: PairingPhoneControllerDependencies;
 
-  constructor(
-    private readonly bootstrap: PairingPhoneBootstrapV1,
-    private readonly deps: PairingPhoneControllerDependencies,
-  ) {}
+  constructor(bootstrap: unknown, deps: PairingPhoneControllerDependencies) {
+    this.bootstrap = decodePairingPhoneBootstrap(bootstrap);
+    this.deps = deps;
+  }
 
   state(): PairingPhoneState {
     return this.view;
@@ -123,13 +166,14 @@ export class PairingPhoneController {
       : this.view.kind === 'error'
         ? this.view.providerKind
         : null;
+    const bootstrap = this.bootstrap;
 
-    if (!this.validBootstrap()) {
+    if (bootstrap === null) {
       this.view = { kind: 'error', providerKind, code: 'INVALID_BOOTSTRAP' };
       return;
     }
 
-    if (this.deps.nowMs() >= this.bootstrap.expiresAtMs) {
+    if (this.deps.nowMs() >= bootstrap.expiresAtMs) {
       this.view = { kind: 'expired' };
       return;
     }
@@ -149,7 +193,7 @@ export class PairingPhoneController {
     let envelope: PairingCiphertextV1;
     try {
       envelope = await this.deps.crypto.encryptForTv(
-        this.bootstrap.tvPublicKey,
+        bootstrap.tvPublicKey,
         encodePairingProviderPayload(payload),
       );
     } catch (error) {
@@ -159,7 +203,7 @@ export class PairingPhoneController {
 
     try {
       await this.deps.relay.putCiphertext({
-        sessionId: this.bootstrap.sessionId,
+        sessionId: bootstrap.sessionId,
         ciphertext: JSON.stringify(envelope),
       });
     } catch (error) {
@@ -170,25 +214,6 @@ export class PairingPhoneController {
     this.xtreamDraft = { serverUrl: '', username: '', password: '' };
     this.m3uDraft = { playlistUrl: '' };
     this.view = { kind: 'success' };
-  }
-
-  private validBootstrap(): boolean {
-    if (
-      this.bootstrap.version !== 1
-      || typeof this.bootstrap.sessionId !== 'string'
-      || this.bootstrap.sessionId.trim().length === 0
-      || !Number.isFinite(this.bootstrap.expiresAtMs)
-      || typeof this.bootstrap.relayBaseUrl !== 'string'
-    ) {
-      return false;
-    }
-
-    try {
-      normalizePairingRelayBaseUrl(this.bootstrap.relayBaseUrl);
-      return true;
-    } catch {
-      return false;
-    }
   }
 
   private normalizedXtream(): PairingProviderPayloadV1 | null {
