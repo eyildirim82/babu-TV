@@ -1,0 +1,30 @@
+name: prov-reentry-i-task3-green
+
+on:
+  push:
+    branches:
+      - verification/prov-reentry-i-task3-green
+
+permissions:
+  contents: read
+
+jobs:
+  focused-green:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact Task 3 revision
+        uses: actions/checkout@v4
+        with:
+          ref: 1c9205c863bf6c981e75c1cc48f165d8bdd2fa56
+      - name: Assert exact Task 3 SHA
+        run: test "$(git rev-parse HEAD)" = "1c9205c863bf6c981e75c1cc48f165d8bdd2fa56"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run Task 3 focused GREEN test
+        run: node --import tsx --test player/test-ts/m5-app-composition.test.ts
