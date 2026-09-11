@@ -220,6 +220,57 @@ function twoColumnModel(): HomeViewModel {
   };
 }
 
+function providerBWithCollidingChannelIds(): HomeViewModel {
+  return {
+    providerSelector: {
+      activeProviderId: 'provider-b',
+      options: [
+        {
+          providerId: 'provider-b',
+          kind: 'm3u',
+          name: 'Yatak Odası',
+          isActive: true,
+          intent: { type: 'SELECT_PROVIDER', providerId: 'provider-b' },
+        },
+      ],
+    },
+    lastWatched: null,
+    liveTv: {
+      available: true,
+      intent: { type: 'OPEN_LIVE_TV', providerId: 'provider-b', scope: 'all' },
+    },
+    favorites: {
+      items: [
+        {
+          providerId: 'provider-b',
+          channelId: 'fav-1',
+          name: 'Başka Sağlayıcı Favorisi',
+          logoUrl: null,
+          number: 112,
+          currentProgram: null,
+          intent: { type: 'OPEN_LIVE_TV_CHANNEL', providerId: 'provider-b', channelId: 'fav-1' },
+        },
+      ],
+      viewAllIntent: { type: 'OPEN_LIVE_TV', providerId: 'provider-b', scope: 'favorites' },
+    },
+    frequentlyWatched: {
+      items: [
+        {
+          providerId: 'provider-b',
+          channelId: 'freq-1',
+          name: 'Başka Sağlayıcı Sık Kanalı',
+          logoUrl: null,
+          number: 124,
+          currentProgram: null,
+          intent: { type: 'OPEN_LIVE_TV_CHANNEL', providerId: 'provider-b', channelId: 'freq-1' },
+        },
+      ],
+    },
+    settings: { intent: { type: 'OPEN_SETTINGS' } },
+    defaultFocus: { kind: 'provider-selector' },
+  };
+}
+
 test('HOME-UI renders ready Home sections in domain order using text nodes', async () => {
   const home = await loadHomeView();
   assert.ok(home, 'HOME-UI presentation module should exist');
@@ -287,11 +338,15 @@ test('HOME-UI first ready render honors HOME-D defaultFocus', async () => {
   const view = new home.HomeView(asDocument(document), { onIntent: () => {}, onBack: () => {} });
 
   view.show({ kind: 'ready', model: readyModel() });
-  assert.equal(focusedKey(document), 'home-last-watched:last-1');
+  assert.equal(focusedKey(document), 'home-last-watched:provider-a:last-1');
 
   const providerDefault = { ...readyModel(), defaultFocus: { kind: 'provider-selector' } as const };
   view.setState({ kind: 'ready', model: providerDefault });
-  assert.equal(focusedKey(document), 'home-last-watched:last-1', 'stable key should win before a new default');
+  assert.equal(
+    focusedKey(document),
+    'home-last-watched:provider-a:last-1',
+    'stable key should win before a new default',
+  );
 
   view.hide();
   view.show({ kind: 'ready', model: providerDefault });
@@ -307,17 +362,17 @@ test('HOME-UI restores stable focus across rerender and falls back when the key 
   view.show({ kind: 'ready', model: readyModel() });
   view.handleAction('down');
   view.handleAction('down');
-  assert.equal(focusedKey(document), 'home-favorite:fav-1');
+  assert.equal(focusedKey(document), 'home-favorite:provider-a:fav-1');
 
   view.setState({ kind: 'ready', model: readyModel() });
-  assert.equal(focusedKey(document), 'home-favorite:fav-1');
+  assert.equal(focusedKey(document), 'home-favorite:provider-a:fav-1');
 
   const withoutFavorite = {
     ...readyModel(),
     favorites: { items: [], viewAllIntent: null },
   } satisfies HomeViewModel;
   view.setState({ kind: 'ready', model: withoutFavorite });
-  assert.equal(focusedKey(document), 'home-last-watched:last-1');
+  assert.equal(focusedKey(document), 'home-last-watched:provider-a:last-1');
 
   const missingDefault = {
     ...withoutFavorite,
@@ -326,6 +381,25 @@ test('HOME-UI restores stable focus across rerender and falls back when the key 
   } satisfies HomeViewModel;
   view.setState({ kind: 'ready', model: missingDefault });
   assert.equal(focusedKey(document), 'home-provider:provider-a');
+});
+
+test('HOME-UI does not restore a channel-card focus key across provider partitions', async () => {
+  const home = await loadHomeView();
+  assert.ok(home);
+  const document = new FakeDocument();
+  const view = new home.HomeView(asDocument(document), { onIntent: () => {}, onBack: () => {} });
+
+  view.show({ kind: 'ready', model: readyModel() });
+  view.handleAction('down');
+  view.handleAction('down');
+  assert.equal(focusedKey(document), 'home-favorite:provider-a:fav-1');
+
+  view.setState({ kind: 'ready', model: providerBWithCollidingChannelIds() });
+  assert.equal(
+    focusedKey(document),
+    'home-provider:provider-b',
+    'same channelId in another provider must not capture the previous provider focus',
+  );
 });
 
 test('HOME-UI left/right clamp within a row and focus movement emits no intent', async () => {
@@ -357,17 +431,17 @@ test('HOME-UI up/down preserves a valid column across conceptual rows', async ()
   const view = new home.HomeView(asDocument(document), { onIntent: () => {}, onBack: () => {} });
 
   view.show({ kind: 'ready', model: twoColumnModel() });
-  assert.equal(focusedKey(document), 'home-last-watched:last-1');
+  assert.equal(focusedKey(document), 'home-last-watched:provider-a:last-1');
   view.handleAction('down');
   assert.equal(focusedKey(document), 'home-live-tv');
   view.handleAction('down');
-  assert.equal(focusedKey(document), 'home-favorite:fav-1');
+  assert.equal(focusedKey(document), 'home-favorite:provider-a:fav-1');
   view.handleAction('right');
-  assert.equal(focusedKey(document), 'home-favorite:fav-2');
+  assert.equal(focusedKey(document), 'home-favorite:provider-a:fav-2');
   view.handleAction('down');
-  assert.equal(focusedKey(document), 'home-frequent:freq-2');
+  assert.equal(focusedKey(document), 'home-frequent:provider-a:freq-2');
   view.handleAction('up');
-  assert.equal(focusedKey(document), 'home-favorite:fav-2');
+  assert.equal(focusedKey(document), 'home-favorite:provider-a:fav-2');
 });
 
 test('HOME-UI Select forwards exactly the focused HomeActionIntent once', async () => {
