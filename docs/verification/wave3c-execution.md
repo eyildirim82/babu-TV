@@ -2,19 +2,19 @@
 
 **Date:** 2026-09-11  
 **Repository:** `eyildirim82/babu-TV`  
-**Authority:** This overlay supersedes historical Wave 1 / Wave 3B lane statuses for the lanes listed here. Historical evidence remains valid for its exact production SHA only.
+**Authority:** This overlay supersedes historical Wave 1 / Wave 3B statuses and the pre-approval status headers inside the Wave 3C design specs for the lanes listed here.
 
 ## 1. Current production baseline
 
-Current `main`:
+Current exact `main`:
 
 `860d9efa8efac7c9872bf31f7f592ae12a414889`
 
-Push-triggered verify on that exact SHA:
+Push-triggered verification on that exact SHA:
 
 `34568089899` — **SUCCESS**
 
-This is the controller base for all new Wave 3C designs unless a later Controller merge advances `main` before a production lane is opened. Every implementation lane must freeze the then-current exact GREEN main SHA in its approved plan before production work starts.
+No physical Samsung/Tizen runtime PASS is inferred from repository CI.
 
 ## 2. Wave 3B merge closure
 
@@ -26,115 +26,102 @@ This is the controller base for all new Wave 3C designs unless a later Controlle
 | HOME-UI | #71 | `3a4d60dd5baa0c3fa5f7dd8a7b8bc48292bc3fd9` | `34568048330` SUCCESS | MERGED/FROZEN |
 | M4-COMP | #70 | `860d9efa8efac7c9872bf31f7f592ae12a414889` | `34568089899` SUCCESS | MERGED/FROZEN |
 
-No physical Samsung/Tizen runtime PASS is claimed by these repository verify runs.
+## 3. Human/Controller approval record
 
-## 3. Wave 3C design lanes
+On 2026-09-11 the user explicitly approved both Wave 3C architectural designs after review.
 
-### 3.1 M5-COMP
+Approved specs:
 
-**Target branch:** `integration/m5-app-composition`  
-**Design:** `docs/superpowers/specs/2026-09-11-wave3c-m5-app-composition-design.md`  
-**Status:** `DESIGN-WRITTEN / REVIEW-REQUIRED`
+- `docs/superpowers/specs/2026-09-11-wave3c-m5-app-composition-design.md`
+- `docs/superpowers/specs/2026-09-11-wave3c-pair-web-phone-ui-design.md`
 
-The Home + M4 dependency gate is closed GREEN, but design review found two M5 Provider Management roadmap gaps in the current merged contracts:
+Approved implementation plans written after that approval:
 
-- provider edit/re-entry is not implemented by current PROV-UI/onboarding contracts;
-- durable Favorites/watch provider cleanup exists in repositories but is not integrated into current Provider Core deletion.
+- `docs/superpowers/plans/2026-09-11-wave3c-m5-app-composition-final.md`
+- `docs/superpowers/plans/2026-09-11-wave3c-pair-web-phone-ui-final.md`
 
-Therefore:
+Both plans freeze exact base `860d9efa8efac7c9872bf31f7f592ae12a414889`. If `main` advances before a worker actually starts, Controller must explicitly retarget/reapprove that worker rather than silently changing the frozen base.
 
-- M5 app composition design may be reviewed now;
-- implementation planning must preserve these gaps explicitly;
-- M5-COMP must not absorb unapproved provider-edit or destructive-cleanup semantics merely to claim the milestone complete;
-- final M5 Provider Management / V1 RC acceptance remains blocked until the two gaps are closed by bounded Controller-approved work.
+## 4. Open implementation lanes
 
-M5 also requires a minimal application-entry seam into M4 Live TV for Home `all`, `favorites`, focus-channel, and explicit play intents. The M5 design allows this as an additive controller contract with no change to existing playback semantics.
+### 4.1 M5-COMP
 
-### 3.2 PAIR-WEB
+**Branch:** `integration/m5-app-composition`  
+**Spec:** `docs/superpowers/specs/2026-09-11-wave3c-m5-app-composition-design.md`  
+**Plan:** `docs/superpowers/plans/2026-09-11-wave3c-m5-app-composition-final.md`  
+**Frozen base:** `860d9efa8efac7c9872bf31f7f592ae12a414889`  
+**Status:** `DESIGN-APPROVED / PLAN-WRITTEN / IMPLEMENTATION-READY`
 
-**Target branch:** `feature/pairing-phone-ui`  
-**Design:** `docs/superpowers/specs/2026-09-11-wave3c-pair-web-phone-ui-design.md`  
-**Status:** `DESIGN-WRITTEN / REVIEW-REQUIRED`
+Owned composition work is limited to the approved app/Home/M4 entry/runtime wiring scope. It must preserve provider and playback semantics and must not absorb either provider-gap lane below.
 
-PAIR-C/S/R are merged/frozen. The design freezes:
+Final M5 Provider Management / V1 RC acceptance remains blocked on:
 
-- public phone bootstrap data;
-- exact versioned Xtream/M3U plaintext DTO;
-- UTF-8 JSON -> PAIR-C -> serialized PAIR-C envelope -> PAIR-R ciphertext-only flow;
-- browser UI state/error/privacy rules;
-- no hosted relay/site claim in this lane.
+- provider re-entry/edit transaction support;
+- provider-scoped Favorites/watch cleanup integration during provider deletion.
 
-After written-spec approval, PAIR-WEB may receive a bounded implementation plan from the then-current exact GREEN main.
+### 4.2 PAIR-WEB
 
-### 3.3 PAIR-I
+**Branch:** `feature/pairing-phone-ui`  
+**Spec:** `docs/superpowers/specs/2026-09-11-wave3c-pair-web-phone-ui-design.md`  
+**Plan:** `docs/superpowers/plans/2026-09-11-wave3c-pair-web-phone-ui-final.md`  
+**Frozen base:** `860d9efa8efac7c9872bf31f7f592ae12a414889`  
+**Status:** `DESIGN-APPROVED / PLAN-WRITTEN / IMPLEMENTATION-READY`
 
-**Target branch:** `integration/pairing-onboarding`  
+PAIR-WEB remains a browser-mountable phone UI contract only. It does not deploy a phone host or relay and does not implement TV QR/session/decrypt/onboarding integration.
+
+## 5. Blocked/deferred lanes
+
+### 5.1 PAIR-I
+
+**Branch:** `integration/pairing-onboarding`  
 **Status:** `BLOCKED`
 
 Opening gates:
 
-1. PAIR-WEB written design approved;
-2. PAIR-WEB implementation merged/frozen;
-3. pairing core remains frozen;
-4. TV QR/bootstrap contract is bounded to the approved PAIR-WEB bootstrap contract;
-5. existing Xtream/M3U onboarding transactions remain final.
+1. PAIR-WEB implementation merged/frozen;
+2. pairing core remains frozen;
+3. TV QR/bootstrap is bounded to the approved PAIR-WEB bootstrap contract;
+4. existing Xtream/M3U onboarding transactions remain final.
 
-PAIR-I must not start before these gates close.
+### 5.2 PROV-REENTRY
 
-## 4. Newly surfaced provider prerequisites
-
-These are Controller blockers discovered by comparing the M5 roadmap to exact `main`. They are not open implementation lanes yet.
-
-### 4.1 Provider re-entry/edit
-
-**Suggested role:** `PROV-REENTRY`  
 **Suggested branch:** `feature/provider-reentry`  
 **Status:** `DESIGN-REQUIRED`
 
-Required product behavior: safely edit/re-enter an existing provider configuration without implementing it as delete+add and without breaking provider-scoped user state.
+Must define a safe existing-provider credential re-entry/edit transaction before UI implementation. Delete+add is not an approved substitute because provider-scoped user state must not be silently lost.
 
-The bounded design must decide the Provider Core transaction first; UI follows that contract. M5-COMP must not invent this transaction in application navigation code.
+### 5.3 PROV-DEL-I
 
-### 4.2 Provider user-state deletion integration
-
-**Suggested role:** `PROV-DEL-I`  
 **Suggested branch:** `integration/provider-user-state-cleanup`  
 **Status:** `DESIGN-REQUIRED`
 
-Current exact-main facts:
+Exact-main facts:
 
 - `StructuredFavoriteRepository.deleteProvider(providerId)` exists;
 - `StructuredWatchStateRepository.deleteProvider(providerId)` exists;
-- `ProviderCoreService.deleteProvider(providerId)` currently removes credential, catalog, EPG and provider metadata but does not call those user-state repositories.
+- current `ProviderCoreService.deleteProvider(providerId)` does not invoke either repository.
 
-The bounded design must integrate provider-scoped cleanup without touching another provider and without falsely claiming atomicity the storage/credential abstractions cannot provide.
+This lane must integrate scoped cleanup without touching another provider and without claiming stronger cross-store atomicity than the abstractions provide.
 
-## 5. Concurrency decision
+## 6. Concurrency decision
 
-After the written specs are approved:
-
-- PAIR-WEB can run independently from M5/provider-gap work;
-- PROV-REENTRY and PROV-DEL-I require their own designs before production branches open;
-- M5-COMP implementation may proceed only under the approved M5 plan and must remain explicit about unresolved provider-management acceptance if either prerequisite is still open;
-- PAIR-I stays blocked on PAIR-WEB.
-
-Preferred dependency shape:
+M5-COMP and PAIR-WEB may execute in parallel from the same frozen exact base because their approved production scopes are disjoint and neither needs the other's unmerged implementation semantics.
 
 ```text
 main@860d9efa... GREEN
-  ├─ PAIR-WEB design -> plan -> implementation -> merge
-  │      └─ then PAIR-I design/plan may open
-  │
-  ├─ PROV-REENTRY design -> bounded implementation
-  ├─ PROV-DEL-I design -> bounded implementation
-  │
-  └─ M5-COMP design -> plan -> application composition
-         └─ M5 Provider Management acceptance requires provider gaps closed
+  ├─ M5-COMP implementation -> Draft PR -> Controller audit
+  │      └─ full M5 Provider Management acceptance still waits on PROV-REENTRY + PROV-DEL-I
+  └─ PAIR-WEB implementation -> Draft PR -> Controller audit
+         └─ after merge/freeze, PAIR-I design/plan may open
+
+PROV-REENTRY / PROV-DEL-I: design required before production branches open
 ```
 
-## 6. Worker evidence contract
+No Wave 3C production implementation has been started by this docs branch.
 
-Every new Wave 3C production head must provide fresh exact-head evidence for:
+## 7. Worker evidence contract
+
+Every production worker must use fresh exact-head evidence:
 
 ```text
 npm test
@@ -143,39 +130,26 @@ npm run brand:check
 npm run build
 npm run tizen:build
 git diff --exit-code
-git diff --check <frozen-exact-base>...HEAD
+git diff --check 860d9efa8efac7c9872bf31f7f592ae12a414889...HEAD
 ```
 
-The PR body must record:
+The Draft PR body records ROLE, branch, frozen base, final production head, exact changed files, RED evidence, focused GREEN evidence, canonical exact-head evidence, invariant/scope review, and physical runtime as `NOT VERIFIED` unless actually executed.
 
-- ROLE;
-- branch;
-- frozen exact base SHA;
-- final production head SHA;
-- exact changed-file set;
-- RED evidence and expected failure;
-- GREEN evidence;
-- canonical exact-head gate evidence;
-- invariant/scope review;
-- physical runtime as `NOT VERIFIED` unless a real device/emulator/browser deployment test was actually executed.
+Verification-only workflow files must not remain in the production diff.
 
-Verification-only workflow files must not remain in production diffs.
-
-## 7. Controller merge policy
+## 8. Controller merge policy
 
 For each accepted production PR:
 
-1. refresh current main and PR head;
-2. verify frozen evidence still targets the unchanged production head;
-3. audit exact changed-file scope and semantic invariants;
-4. mark Ready only from Controller authority;
-5. merge with exact expected head SHA;
-6. fetch the resulting main SHA;
-7. require push-triggered standard verify on that exact SHA to complete SUCCESS;
-8. only then open or merge dependent/conflicting work.
+1. refresh current `main` and PR head;
+2. verify the PR still matches its frozen base/head evidence;
+3. audit exact changed-file scope and semantic/security invariants;
+4. mark Ready only under Controller authority;
+5. merge using the exact expected head SHA;
+6. fetch resulting `main` SHA;
+7. require push-triggered standard verification on that exact SHA to complete SUCCESS;
+8. only then open/merge dependent work.
 
-## 8. Immediate next gate
+## 9. Immediate next action
 
-No Wave 3C production implementation begins from these documents until the written M5 and PAIR-WEB specs are reviewed/approved.
-
-After approval, create separate implementation plans. Do not combine M5-COMP and PAIR-WEB into one plan because they are independent subsystems with different ownership/security boundaries.
+The design and planning gates for **M5-COMP** and **PAIR-WEB** are closed. They are ready to start as two parallel production workers from exact base `860d9efa8efac7c9872bf31f7f592ae12a414889` when the user authorizes implementation execution.
