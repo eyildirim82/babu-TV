@@ -1,0 +1,30 @@
+name: prov-reentry-i-task4-red
+
+on:
+  push:
+    branches:
+      - verification/prov-reentry-i-task4-red
+
+permissions:
+  contents: read
+
+jobs:
+  focused-red:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact Task 4 test-only revision
+        uses: actions/checkout@v4
+        with:
+          ref: e4cd964f2e063f8bca81a2ac8f610ee33c48cc4b
+      - name: Assert exact Task 4 test-only SHA
+        run: test "$(git rev-parse HEAD)" = "e4cd964f2e063f8bca81a2ac8f610ee33c48cc4b"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run Task 4 focused RED tests
+        run: node --import tsx --test player/test-ts/m5-app-composition.test.ts player/test-ts/m5-browser-app-dependencies.test.ts
