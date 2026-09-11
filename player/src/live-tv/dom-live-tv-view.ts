@@ -89,8 +89,15 @@ export class DomLiveTvView implements LiveTvView {
 
   private renderCategories(state: LiveTvState, model: LiveTvViewModel): void {
     const activeKey = scopeKey(state.activeScope);
+    const favoriteEntry = model.features === undefined
+      ? []
+      : [{
+          key: model.features.favorites.categoryKey,
+          name: model.features.favorites.categoryLabel,
+        }];
     const entries = [
       { key: 'all', name: 'Tümü' },
+      ...favoriteEntry,
       ...model.categories.map((category) => ({
         key: `category:${category.id}`,
         name: category.name,

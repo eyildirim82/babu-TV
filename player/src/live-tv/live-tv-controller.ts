@@ -8,7 +8,7 @@ import type {
 import type { Platform } from '../platform/contracts.js';
 import type { ProviderSnapshot } from '../providers/provider-core-service.js';
 import type { SearchKeyboardEvent } from '../search/search-input-boundary.js';
-import type { ChannelIntentEvent, LiveTvState } from './contracts.js';
+import type { ChannelIntentEvent, LiveTvScope, LiveTvState } from './contracts.js';
 import type {
   LiveTvFeatureComposition,
   LiveTvFeatureRefreshInput,
@@ -70,7 +70,11 @@ function modelFor(
   const model: LiveTvViewModel = {
     categories: snapshot.categories,
     channels: snapshot.channels,
-    visibleChannels: channelsForScope(snapshot.channels, state.activeScope),
+    visibleChannels: channelsForScope(
+      snapshot.channels,
+      state.activeScope,
+      state.favoriteChannelIds,
+    ),
   };
   return features === null ? model : { ...model, features };
 }
@@ -355,7 +359,11 @@ export class LiveTvController {
     return {
       providerId: this.current.providerId,
       channels: this.snapshot.channels,
-      visibleChannels: channelsForScope(this.snapshot.channels, this.current.activeScope),
+      visibleChannels: channelsForScope(
+        this.snapshot.channels,
+        this.current.activeScope,
+        this.current.favoriteChannelIds,
+      ),
       categories: this.snapshot.categories,
       highlightedChannelId: this.current.highlightedChannelId,
     };
@@ -376,10 +384,25 @@ export class LiveTvController {
         return;
       }
       this.featureState = state;
+      if (this.syncFavoriteScope(state.favorites.focusItemIds)) {
+        this.refreshFeatures();
+        return;
+      }
       this.render();
     }).catch(() => {
       // Presentation feature failure must never make M3 Live TV unusable.
     });
+  }
+
+  private syncFavoriteScope(channelIds: readonly ChannelId[]): boolean {
+    if (this.current === null || this.snapshot === null) return false;
+    const previousHighlight = this.current.highlightedChannelId;
+    this.current = reduceLiveTv(this.current, {
+      type: 'SYNC_FAVORITES',
+      channelIds,
+      channels: this.snapshot.channels,
+    });
+    return this.current.highlightedChannelId !== previousHighlight;
   }
 
   private closeFeatureLayer(): boolean {
@@ -462,6 +485,10 @@ export class LiveTvController {
       return;
     }
     this.featureState = state;
+    if (this.syncFavoriteScope(state.favorites.focusItemIds)) {
+      this.refreshFeatures();
+      return;
+    }
     this.render();
   }
 
@@ -514,19 +541,15 @@ export class LiveTvController {
 
   private moveCategory(delta: -1 | 1): void {
     if (this.current === null || this.snapshot === null) return;
-    const scopes = [
-      { kind: 'all' as const },
-      ...this.snapshot.categories.map((category) => ({
-        kind: 'category' as const,
-        categoryId: category.id,
-      })),
-    ];
-    const currentIndex = scopes.findIndex((scope) => {
-      if (scope.kind !== this.current!.activeScope.kind) return false;
-      return scope.kind === 'all'
-        || (this.current!.activeScope.kind === 'category'
-          && scope.categoryId === this.current!.activeScope.categoryId);
-    });
+    const scopes: LiveTvScope[] = [{ kind: 'all' }];
+    if (this.featureState !== null) scopes.push({ kind: 'favorites' });
+    scopes.push(...this.snapshot.categories.map((category) => ({
+      kind: 'category' as const,
+      categoryId: category.id,
+    })));
+
+    const currentKey = scopeKey(this.current.activeScope);
+    const currentIndex = scopes.findIndex((scope) => scopeKey(scope) === currentKey);
     const start = currentIndex < 0 ? 0 : currentIndex;
     const nextIndex = Math.max(0, Math.min(scopes.length - 1, start + delta));
     const scope = scopes[nextIndex];
@@ -542,7 +565,11 @@ export class LiveTvController {
 
   private zapTarget(direction: 'PREVIOUS' | 'NEXT'): ChannelId | null {
     if (this.current === null || this.snapshot === null) return null;
-    const visible = channelsForScope(this.snapshot.channels, this.current.activeScope);
+    const visible = channelsForScope(
+      this.snapshot.channels,
+      this.current.activeScope,
+      this.current.favoriteChannelIds,
+    );
     if (visible.length === 0) return null;
     const anchorId = this.current.playingChannelId ?? this.current.highlightedChannelId;
     const anchorIndex = anchorId === null

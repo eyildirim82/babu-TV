@@ -8,6 +8,7 @@ import type { PlaybackErrorCode, StreamRequest } from '../playback/contracts.js'
 
 export type LiveTvScope =
   | { kind: 'all' }
+  | { kind: 'favorites' }
   | { kind: 'category'; categoryId: CategoryId };
 
 export type LiveTvOverlayZone = 'CATEGORY' | 'CHANNEL' | 'ACTIONS';
@@ -70,6 +71,7 @@ export interface LiveTvState {
   playingChannelId: ChannelId | null;
   highlightedChannelId: ChannelId | null;
   activeScope: LiveTvScope;
+  favoriteChannelIds: readonly ChannelId[];
   restoreChannelIdByScope: Readonly<Record<string, ChannelId | null>>;
   overlayOpen: boolean;
   overlayZone: LiveTvOverlayZone;
@@ -96,4 +98,9 @@ export type LiveTvAction =
       direction: 'PREVIOUS' | 'NEXT';
       channels: readonly Channel[];
     }
-  | { type: 'SYNC_CHANNELS'; channels: readonly Channel[] };
+  | { type: 'SYNC_CHANNELS'; channels: readonly Channel[] }
+  | {
+      type: 'SYNC_FAVORITES';
+      channelIds: readonly ChannelId[];
+      channels: readonly Channel[];
+    };
