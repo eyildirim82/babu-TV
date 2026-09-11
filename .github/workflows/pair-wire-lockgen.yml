@@ -20,11 +20,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm install qrcode@1.5.4 -w player
-      - run: npm install -D @types/qrcode@1.5.6 -w player
+      - run: npm install --save-exact qrcode@1.5.4 -w player
+      - run: npm install -D --save-exact @types/qrcode@1.5.6 -w player
       - uses: actions/upload-artifact@v4
         with:
-          name: pair-wire-lockfiles
+          name: pair-wire-lockfiles-exact
           path: |
             player/package.json
             package-lock.json
