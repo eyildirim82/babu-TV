@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { PairingRelayRequest } from '../src/pairing/relay-contracts.js';
 import { PairingRelayError } from '../src/pairing/relay-client.js';
 import { FetchPairingRelayTransport } from '../src/pairing/fetch-relay-transport.js';
 
@@ -35,7 +34,7 @@ test('PAIR-I-WIRE browser transport sends POST JSON and GET without a body', asy
 });
 
 test('PAIR-I-WIRE browser transport returns null for an empty success response', async () => {
-  const fetchImpl = (async () => new Response('', { status: 204 })) as typeof fetch;
+  const fetchImpl = (async () => new Response(null, { status: 204 })) as typeof fetch;
   const transport = new FetchPairingRelayTransport(fetchImpl);
   const result = await transport.request<unknown>({
     method: 'GET',
@@ -102,5 +101,3 @@ test('PAIR-I-WIRE browser transport maps non-2xx and malformed JSON to fixed err
     console.error = original.error;
   }
 });
-
-void (null as unknown as PairingRelayRequest);
