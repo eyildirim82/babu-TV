@@ -16,11 +16,11 @@ jobs:
       - name: Checkout exact production head
         uses: actions/checkout@v4
         with:
-          ref: e096c62eb959aad59ef033f8e748682fc1eaba53
+          ref: 6c8ab7eef1142a87248cd33c808f5d900a8487f8
           fetch-depth: 0
 
       - name: Assert exact production head
-        run: test "$(git rev-parse HEAD)" = "e096c62eb959aad59ef033f8e748682fc1eaba53"
+        run: test "$(git rev-parse HEAD)" = "6c8ab7eef1142a87248cd33c808f5d900a8487f8"
 
       - name: Setup Node
         uses: actions/setup-node@v4
