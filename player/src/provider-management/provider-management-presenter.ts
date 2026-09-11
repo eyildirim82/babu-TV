@@ -186,7 +186,19 @@ export class ProviderManagementPresenter {
 
     const editTarget = this.view.providers.find((provider) => provider.editFocusId === this.view.focusedId);
     if (editTarget !== undefined) {
-      await this.operations.requestEditProvider(editTarget.id, editTarget.kind);
+      try {
+        await this.operations.requestEditProvider(editTarget.id, editTarget.kind);
+        this.view = {
+          ...this.view,
+          errorMessage: null,
+        };
+      } catch {
+        this.view = {
+          ...this.view,
+          focusedId: editTarget.editFocusId,
+          errorMessage: 'Sağlayıcı düzenleme açılamadı.',
+        };
+      }
       return;
     }
 
