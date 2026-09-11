@@ -196,3 +196,35 @@ void test('M4-COMP DOM renders Search stable keys, ACT-UI labels, and Program In
   assert.match(programInfo.textContent, /Program a/);
   assert.match(programInfo.textContent, /Program a detail/);
 });
+
+void test('M4-COMP DOM exposes virtual:favorites as the focused category scope', async () => {
+  const channels = [channel('a', 'Alpha'), channel('b', 'Beta')];
+  const { features } = await featureModel(channels);
+  const { document, view } = fixture();
+
+  view.render(
+    state({
+      activeScope: { kind: 'favorites' },
+      highlightedChannelId: 'b',
+      overlayZone: 'CATEGORY',
+      favoriteChannelIds: ['b'],
+    }),
+    {
+      categories: [],
+      channels,
+      visibleChannels: [channels[1]!],
+      features,
+    },
+  );
+
+  const groups = document.getElementById('group-list')!;
+  assert.deepEqual(groups.children.map((item) => item.dataset.scopeKey), [
+    'all',
+    'virtual:favorites',
+  ]);
+  const favoriteGroup = groups.children.find(
+    (item) => item.dataset.scopeKey === 'virtual:favorites',
+  )!;
+  assert.equal(favoriteGroup.textContent, 'Favoriler');
+  assert.equal(favoriteGroup.dataset.presentationState, 'focused');
+});
