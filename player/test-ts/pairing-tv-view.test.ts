@@ -77,6 +77,19 @@ class FakeScheduler {
 
 function asDocument(document: FakeDocument): Document { return document as unknown as Document; }
 
+function snapshot(node: FakeElement): unknown {
+  return {
+    id: node.id,
+    className: node.className,
+    textContent: node.textContent,
+    src: node.src,
+    alt: node.alt,
+    type: node.type,
+    attributes: [...node.attributes.entries()],
+    children: node.children.map(snapshot),
+  };
+}
+
 function createCore(results: PairingTvPollResult[]) {
   let startCalls = 0;
   let pollCalls = 0;
@@ -117,7 +130,7 @@ test('PAIR-I-WIRE TV view starts once, renders local QR from public fragment, an
   assert.match(parsed.hash, /^#pairing=[A-Za-z0-9_-]+$/);
   assert.equal(document.getElementById('pairing-tv-qr')?.src, 'data:image/png;base64,public-qr');
   assert.equal(scheduler.jobs.size, 1);
-  const surface = JSON.stringify(document.body);
+  const surface = JSON.stringify(snapshot(document.body));
   for (const forbidden of ['password', 'username', 'playlistUrl', 'serverUrl', 'privateKey', 'data-credential']) {
     assert.equal(surface.includes(forbidden), false, `forbidden TV surface value: ${forbidden}`);
   }
