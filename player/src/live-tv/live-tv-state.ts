@@ -53,6 +53,10 @@ function visibleIds(
   return channelsForScope(channels, scope, favoriteChannelIds).map((channel) => channel.id);
 }
 
+function favoriteIds(state: LiveTvState): readonly ChannelId[] {
+  return state.favoriteChannelIds ?? [];
+}
+
 export function createInitialLiveTvState(providerId: ProviderId): LiveTvState {
   return {
     providerId,
@@ -73,7 +77,7 @@ export function createInitialLiveTvState(providerId: ProviderId): LiveTvState {
 export function reduceLiveTv(state: LiveTvState, action: LiveTvAction): LiveTvState {
   switch (action.type) {
     case 'ENTER': {
-      const ids = visibleIds(action.channels, state.activeScope, state.favoriteChannelIds);
+      const ids = visibleIds(action.channels, state.activeScope, favoriteIds(state));
       const restore = state.restoreChannelIdByScope[scopeKey(state.activeScope)] ?? null;
       const highlightedChannelId = firstExisting(
         [state.playingChannelId, restore, state.highlightedChannelId],
@@ -88,7 +92,7 @@ export function reduceLiveTv(state: LiveTvState, action: LiveTvAction): LiveTvSt
     }
 
     case 'OPEN_OVERLAY': {
-      const ids = visibleIds(action.channels, state.activeScope, state.favoriteChannelIds);
+      const ids = visibleIds(action.channels, state.activeScope, favoriteIds(state));
       const restore = state.restoreChannelIdByScope[scopeKey(state.activeScope)] ?? null;
       const highlightedChannelId = firstExisting(
         [state.playingChannelId, restore, state.highlightedChannelId],
@@ -106,7 +110,7 @@ export function reduceLiveTv(state: LiveTvState, action: LiveTvAction): LiveTvSt
       return { ...state, overlayOpen: false };
 
     case 'SET_SCOPE': {
-      const ids = visibleIds(action.channels, action.scope, state.favoriteChannelIds);
+      const ids = visibleIds(action.channels, action.scope, favoriteIds(state));
       const restore = state.restoreChannelIdByScope[scopeKey(action.scope)] ?? null;
       const highlightedChannelId = firstExisting(
         [state.playingChannelId, restore, state.highlightedChannelId],
@@ -121,7 +125,7 @@ export function reduceLiveTv(state: LiveTvState, action: LiveTvAction): LiveTvSt
     }
 
     case 'MOVE_HIGHLIGHT': {
-      const ids = visibleIds(action.channels, state.activeScope, state.favoriteChannelIds);
+      const ids = visibleIds(action.channels, state.activeScope, favoriteIds(state));
       if (ids.length === 0) {
         return {
           ...state,
@@ -148,7 +152,7 @@ export function reduceLiveTv(state: LiveTvState, action: LiveTvAction): LiveTvSt
     }
 
     case 'SYNC_CHANNELS': {
-      const ids = visibleIds(action.channels, state.activeScope, state.favoriteChannelIds);
+      const ids = visibleIds(action.channels, state.activeScope, favoriteIds(state));
       const restore = state.restoreChannelIdByScope[scopeKey(state.activeScope)] ?? null;
       const highlightedChannelId = firstExisting(
         [state.highlightedChannelId, restore, state.playingChannelId],

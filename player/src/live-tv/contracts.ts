@@ -71,7 +71,7 @@ export interface LiveTvState {
   playingChannelId: ChannelId | null;
   highlightedChannelId: ChannelId | null;
   activeScope: LiveTvScope;
-  favoriteChannelIds: readonly ChannelId[];
+  favoriteChannelIds?: readonly ChannelId[];
   restoreChannelIdByScope: Readonly<Record<string, ChannelId | null>>;
   overlayOpen: boolean;
   overlayZone: LiveTvOverlayZone;
