@@ -1,0 +1,88 @@
+.provider-management-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--babu-space-xl);
+  background: var(--babu-bg);
+  color: var(--babu-text-primary);
+  font-family: var(--babu-font-family);
+}
+
+.provider-management-panel {
+  width: min(92vw, 960px);
+  display: grid;
+  gap: var(--babu-space-lg);
+  padding: var(--babu-space-xl);
+  border-radius: var(--babu-radius-lg);
+  background: var(--babu-surface);
+}
+
+.provider-management-title,
+.provider-management-status,
+.provider-management-confirmation-copy {
+  margin: 0;
+}
+
+.provider-management-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--babu-space-lg);
+  padding: var(--babu-space-md);
+  border-radius: var(--babu-radius-md);
+  background: var(--babu-surface-raised);
+}
+
+.provider-management-name {
+  color: var(--babu-text-primary);
+}
+
+.provider-management-actions {
+  display: flex;
+  gap: var(--babu-space-md);
+  flex-wrap: wrap;
+}
+
+.provider-management-button {
+  min-height: 48px;
+  padding: var(--babu-space-md) var(--babu-space-lg);
+  border: var(--babu-focus-width) solid transparent;
+  border-radius: var(--babu-radius-md);
+  background: var(--babu-surface-raised);
+  color: var(--babu-text-primary);
+  font: inherit;
+}
+
+.provider-management-button:focus,
+.provider-management-button:focus-visible {
+  border-color: var(--babu-accent-strong);
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: var(--babu-focus-offset);
+  box-shadow: var(--babu-focus-shadow);
+}
+
+.provider-management-button:disabled {
+  opacity: 0.55;
+}
+
+.provider-management-status {
+  color: var(--babu-text-secondary);
+}
+
+.provider-management-confirmation {
+  display: grid;
+  gap: var(--babu-space-lg);
+  padding: var(--babu-space-lg);
+  border-radius: var(--babu-radius-lg);
+  background: var(--babu-surface-raised);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .provider-management-page,
+  .provider-management-panel,
+  .provider-management-row,
+  .provider-management-button {
+    transition: none;
+    animation: none;
+  }
+}
