@@ -6,6 +6,7 @@ import { StructuredEpgProgramRepository } from '../src/epg/structured-epg-progra
 import { createBrowserProviderRuntime } from '../src/providers/create-browser-provider-runtime.js';
 import { ProviderAdapterFactoryImpl } from '../src/providers/provider-adapter-factory.js';
 import { ProviderCoreService } from '../src/providers/provider-core-service.js';
+import { ProviderUserStateCleanup } from '../src/providers/provider-user-state-cleanup.js';
 import type { ProviderSyncReport } from '../src/providers/provider-sync-service.js';
 import { StructuredCatalogRepository } from '../src/repository/structured-catalog-repository.js';
 import { StructuredProviderRepository } from '../src/repository/structured-provider-repository.js';
@@ -23,6 +24,13 @@ function report(providerId: string): ProviderSyncReport {
     channels: { status: 'success', count: 0 },
     completedAtMs: 1,
   };
+}
+
+function noOpUserStateCleanup(): ProviderUserStateCleanup {
+  return new ProviderUserStateCleanup(
+    { async deleteProvider() {} },
+    { async deleteProvider() {} },
+  );
 }
 
 test('EPG-PI browser provider runtime composes structured EPG persistence and refresh orchestration', () => {
@@ -67,6 +75,7 @@ test('EPG-PI Provider Core deletion cleans only the target EPG partition', async
     sync,
     null,
     { deleteProvider: (providerId) => epgRepository.deleteProvider(providerId) },
+    noOpUserStateCleanup(),
   );
 
   await core.deleteProvider('p1');
@@ -96,6 +105,7 @@ test('EPG-PI EPG cleanup failure never blocks normal Provider Core removal', asy
     sync,
     null,
     { async deleteProvider() { throw new Error('EPG storage unavailable'); } },
+    noOpUserStateCleanup(),
   );
 
   await core.deleteProvider('p1');
