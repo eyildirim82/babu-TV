@@ -384,6 +384,8 @@ async function init() {
     fetchImpl: window.fetch.bind(window),
     platform,
     document,
+    legacyPlayer,
+    legacyAvplay,
     setRemoteNumericMode: setAppRemoteNumericMode,
     legacy: {
       hidePlayerShell: () => hidePlayer(),
