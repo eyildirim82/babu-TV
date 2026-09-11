@@ -27,7 +27,7 @@ At `860d9efa8efac7c9872bf31f7f592ae12a414889`:
 - `createBrowserProviderRuntime()` exposes provider/catalog/watch/credential/EPG/core seams, but does not currently expose the durable Favorites repository required by Home and M4 feature ports.
 - `createBrowserLiveTvRuntime()` accepts optional M4 `featurePorts`, but current `main.js` does not supply them.
 - `LiveTvController` has no explicit application-entry API for Home deep links (`all`, `favorites`, focus channel, explicit play channel).
-- current `main.js` owns boot, legacy fallback, remote initialization, Settings, onboarding entry, and the M3 startup short-circuit; it returns immediately when M3 starts, so Home is not yet the application root.
+- current `main.js` owns boot, legacy fallback, remote initialization, the existing playback/proxy/update Settings surface, onboarding entry, and the M3 startup short-circuit; it returns immediately when M3 starts, so Home is not yet the application root.
 
 These are composition seams, not reasons to duplicate the underlying feature implementations.
 
@@ -46,6 +46,7 @@ It owns:
 - Home data refresh and intent routing;
 - first-run/onboarding navigation;
 - provider-management presentation mounting;
+- access to the existing playback/proxy/update Settings surface;
 - Live TV application entry/return-to-Home behavior;
 - application-level Back ownership.
 
@@ -61,6 +62,7 @@ type AppRoute =
   | { kind: 'home' }
   | { kind: 'live-tv' }
   | { kind: 'provider-management' }
+  | { kind: 'legacy-settings'; returnTo: 'provider-management' }
   | { kind: 'xtream-entry'; returnTo: 'first-run' | 'provider-management' }
   | { kind: 'm3u-entry'; returnTo: 'first-run' | 'provider-management' };
 ```
@@ -134,7 +136,7 @@ The orchestrator maps frozen Home intents exactly:
 | `OPEN_LIVE_TV` / `favorites` | enter Live TV in the virtual Favorites scope; no playback |
 | `OPEN_LIVE_TV_CHANNEL` | enter Live TV, focus that provider-scoped channel in normal `all` scope; no playback |
 | `PLAY_CHANNEL` | enter Live TV and explicitly request playback of that provider-scoped channel |
-| `OPEN_SETTINGS` | open application provider-management surface |
+| `OPEN_SETTINGS` | open application provider-management surface; the existing playback/proxy/update Settings surface remains reachable from there |
 
 If an intent provider is not the active provider, M5 first uses the existing Provider Core switch operation and only then creates/enters the Live TV runtime. Provider switching alone is never playback.
 
@@ -182,13 +184,14 @@ The app orchestrator dispatches arrows/Select/Back according to the active route
 - Xtream -> `XtreamEntryView.handleAction()`;
 - M3U -> `M3uEntryView.handleAction()`;
 - provider management -> application-shell provider-management adapter;
+- legacy Settings -> the existing Settings input/DOM path without creating a second Settings implementation;
 - Live TV -> existing `LiveTvController.handleInput()` plus numeric/channel/options actions.
 
 The Samsung `tizenhwkey` Back listener also exists once at the application boundary.
 
 No route may independently install a second global remote/back listener.
 
-## 11. Provider-management surface
+## 11. Provider-management and Settings surface
 
 Because merged PROV-UI exposes `ProviderManagementPresenter` state rather than a DOM view, M5 may create a small materialization adapter, preferably:
 
@@ -200,9 +203,14 @@ It may:
 - use presenter-provided focus IDs/order;
 - map remote next/previous/select/back into presenter methods/application navigation;
 - refresh/render after presenter async operations;
-- route `requestAddProvider()` to the existing first-run provider-kind chooser or directly to the Xtream/M3U choice surface.
+- route `requestAddProvider()` to the existing first-run provider-kind chooser or directly to the Xtream/M3U choice surface;
+- expose one application-owned action labelled for playback/application settings that opens the existing Settings module as `legacy-settings`.
 
-It may not duplicate provider switch/delete/confirmation rules already owned by the presenter.
+The application-owned Settings action is outside `ProviderManagementPresenter` state and must not alter provider switch/delete/confirmation semantics. Its Back action returns to provider management.
+
+This preserves access to existing proxy, update, playlist/legacy application controls while provider management becomes the Home `Settings` landing surface.
+
+The surface may not duplicate provider switch/delete/confirmation rules already owned by the presenter, and it may not copy the existing Settings implementation.
 
 ## 12. Provider-management gaps discovered during design review
 
@@ -245,11 +253,13 @@ M5 attaches already-merged scoped styles from the application bootstrap, includi
 
 Prefer module CSS imports from `main.js`/the application entry rather than adding static duplicate stylesheet tags to `index.html`. `index.html` changes are allowed only if a mount/accessibility requirement cannot be satisfied through the existing body-based views.
 
-## 15. Legacy fallback
+## 15. Legacy fallback and existing Settings
 
 Do not delete the legacy player/settings path in M5 unless exact tests prove it is unreachable and intentionally retired.
 
 `createBrowserLiveTvRuntime()` may still return `legacy`. In that case the application must preserve the current usable legacy path rather than leaving a dead Home/Live TV route.
+
+When M3/Home composition is active, the existing playback/proxy/update Settings module remains explicitly reachable through the provider-management Settings surface described above. M5 must not strand existing settings simply because Home became the application root.
 
 Legacy fallback must not become a reason to bypass Provider Core when a valid M3 provider runtime is available.
 
@@ -260,6 +270,7 @@ Legacy fallback must not become a reason to bypass Provider Core when a valid M3
 - M4 feature-port failure -> existing M4 graceful degradation; Live TV remains usable.
 - Live TV runtime failure/legacy result -> controlled legacy fallback.
 - onboarding failure -> existing sanitized Xtream/M3U view behavior.
+- legacy Settings failure must not destroy Home/provider-management route state.
 - no raw provider credential, playlist URL, stream URL, relay secret, repository exception, or native playback error is newly rendered/logged by M5.
 
 ## 17. Preferred production scope
@@ -308,6 +319,7 @@ M5-COMP acceptance must prove at minimum:
 - onboarding success returns Home through the existing Xtream/M3U transactions;
 - provider-management add uses the same onboarding views;
 - provider list/switch/delete presentation remains presenter-driven;
+- Home -> Settings -> playback/application Settings remains reachable and Back returns to provider management;
 - cross-provider focus/channel identity remains provider-scoped;
 - legacy fallback remains usable;
 - physical Samsung/Tizen runtime remains `NOT VERIFIED` unless a real device/emulator run is performed.
@@ -336,5 +348,6 @@ M5-COMP does not:
 - solve provider edit/re-entry without a separately approved transaction contract;
 - claim atomic provider deletion across credential storage and IndexedDB on failure paths;
 - redesign Home/Provider Core/M4 domain semantics;
+- replace or duplicate the existing playback/proxy/update Settings module;
 - add a routing framework;
 - perform final hardening/performance/release verification.
