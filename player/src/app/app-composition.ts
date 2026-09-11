@@ -1,5 +1,5 @@
 import type { LogicalInput } from '../domain/actions.js';
-import type { ChannelId, ProviderId } from '../domain/models.js';
+import type { ChannelId, ProviderId, ProviderKind } from '../domain/models.js';
 import type { HomeActionIntent } from '../home/home-domain.js';
 import type {
   HomeInputAction,
@@ -22,11 +22,16 @@ import type {
   M3uEntrySubmission,
 } from '../m3u-entry.js';
 import type { ProviderRepository } from '../repository/provider-repository.js';
+import type { ProviderReentryInput } from '../providers/provider-reentry-service.js';
 import type { HomeDataSource } from './home-data-source.js';
 import type {
   ProviderManagementSurfaceAction,
   ProviderManagementSurfaceCallbacks,
 } from './provider-management-surface.js';
+
+export type AppEntryMode =
+  | { kind: 'add' }
+  | { kind: 'edit'; providerId: ProviderId };
 
 export type AppRoute =
   | { kind: 'first-run' }
@@ -34,8 +39,16 @@ export type AppRoute =
   | { kind: 'live-tv' }
   | { kind: 'provider-management' }
   | { kind: 'legacy-settings'; returnTo: 'provider-management' }
-  | { kind: 'xtream-entry'; returnTo: 'first-run' | 'provider-management' }
-  | { kind: 'm3u-entry'; returnTo: 'first-run' | 'provider-management' };
+  | {
+      kind: 'xtream-entry';
+      returnTo: 'first-run' | 'provider-management';
+      mode: AppEntryMode;
+    }
+  | {
+      kind: 'm3u-entry';
+      returnTo: 'first-run' | 'provider-management';
+      mode: AppEntryMode;
+    };
 
 export type AppRemoteAction =
   | 'up'
@@ -84,12 +97,17 @@ export interface AppEntryViewPort<Action extends string> {
 
 export interface AppProviderManagementCallbacks extends ProviderManagementSurfaceCallbacks {
   onAddProvider(): void;
+  onEditProvider(providerId: ProviderId, kind: ProviderKind): void;
 }
 
 export interface AppProviderManagementPort {
   show(): Promise<void>;
   hide(): void;
   handleAction(action: ProviderManagementSurfaceAction): Promise<void>;
+}
+
+export interface AppProviderReentryPort {
+  reenter(input: ProviderReentryInput): Promise<unknown>;
 }
 
 export interface AppLiveTvControllerPort {
@@ -124,6 +142,7 @@ export interface AppCompositionDependencies {
     connectXtream(input: XtreamEntrySubmission): Promise<void>;
     connectM3u(input: M3uEntrySubmission): Promise<void>;
   };
+  reentry: AppProviderReentryPort;
   liveTv: {
     start(onRootBack: () => void): Promise<AppLiveTvStart>;
   };
@@ -187,12 +206,26 @@ export class AppComposition {
       onBack: () => deps.exitApp(),
     });
     this.firstRunView = deps.views.firstRun({
-      onXtreamSelected: () => { this.showXtream(this.firstRunDestination()); },
-      onM3uSelected: () => { this.showM3u(this.firstRunDestination()); },
+      onXtreamSelected: () => {
+        this.showXtream(this.firstRunDestination(), { kind: 'add' });
+      },
+      onM3uSelected: () => {
+        this.showM3u(this.firstRunDestination(), { kind: 'add' });
+      },
       onBack: () => { void this.handleFirstRunBack(); },
     });
     this.xtreamView = deps.views.xtream({
       onSubmit: async (input) => {
+        const route = this.currentRoute;
+        if (route.kind === 'xtream-entry' && route.mode.kind === 'edit') {
+          await deps.reentry.reenter({
+            providerId: route.mode.providerId,
+            kind: 'xtream',
+            ...input,
+          });
+          await this.showProviderManagement();
+          return;
+        }
         await deps.onboarding.connectXtream(input);
         await this.showHome();
       },
@@ -200,6 +233,16 @@ export class AppComposition {
     });
     this.m3uView = deps.views.m3u({
       onSubmit: async (input) => {
+        const route = this.currentRoute;
+        if (route.kind === 'm3u-entry' && route.mode.kind === 'edit') {
+          await deps.reentry.reenter({
+            providerId: route.mode.providerId,
+            kind: 'm3u',
+            playlistUrl: input.playlistUrl,
+          });
+          await this.showProviderManagement();
+          return;
+        }
         await deps.onboarding.connectM3u(input);
         await this.showHome();
       },
@@ -209,6 +252,7 @@ export class AppComposition {
       onBack: () => { void this.showHome(); },
       onOpenLegacySettings: () => { this.showLegacySettings(); },
       onAddProvider: () => { this.showProviderChooser('provider-management'); },
+      onEditProvider: (providerId, kind) => { this.showProviderEdit(providerId, kind); },
     });
   }
 
@@ -341,18 +385,33 @@ export class AppComposition {
     this.deps.legacy.showSettings();
   }
 
-  private showXtream(returnTo: 'first-run' | 'provider-management'): void {
+  private showXtream(
+    returnTo: 'first-run' | 'provider-management',
+    mode: AppEntryMode,
+  ): void {
     this.hideModernViews();
     this.deps.legacy.hidePlayerShell();
-    this.currentRoute = { kind: 'xtream-entry', returnTo };
+    this.currentRoute = { kind: 'xtream-entry', returnTo, mode };
     this.xtreamView.show();
   }
 
-  private showM3u(returnTo: 'first-run' | 'provider-management'): void {
+  private showM3u(
+    returnTo: 'first-run' | 'provider-management',
+    mode: AppEntryMode,
+  ): void {
     this.hideModernViews();
     this.deps.legacy.hidePlayerShell();
-    this.currentRoute = { kind: 'm3u-entry', returnTo };
+    this.currentRoute = { kind: 'm3u-entry', returnTo, mode };
     this.m3uView.show();
+  }
+
+  private showProviderEdit(providerId: ProviderId, kind: ProviderKind): void {
+    const mode: AppEntryMode = { kind: 'edit', providerId };
+    if (kind === 'xtream') {
+      this.showXtream('provider-management', mode);
+      return;
+    }
+    this.showM3u('provider-management', mode);
   }
 
   private async openLiveTv(
