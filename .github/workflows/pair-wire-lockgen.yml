@@ -1,0 +1,30 @@
+name: pair-wire-lockgen
+
+on:
+  push:
+    branches:
+      - integration/pairing-onboarding
+
+permissions:
+  contents: read
+
+jobs:
+  lockgen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm install qrcode@1.5.4 -w player
+      - run: npm install -D @types/qrcode@1.5.6 -w player
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pair-wire-lockfiles
+          path: |
+            player/package.json
+            package-lock.json
