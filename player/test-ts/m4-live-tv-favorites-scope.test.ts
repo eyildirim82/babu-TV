@@ -35,7 +35,7 @@ function snapshot(): ProviderSnapshot {
       lastSuccessfulSyncAtMs: null,
     },
     categories: [],
-    channels: [channel('a'), channel('b')],
+    channels: [channel('a'), channel('b'), channel('c')],
   };
 }
 
@@ -69,18 +69,21 @@ async function nextTurn(): Promise<void> {
   await new Promise<void>((resolve) => setImmediate(resolve));
 }
 
-void test('M4-COMP exposes virtual:favorites as a real Live TV scope without playback', async () => {
+void test('M4-COMP exposes virtual:favorites as a real browsable Live TV scope without playback', async () => {
   const ports: LiveTvFeaturePorts = {
     epg: {
       async getCurrent() { return null; },
       async getNext() { return null; },
     },
     favorites: {
-      async isFavorite(_providerId, channelId) { return channelId === 'b'; },
+      async isFavorite(_providerId, channelId) { return channelId === 'b' || channelId === 'c'; },
       async toggle() { return false; },
       async reconcile() {
         return {
-          available: [{ providerId: 'provider-1', channelId: 'b', addedAtMs: 1 }],
+          available: [
+            { providerId: 'provider-1', channelId: 'b', addedAtMs: 1 },
+            { providerId: 'provider-1', channelId: 'c', addedAtMs: 2 },
+          ],
           missing: [],
         };
       },
@@ -106,7 +109,13 @@ void test('M4-COMP exposes virtual:favorites as a real Live TV scope without pla
 
   assert.deepEqual(controller.state().activeScope, { kind: 'favorites' });
   assert.equal(controller.state().highlightedChannelId, 'b');
-  assert.deepEqual(view.models.at(-1)?.visibleChannels.map((item) => item.id), ['b']);
+  assert.deepEqual(view.models.at(-1)?.visibleChannels.map((item) => item.id), ['b', 'c']);
   assert.equal(view.models.at(-1)?.features?.favorites.categoryKey, 'virtual:favorites');
+
+  await controller.handleInput({ type: 'ACTION', action: 'SELECT' });
+  await controller.handleInput({ type: 'ACTION', action: 'DOWN' });
+
+  assert.equal(controller.state().highlightedChannelId, 'c');
+  assert.deepEqual(view.models.at(-1)?.visibleChannels.map((item) => item.id), ['b', 'c']);
   assert.deepEqual(intent.requests, []);
 });
