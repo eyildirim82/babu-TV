@@ -1,5 +1,3 @@
-import * as legacyPlayer from '../player.js';
-import * as legacyAvplay from '../avplay.js';
 import type { Platform } from '../platform/contracts.js';
 import { createBrowserProviderRuntime } from '../providers/create-browser-provider-runtime.js';
 import { XtreamOnboardingService } from '../providers/xtream-onboarding-service.js';
@@ -12,8 +10,14 @@ import { M3uEntryView } from '../m3u-entry.js';
 import { ProviderManagementPresenter } from '../provider-management/provider-management-presenter.js';
 import { FavoriteService } from '../favorites/service.js';
 import { RepositoryEpgQuery } from '../epg/query-engine.js';
-import { createBrowserLiveTvRuntime } from '../live-tv/create-live-tv-runtime.js';
-import { RepositoryHomeDataSource } from './home-data-source.js';
+import {
+  createBrowserLiveTvRuntime,
+  type BrowserLiveTvRuntimeDependencies,
+} from '../live-tv/create-live-tv-runtime.js';
+import {
+  createHomeDataSource,
+  DEFAULT_HOME_WATCH_SCORE_POLICY,
+} from './home-data-source.js';
 import { createAppLiveTvFeaturePorts } from './live-tv-feature-ports.js';
 import { ProviderManagementSurface } from './provider-management-surface.js';
 import type { AppCompositionDependencies } from './app-composition.js';
@@ -25,12 +29,16 @@ import '../ui/m3u-entry.css';
 import '../ui/provider-management.css';
 import '../ui/xtream-entry.css';
 
+const EPG_QUERY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 export interface BrowserAppDependencyInput {
   indexedDb: IDBFactory | null;
   widgetData: WidgetDataLike | null;
   fetchImpl: typeof fetch;
   platform: Platform;
   document: Document;
+  legacyPlayer: BrowserLiveTvRuntimeDependencies['legacyPlayer'];
+  legacyAvplay: BrowserLiveTvRuntimeDependencies['legacyAvplay'];
   setRemoteNumericMode(mode: 'buffered' | 'digits'): void;
   legacy: AppCompositionDependencies['legacy'];
   exitApp(): void;
@@ -53,16 +61,19 @@ export function createBrowserAppDependencies(
     widgetData: input.widgetData,
     fetchImpl: input.fetchImpl,
   });
-  const homeData = new RepositoryHomeDataSource({
+  const homeData = createHomeDataSource({
     providers: runtime.providers,
     catalog: runtime.catalog,
-    watch: runtime.watchState,
+    watchState: runtime.watchState,
     favorites: runtime.favorites,
-    epg: new RepositoryEpgQuery(runtime.epg),
     nowMs,
+    watchScorePolicy: DEFAULT_HOME_WATCH_SCORE_POLICY,
   });
-  const favoriteService = new FavoriteService(runtime.favorites);
-  const epgQuery = new RepositoryEpgQuery(runtime.epg);
+  const favoriteService = new FavoriteService(runtime.favorites, nowMs);
+  const epgQuery = new RepositoryEpgQuery(runtime.epgRepository, {
+    lookBehindMs: EPG_QUERY_WINDOW_MS,
+    lookAheadMs: EPG_QUERY_WINDOW_MS,
+  });
   const liveTvFeaturePorts = createAppLiveTvFeaturePorts({
     epg: epgQuery,
     favorites: favoriteService,
@@ -137,8 +148,8 @@ export function createBrowserAppDependencies(
           fetchImpl: input.fetchImpl,
           platform: routePlatform,
           document: input.document,
-          legacyPlayer,
-          legacyAvplay,
+          legacyPlayer: input.legacyPlayer,
+          legacyAvplay: input.legacyAvplay,
           featurePorts: liveTvFeaturePorts,
         });
         input.setRemoteNumericMode(result.mode === 'm3' ? 'digits' : 'buffered');
