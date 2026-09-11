@@ -21,10 +21,10 @@ jobs:
           from pathlib import Path
           path = Path('player/src/main.js')
           text = path.read_text()
-          old = "      platform,\n      document,\n      setRemoteNumericMode: setAppRemoteNumericMode,\n"
-          new = "      platform,\n      document,\n      legacyPlayer,\n      legacyAvplay,\n      setRemoteNumericMode: setAppRemoteNumericMode,\n"
+          old = "    platform,\n    document,\n    setRemoteNumericMode: setAppRemoteNumericMode,\n"
+          new = "    platform,\n    document,\n    legacyPlayer,\n    legacyAvplay,\n    setRemoteNumericMode: setAppRemoteNumericMode,\n"
           assert text.count(old) == 1
-          assert text.count('      legacyPlayer,\n      legacyAvplay,\n      setRemoteNumericMode: setAppRemoteNumericMode,') == 0
+          assert text.count('    legacyPlayer,\n    legacyAvplay,\n    setRemoteNumericMode: setAppRemoteNumericMode,') == 0
           path.write_text(text.replace(old, new, 1))
           PY
           git diff --check
