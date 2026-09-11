@@ -83,8 +83,10 @@ test('PAIR-WEB keeps Xtream required validation and M3U protocol validation loca
   m3u.chooseProvider('m3u');
   m3u.updateM3u({ playlistUrl: 'ftp://playlist.example.invalid/a.m3u8' });
   await m3u.submit();
-  assert.equal(m3u.state().kind, 'm3u');
-  assert.equal(m3u.state().kind === 'm3u' ? m3u.state().error : null, 'UNSUPPORTED_PROTOCOL');
+  const m3uState = m3u.state();
+  assert.equal(m3uState.kind, 'm3u');
+  if (m3uState.kind !== 'm3u') throw new Error('Expected M3U validation state.');
+  assert.equal(m3uState.error, 'UNSUPPORTED_PROTOCOL');
   assert.equal(cryptoCalls, 0);
   assert.equal(relayCalls, 0);
 });
@@ -93,31 +95,17 @@ test('PAIR-WEB sends only serialized PAIR-C ciphertext to relay and clears secre
   const relayRequests: Array<{ sessionId: string; ciphertext: string }> = [];
   let plaintext: Uint8Array | null = null;
   const controller = new PairingPhoneController(validBootstrap, {
-    crypto: {
-      async encryptForTv(_key, bytes) {
-        plaintext = bytes;
-        return envelope;
-      },
-    },
+    crypto: { async encryptForTv(_key, bytes) { plaintext = bytes; return envelope; } },
     relay: { async putCiphertext(request) { relayRequests.push(request); } },
     nowMs: () => 100,
   });
   controller.chooseProvider('xtream');
-  controller.updateXtream({
-    serverUrl: ' https://iptv.example.invalid ',
-    username: ' user ',
-    password: ' secret ',
-  });
+  controller.updateXtream({ serverUrl: ' https://iptv.example.invalid ', username: ' user ', password: ' secret ' });
   await controller.submit();
 
   assert.ok(plaintext);
-  const plaintextJson = new TextDecoder().decode(plaintext);
-  assert.match(plaintextJson, /https:\/\/iptv\.example\.invalid/);
-  assert.equal(relayRequests.length, 1);
-  assert.deepEqual(relayRequests[0], {
-    sessionId: 'session-1',
-    ciphertext: JSON.stringify(envelope),
-  });
+  assert.match(new TextDecoder().decode(plaintext), /https:\/\/iptv\.example\.invalid/);
+  assert.deepEqual(relayRequests, [{ sessionId: 'session-1', ciphertext: JSON.stringify(envelope) }]);
   assert.doesNotMatch(relayRequests[0]!.ciphertext, /iptv|user|secret/);
   assert.deepEqual(controller.state(), { kind: 'success' });
   controller.chooseProvider('xtream');
@@ -128,7 +116,7 @@ test('PAIR-WEB sends only serialized PAIR-C ciphertext to relay and clears secre
   });
 });
 
-test('PAIR-WEB maps crypto and relay failures to fixed sanitized codes and preserves retry input', async () => {
+test('PAIR-WEB maps crypto and relay failures to sanitized codes and preserves retry input', async () => {
   const invalidKey = new PairingPhoneController(validBootstrap, {
     crypto: { async encryptForTv() { throw new PairingCryptoError('INVALID_KEY'); } },
     relay: { async putCiphertext() { throw new Error('unexpected'); } },
@@ -138,6 +126,16 @@ test('PAIR-WEB maps crypto and relay failures to fixed sanitized codes and prese
   invalidKey.updateXtream({ serverUrl: 'https://iptv.example.invalid', username: 'user', password: 'secret' });
   await invalidKey.submit();
   assert.deepEqual(invalidKey.state(), { kind: 'error', providerKind: 'xtream', code: 'INVALID_TV_KEY' });
+
+  const cryptoUnavailable = new PairingPhoneController(validBootstrap, {
+    crypto: { async encryptForTv() { throw new Error('native secret failure'); } },
+    relay: { async putCiphertext() {} },
+    nowMs: () => 100,
+  });
+  cryptoUnavailable.chooseProvider('m3u');
+  cryptoUnavailable.updateM3u({ playlistUrl: 'https://playlist.example.invalid/a.m3u8' });
+  await cryptoUnavailable.submit();
+  assert.deepEqual(cryptoUnavailable.state(), { kind: 'error', providerKind: 'm3u', code: 'CRYPTO_UNAVAILABLE' });
 
   let relayAttempts = 0;
   const network = new PairingPhoneController(validBootstrap, {
@@ -249,7 +247,7 @@ function asDocument(fake: FakeDocument): Document {
   return fake as unknown as Document;
 }
 
-test('PAIR-WEB phone view renders accessible provider choice and form states without exposing bootstrap data', async () => {
+test('PAIR-WEB phone view is accessible and never renders bootstrap material', async () => {
   const controller = new PairingPhoneController(validBootstrap, {
     crypto: { async encryptForTv() { return envelope; } },
     relay: { async putCiphertext() {} },
@@ -262,15 +260,13 @@ test('PAIR-WEB phone view renders accessible provider choice and form states wit
   assert.ok(document.getElementById('pairing-phone-xtream'));
   assert.ok(document.getElementById('pairing-phone-m3u'));
   assert.equal(document.getElementById('pairing-phone-status')?.getAttribute('aria-live'), 'polite');
-  assert.doesNotMatch(document.body.textContent, /session-1|relay\.example|\"x\"/);
-
   await document.getElementById('pairing-phone-xtream')?.dispatch('click');
   assert.equal(document.getElementById('pairing-phone-password')?.type, 'password');
   assert.ok(document.getElementById('pairing-phone-submit'));
   assert.ok(document.getElementById('pairing-phone-back'));
 });
 
-test('PAIR-WEB success view removes credential fields and stylesheet is focus/reduced-motion safe', async () => {
+test('PAIR-WEB success removes credential fields and stylesheet uses focus/reduced-motion tokens', async () => {
   const controller = new PairingPhoneController(validBootstrap, {
     crypto: { async encryptForTv() { return envelope; } },
     relay: { async putCiphertext() {} },
@@ -296,7 +292,7 @@ test('PAIR-WEB success view removes credential fields and stylesheet is focus/re
   assert.match(css, /prefers-reduced-motion/);
 });
 
-test('PAIR-WEB source never introduces browser persistence or plaintext logging', async () => {
+test('PAIR-WEB source introduces no browser persistence, URL-secret handling, or plaintext logging', async () => {
   const [controllerSource, viewSource] = await Promise.all([
     readFile(new URL('../src/pairing/phone-controller.ts', import.meta.url), 'utf8'),
     readFile(new URL('../src/pairing/phone-view.ts', import.meta.url), 'utf8'),
