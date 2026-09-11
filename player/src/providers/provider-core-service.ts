@@ -10,6 +10,7 @@ import type { ProviderRepository } from '../repository/provider-repository.js';
 import type { ProviderAdapterFactory, ProviderProfile } from './contracts.js';
 import { ProviderError } from './errors.js';
 import type { ProviderSyncReport } from './provider-sync-service.js';
+import type { ProviderUserStateCleanup } from './provider-user-state-cleanup.js';
 
 export interface ProviderSnapshot {
   provider: ProviderRecord;
@@ -50,6 +51,10 @@ function persistenceUnavailable(): ProviderError {
   return new ProviderError('UNAVAILABLE', null, 'Provider configuration could not be saved.');
 }
 
+function providerDataUnavailable(): ProviderError {
+  return new ProviderError('UNAVAILABLE', null, 'Provider data is unavailable.');
+}
+
 export class ProviderCoreService {
   constructor(
     private readonly providers: ProviderRepository,
@@ -58,6 +63,7 @@ export class ProviderCoreService {
     private readonly sync: ProviderSyncPort,
     private readonly adapters: ProviderAdapterFactory | null = null,
     private readonly epgCleanup: ProviderEpgCleanupPort | null = null,
+    private readonly userStateCleanup: Pick<ProviderUserStateCleanup, 'deleteProvider'> | null = null,
   ) {}
 
   async registerProvider(
@@ -121,7 +127,9 @@ export class ProviderCoreService {
 
   async deleteProvider(providerId: ProviderId): Promise<void> {
     if (await this.providers.getProvider(providerId) === null) throw missingProvider();
+    if (this.userStateCleanup === null) throw providerDataUnavailable();
 
+    // Intentionally non-atomic: provider-scoped deletes are idempotent so retry can converge.
     await this.credentials.remove(providerId);
     await this.catalog.removeProviderCatalog(providerId);
     if (this.epgCleanup !== null) {
@@ -131,6 +139,13 @@ export class ProviderCoreService {
         // EPG cleanup is best-effort and must not block provider availability semantics.
       }
     }
+
+    try {
+      await this.userStateCleanup.deleteProvider(providerId);
+    } catch {
+      throw providerDataUnavailable();
+    }
+
     await this.providers.removeProvider(providerId);
   }
 }
