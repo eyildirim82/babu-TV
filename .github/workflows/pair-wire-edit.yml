@@ -182,3 +182,5 @@ jobs:
           git add player/test-ts/m5-app-composition.test.ts
           git commit -m "test(app): add RED pairing route coverage"
           git push origin HEAD:integration/pairing-onboarding
+
+# verification trigger only; removed before final production head
