@@ -172,6 +172,7 @@ export class AppComposition {
   private readonly providerView: AppProviderManagementPort;
   private liveTvController: AppLiveTvControllerPort | null = null;
   private liveTvMode: 'm3' | 'legacy' | null = null;
+  private liveTvProviderId: ProviderId | null = null;
   private firstRunReturnTo: 'legacy' | 'provider-management' = 'legacy';
 
   constructor(private readonly deps: AppCompositionDependencies) {
@@ -292,8 +293,6 @@ export class AppComposition {
     this.hideModernViews();
     this.deps.legacy.hideSettings();
     this.deps.legacy.hidePlayerShell();
-    this.liveTvController = null;
-    this.liveTvMode = null;
     this.currentRoute = { kind: 'home' };
     this.homeView.show({ kind: 'loading' });
     try {
@@ -360,10 +359,20 @@ export class AppComposition {
     this.deps.legacy.showPlayerShell?.();
     this.currentRoute = { kind: 'live-tv' };
 
+    if (
+      this.liveTvMode === 'm3'
+      && this.liveTvController !== null
+      && this.liveTvProviderId === providerId
+    ) {
+      await activate(this.liveTvController);
+      return;
+    }
+
     const runtime = await this.deps.liveTv.start(() => {
       void this.showHome();
     });
     this.liveTvMode = runtime.mode;
+    this.liveTvProviderId = providerId;
     if (runtime.mode === 'legacy') {
       this.liveTvController = null;
       this.deps.legacy.openPlayer();
@@ -419,6 +428,7 @@ export class AppComposition {
     this.currentRoute = { kind: 'live-tv' };
     this.liveTvMode = 'legacy';
     this.liveTvController = null;
+    this.liveTvProviderId = null;
     this.deps.legacy.openPlayer();
   }
 
