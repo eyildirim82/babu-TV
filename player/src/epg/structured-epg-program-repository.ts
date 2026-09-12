@@ -31,6 +31,30 @@ function programKey(providerId: ProviderId, program: EpgProgram, index: number):
   ]);
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isStoredEpgProgram(value: unknown): value is StoredEpgProgram {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.key === 'string'
+    && typeof candidate.providerId === 'string'
+    && typeof candidate.providerChannelKey === 'string'
+    && typeof candidate.channelId === 'string'
+    && isFiniteNumber(candidate.startMs)
+    && isFiniteNumber(candidate.endMs)
+    && candidate.endMs > candidate.startMs
+    && typeof candidate.title === 'string'
+    && (candidate.description === null || typeof candidate.description === 'string')
+    && candidate.providerChannelKey === providerChannelKey(candidate.providerId, candidate.channelId);
+}
+
+function hasStoredKey(value: unknown): value is { key: string } {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  return typeof (value as Record<string, unknown>).key === 'string';
+}
+
 function intersects(program: EpgProgram, window: EpgWindow): boolean {
   return program.startMs < window.endMs && program.endMs > window.startMs;
 }
@@ -70,14 +94,17 @@ export class StructuredEpgProgramRepository implements EpgProgramRepository {
     window: EpgWindow,
     programs: readonly EpgProgram[],
   ): Promise<void> {
-    const existing = await this.store.getAllByIndex<StoredEpgProgram>(
+    const existing = await this.store.getAllByIndex<unknown>(
       'epg_programs',
       'providerId',
       providerId,
     );
 
     for (const stored of existing) {
-      if (intersects(stored, window)) await this.store.delete('epg_programs', stored.key);
+      if (!hasStoredKey(stored)) continue;
+      if (!isStoredEpgProgram(stored) || intersects(stored, window)) {
+        await this.store.delete('epg_programs', stored.key);
+      }
     }
 
     for (let index = 0; index < programs.length; index += 1) {
@@ -90,14 +117,19 @@ export class StructuredEpgProgramRepository implements EpgProgramRepository {
     channelId: ChannelId,
     window: EpgWindow,
   ): Promise<readonly EpgProgram[]> {
-    const programs = await this.store.getAllByIndex<StoredEpgProgram>(
+    const programs = await this.store.getAllByIndex<unknown>(
       'epg_programs',
       'providerChannelKey',
       providerChannelKey(providerId, channelId),
     );
 
     return programs
-      .filter((program) => intersects(program, window))
+      .filter((program): program is StoredEpgProgram => (
+        isStoredEpgProgram(program)
+        && program.providerId === providerId
+        && program.channelId === channelId
+        && intersects(program, window)
+      ))
       .sort((a, b) => a.startMs - b.startMs)
       .map(programFromStored);
   }
