@@ -27,21 +27,29 @@ jobs:
       - run: npm test
       - run: npm run typecheck
 
-  task4-exact:
-    if: "${{ github.event.head_commit.message == 'chore(pairing): verify Task 4 fixture fix' }}"
+  task5-exact:
+    if: "${{ github.event.head_commit.message == 'chore(pairing): verify Task 5 GREEN' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 70b4846306c1758a65a541dcc321f64a3ffa9773
-      - name: Assert Task 4 exact head
-        run: test "$(git rev-parse HEAD)" = "70b4846306c1758a65a541dcc321f64a3ffa9773"
+          ref: 69f4e495c6b51526c074d23575f8aa72c9fd83ac
+      - name: Assert Task 5 exact head
+        run: test "$(git rev-parse HEAD)" = "69f4e495c6b51526c074d23575f8aa72c9fd83ac"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Focused Task 4 regression
-        run: node --import tsx --test player/test-ts/m5-app-composition.test.ts
-      - name: Typecheck Task 4 exact head
+      - name: Focused Task 5 regression
+        run: >-
+          node --import tsx --test
+          player/test-ts/pairing-tv-controller.test.ts
+          player/test-ts/pairing-tv-core.test.ts
+          player/test-ts/pairing-browser-transport.test.ts
+          player/test-ts/pairing-bootstrap-link.test.ts
+          player/test-ts/pairing-tv-view.test.ts
+          player/test-ts/pairing-browser-app-dependencies.test.ts
+          player/test-ts/m5-app-composition.test.ts
+      - name: Typecheck Task 5 exact head
         run: npm run typecheck
