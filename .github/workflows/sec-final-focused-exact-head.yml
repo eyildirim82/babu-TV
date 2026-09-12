@@ -1,0 +1,29 @@
+name: sec-final-focused-exact-head
+
+on:
+  push:
+    branches:
+      - verification/sec-final-focused-891f348
+
+permissions:
+  contents: read
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 891f348dd9a18c7631d537e17744720d92098675
+          fetch-depth: 0
+      - name: Assert exact fix head
+        run: test "$(git rev-parse HEAD)" = "891f348dd9a18c7631d537e17744720d92098675"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Focused M7 SEC audit
+        run: npx tsx --test player/test-ts/m7-security-privacy-audit.test.ts
+      - name: Focused M7 SEC static audit
+        run: node tools/check-m7-security-privacy.mjs
