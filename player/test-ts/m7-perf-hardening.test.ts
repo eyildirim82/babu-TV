@@ -3,11 +3,18 @@ import assert from 'node:assert/strict';
 import type { EpgProgram } from '../src/domain/models.js';
 import type {
   EpgProgramRepository,
+  EpgSourceProgram,
   EpgWindow,
 } from '../src/epg/contracts.js';
+import { normalizeEpgPrograms } from '../src/epg/normalize.js';
 import { RepositoryEpgQuery } from '../src/epg/query-engine.js';
 import { createHomeViewModel } from '../src/home/home-domain.js';
+import { StructuredCatalogRepository } from '../src/repository/structured-catalog-repository.js';
 import { searchCatalog } from '../src/search/search-core.js';
+import type {
+  StructuredStore,
+  StructuredStoreName,
+} from '../src/storage/contracts.js';
 import {
   createM7LargeDataFixture,
   M7_CATEGORY_COUNT,
@@ -46,6 +53,56 @@ class CountingEpgRepository implements EpgProgramRepository {
   }
 
   async deleteProvider(): Promise<void> {}
+}
+
+class CountingStructuredStore implements StructuredStore {
+  getAllByIndexCalls = 0;
+
+  constructor(private readonly channelRows: readonly unknown[]) {}
+
+  async get<T>(): Promise<T | null> {
+    return null;
+  }
+
+  async getAll<T>(): Promise<readonly T[]> {
+    return [];
+  }
+
+  async getAllByIndex<T>(
+    store: StructuredStoreName,
+    indexName: string,
+    indexValue: IDBValidKey,
+  ): Promise<readonly T[]> {
+    this.getAllByIndexCalls += 1;
+    assert.equal(store, 'channels');
+    assert.equal(indexName, 'providerId');
+    assert.equal(indexValue, M7_PRIMARY_PROVIDER_ID);
+    return this.channelRows as readonly T[];
+  }
+
+  async put<T>(): Promise<void> {}
+
+  async delete(): Promise<void> {}
+
+  async replaceByIndex<T>(): Promise<void> {}
+
+  async deleteByIndex(): Promise<void> {}
+}
+
+function countedArray<T>(items: readonly T[]): {
+  readonly values: readonly T[];
+  readonly readCount: () => number;
+} {
+  let reads = 0;
+  const values = new Proxy([...items], {
+    get(target, property, receiver) {
+      if (typeof property === 'string' && /^\d+$/.test(property)) {
+        reads += 1;
+      }
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  return { values, readCount: () => reads };
 }
 
 function homeSummary(inputFixture = fixture) {
@@ -189,4 +246,98 @@ test('M7 PERF large-data fixture is deterministic in size and contains no creden
   const serialized = JSON.stringify(fixture);
   assert.equal(/https?:\/\//i.test(serialized), false);
   assert.equal(/password|credential|streamurl|token/i.test(serialized), false);
+});
+
+test('M7 PERF normalization reads each source row once and is stable under reversed input', () => {
+  const sources: EpgSourceProgram[] = fixture.epgPrograms
+    .filter((program) => program.channelId === 'channel-0')
+    .map((program) => ({
+      sourceChannel: {
+        providerChannelId: 'channel-0',
+        tvgId: null,
+        name: null,
+      },
+      startMs: program.startMs,
+      endMs: program.endMs,
+      title: program.title,
+      description: program.description,
+    }));
+  const forward = countedArray(sources);
+  const reversed = countedArray([...sources].reverse());
+
+  const normalizedForward = normalizeEpgPrograms('channel-0', forward.values);
+  const normalizedReversed = normalizeEpgPrograms('channel-0', reversed.values);
+
+  assert.equal(forward.readCount(), sources.length);
+  assert.equal(reversed.readCount(), sources.length);
+  assert.deepEqual(normalizedReversed, normalizedForward);
+});
+
+test('M7 PERF EPG query repository-call work is not multiplied by unrelated channels', async () => {
+  const repository = new CountingEpgRepository(fixture.epgPrograms);
+  const query = new RepositoryEpgQuery(repository, {
+    lookBehindMs: 60 * 60 * 1_000,
+    lookAheadMs: 24 * 60 * 60 * 1_000,
+  });
+
+  const current = await query.getCurrent(
+    M7_PRIMARY_PROVIDER_ID,
+    'channel-777',
+    M7_EPG_START_MS + 15 * 60 * 1_000,
+  );
+
+  assert.equal(current?.channelId, 'channel-777');
+  assert.equal(repository.calls.length, 1);
+});
+
+test('M7 PERF catalog listChannels performs one indexed full-provider read', async () => {
+  const rows = fixture.primaryChannels.map((channel) => ({
+    ...channel,
+    key: `${channel.providerId}:${channel.id}`,
+  }));
+  const store = new CountingStructuredStore(rows);
+  const repository = new StructuredCatalogRepository(store);
+
+  const channels = await repository.listChannels(M7_PRIMARY_PROVIDER_ID);
+
+  assert.equal(store.getAllByIndexCalls, 1);
+  assert.equal(channels.length, M7_CHANNEL_COUNT);
+  assert.equal(channels[0]?.providerId, M7_PRIMARY_PROVIDER_ID);
+});
+
+test('M7 PERF Search performs one category-index traversal and one channel traversal per call', () => {
+  const categories = countedArray(fixture.allCategories);
+  const channels = countedArray(fixture.allChannels);
+
+  const results = searchCatalog({
+    channels: channels.values,
+    categories: categories.values,
+    query: 'kategori 007 şğüöç',
+    limit: 4,
+  });
+
+  assert.equal(results.length, 4);
+  assert.equal(categories.readCount(), fixture.allCategories.length);
+  assert.equal(channels.readCount(), fixture.allChannels.length);
+});
+
+test('M7 PERF Home performs one active-provider channel input traversal without repository I/O', () => {
+  const channels = countedArray(fixture.allChannels);
+  const model = createHomeViewModel({
+    providers: fixture.providers,
+    activeProviderId: M7_PRIMARY_PROVIDER_ID,
+    channels: channels.values,
+    lastWatched: null,
+    favorites: fixture.favorites,
+    watchAggregates: fixture.watchAggregates,
+    nowMs: M7_NOW_MS,
+    watchScorePolicy: {
+      durationWeightPerMinute: 1,
+      openWeight: 5,
+      recencyHalfLifeMs: 60_000,
+    },
+  });
+
+  assert.equal(model.liveTv.available, true);
+  assert.equal(channels.readCount(), fixture.allChannels.length);
 });
