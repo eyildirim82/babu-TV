@@ -205,6 +205,15 @@ async function openLiveTv(page) {
   await expect(page.locator('.channel-item')).toHaveCount(2, { timeout: 10_000 });
   await expect(page.locator('.channel-item.highlighted')).toHaveAttribute('data-channel-id', COLLIDING_CHANNEL_ID);
   await waitForFeatures(page);
+  await expect(page.locator('#channel-list')).toHaveClass(/zone-active/, { timeout: 10_000 });
+}
+
+async function openChannelActions(page) {
+  await expect(page.locator('#channel-list')).toHaveClass(/zone-active/, { timeout: 10_000 });
+  await pressRemote(page, 'RIGHT');
+  await expect(page.locator('#channel-list')).not.toHaveClass(/zone-active/, { timeout: 10_000 });
+  await pressRemote(page, 'SELECT');
+  await expect(page.locator('.live-tv-feature-root')).toHaveAttribute('data-active-layer', 'actions', { timeout: 10_000 });
 }
 
 async function returnFromLiveTvToHome(page) {
@@ -218,8 +227,7 @@ async function returnFromLiveTvToHome(page) {
 
 async function toggleFavoriteForActiveProvider(page, providerId) {
   await openLiveTv(page);
-  await pressRemote(page, 'RIGHT');
-  await pressRemote(page, 'SELECT');
+  await openChannelActions(page);
   await expect(page.locator('.live-tv-action[data-action-id="WATCH"]')).toHaveAttribute('data-presentation-state', 'focused');
   await pressRemote(page, 'DOWN');
   await expect(page.locator('.live-tv-action[data-action-id="FAVORITE"]')).toHaveAttribute('data-presentation-state', 'focused');
