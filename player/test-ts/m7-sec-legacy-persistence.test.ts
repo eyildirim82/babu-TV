@@ -100,8 +100,8 @@ void test('M7 SEC legacy Settings no longer combines arbitrary M3U source accept
   const config = readFileSync(configPath, 'utf8');
   const settings = readFileSync(settingsPath, 'utf8');
   const storesWholeSettings = /localStorage\.setItem\(SETTINGS_KEY,\s*JSON\.stringify\(merged\)\)/.test(config);
-  const acceptsArbitraryPlaylistUrl = /playlists\.push\(\{\s*name:[^}]*\burl\s*\}\)/s.test(settings)
-    || /playlists\[editIndex\]\s*=\s*\{\s*name:[^}]*\burl\s*\}/s.test(settings);
+  const acceptsArbitraryPlaylistUrl = /playlists\.push\(\{\s*name:[^}]*\burl\s*\}\)/.test(settings)
+    || /playlists\[editIndex\]\s*=\s*\{\s*name:[^}]*\burl\s*\}/.test(settings);
 
   assert.equal(
     storesWholeSettings && acceptsArbitraryPlaylistUrl,
@@ -176,7 +176,7 @@ void test('M7 SEC legacy Settings source UI has no local M3U add/edit/fetch cred
   const settings = readFileSync(settingsPath, 'utf8');
 
   assert.doesNotMatch(settings, /pl-add-url|pl-edit-url|playlist-url/);
-  assert.doesNotMatch(settings, /fetchPlaylist\(active\.url\)|saveSettings\(\{\s*playlists/s);
+  assert.doesNotMatch(settings, /fetchPlaylist\(active\.url\)|saveSettings\(\{\s*playlists/);
   assert.match(settings, /onXtreamRequested/);
   assert.match(settings, /settings-xtream-btn/);
   assert.doesNotMatch(settings, /data-[^=]*=["'][^"']*(?:playlist|token|password|sourceUrl)/i);
