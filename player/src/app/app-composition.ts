@@ -498,7 +498,7 @@ export class AppComposition {
         this.deps.exitApp();
         return;
       case 'provider-management':
-        await this.showHome();
+        await this.providerView.handleAction('back');
         return;
       case 'legacy-settings':
         this.deps.legacy.hideSettings();
