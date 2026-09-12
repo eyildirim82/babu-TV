@@ -27,29 +27,17 @@ jobs:
       - run: npm test
       - run: npm run typecheck
 
-  task5-exact:
-    if: "${{ github.event.head_commit.message == 'chore(pairing): verify Task 5 final GREEN' }}"
+  task6-red:
+    if: "${{ github.event.head_commit.message == 'chore(pairing): verify Task 6 RED' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 25a5fade61421039af72407a72b76dcf976e2c55
-      - name: Assert Task 5 exact head
-        run: test "$(git rev-parse HEAD)" = "25a5fade61421039af72407a72b76dcf976e2c55"
+          ref: 339fcf336b7c158a302c8cab05a53df27178352d
+      - name: Assert Task 6 RED head
+        run: test "$(git rev-parse HEAD)" = "339fcf336b7c158a302c8cab05a53df27178352d"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Focused Task 5 regression
-        run: >-
-          node --import tsx --test
-          player/test-ts/pairing-tv-controller.test.ts
-          player/test-ts/pairing-tv-core.test.ts
-          player/test-ts/pairing-browser-transport.test.ts
-          player/test-ts/pairing-bootstrap-link.test.ts
-          player/test-ts/pairing-tv-view.test.ts
-          player/test-ts/pairing-browser-app-dependencies.test.ts
-          player/test-ts/m5-app-composition.test.ts
-      - name: Typecheck Task 5 exact head
-        run: npm run typecheck
+      - name: Focused Task 6 RED
+        run: node --test player/test/m3-live-tv-wiring.test.js
