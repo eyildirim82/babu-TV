@@ -30,3 +30,20 @@ jobs:
         run: npm test
       - name: Typecheck
         run: npm run typecheck
+
+  task4-focused:
+    if: "${{ github.event.head_commit.message == 'chore(pairing): verify Task 4 GREEN' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 48a71f21b048cf0d7754a0a9600e5c57918e50e6
+      - name: Assert Task 4 production SHA
+        run: test "$(git rev-parse HEAD)" = "48a71f21b048cf0d7754a0a9600e5c57918e50e6"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Focused Task 4 GREEN
+        run: node --import tsx --test player/test-ts/m5-app-composition.test.ts
