@@ -1,0 +1,54 @@
+name: sec-final-full-exact-head
+
+on:
+  push:
+    branches:
+      - verification/sec-final-full-4039d46
+
+permissions:
+  contents: read
+
+jobs:
+  full-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 4039d46b484612f66cfb4d6038eaac299ca36977
+          fetch-depth: 0
+      - name: Assert exact final head
+        run: |
+          test "$(git rev-parse HEAD)" = "4039d46b484612f66cfb4d6038eaac299ca36977"
+          test -z "$(git status --porcelain --untracked-files=all)"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Test
+        run: npm test
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Brand check
+        run: npm run brand:check
+      - name: Build
+        run: npm run build
+      - name: Tizen build
+        run: npm run tizen:build
+      - name: M7 SEC static audit after builds
+        run: node tools/check-m7-security-privacy.mjs
+      - name: Exact base diff and scope assertion
+        shell: bash
+        run: |
+          BASE=1e9003025249e11a6d4df786ad9fdc5d9d1fadab
+          test "$(git rev-parse HEAD)" = "4039d46b484612f66cfb4d6038eaac299ca36977"
+          git diff --check "$BASE"...HEAD
+          actual="$(git diff --name-only "$BASE"...HEAD | sort)"
+          expected="$(printf '%s\n' \
+            player/src/logging/sanitize.ts \
+            player/test-ts/m7-security-privacy-audit.test.ts \
+            tools/check-m7-security-privacy.mjs | sort)"
+          printf 'Changed files:\n%s\n' "$actual"
+          test "$actual" = "$expected"
+      - name: Clean tree
+        run: test -z "$(git status --porcelain --untracked-files=all)"
