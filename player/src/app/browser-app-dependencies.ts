@@ -23,12 +23,18 @@ import { createAppLiveTvFeaturePorts } from './live-tv-feature-ports.js';
 import { ProviderManagementSurface } from './provider-management-surface.js';
 import type { AppCompositionDependencies } from './app-composition.js';
 import type { WidgetDataLike } from '../credentials/samsung-widgetdata-credential-store.js';
+import QRCode from 'qrcode';
+import { FetchPairingRelayTransport } from '../pairing/fetch-relay-transport.js';
+import { PairingRelayClient } from '../pairing/relay-client.js';
+import { createTvPairingCore } from '../pairing/create-tv-pairing-core.js';
+import { PairingTvView } from '../pairing/tv-view.js';
 
 import '../ui/home.css';
 import '../ui/first-run.css';
 import '../ui/m3u-entry.css';
 import '../ui/provider-management.css';
 import '../ui/xtream-entry.css';
+import '../ui/pairing-tv.css';
 
 const EPG_QUERY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -43,6 +49,12 @@ export interface BrowserAppDependencyInput {
   setRemoteNumericMode(mode: 'buffered' | 'digits'): void;
   legacy: AppCompositionDependencies['legacy'];
   exitApp(): void;
+  pairing?: {
+    relayBaseUrl: string;
+    phoneBaseUrl: string;
+    relayTimeoutMs: number;
+    pollIntervalMs: number;
+  };
   nowMs?: () => number;
 }
 
@@ -98,6 +110,7 @@ export function createBrowserAppDependencies(
     adapters: runtime.adapters,
     sync: runtime.sync,
   });
+  const pairingConfig = input.pairing;
 
   return {
     providers: runtime.providers,
@@ -140,6 +153,44 @@ export function createBrowserAppDependencies(
         }
       },
     },
+    pairing: pairingConfig ? {
+      view: (callbacks) => {
+        const transport = new FetchPairingRelayTransport(input.fetchImpl);
+        const relay = new PairingRelayClient(
+          pairingConfig.relayBaseUrl,
+          transport,
+          pairingConfig.relayTimeoutMs,
+        );
+        const pairingCore = createTvPairingCore({
+          relay,
+          relayBaseUrl: pairingConfig.relayBaseUrl,
+          onboarding: {
+            connectXtream: (entry) => xtreamOnboarding.connect(entry),
+            connectM3u: (entry) => m3uOnboarding.connect(entry),
+          },
+        });
+        const qr = {
+          toDataUrl: (value: string) => QRCode.toDataURL(
+            value,
+            {
+              errorCorrectionLevel: 'M',
+              margin: 2,
+              width: 360,
+            },
+          ),
+        };
+        return new PairingTvView(
+          input.document,
+          pairingCore,
+          callbacks,
+          {
+            phoneBaseUrl: pairingConfig.phoneBaseUrl,
+            pollIntervalMs: pairingConfig.pollIntervalMs,
+          },
+          qr,
+        );
+      },
+    } : undefined,
     reentry: {
       reenter: (input) => providerReentry.reenter(input),
     },

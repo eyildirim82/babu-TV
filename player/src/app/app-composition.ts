@@ -39,6 +39,7 @@ export type AppRoute =
   | { kind: 'live-tv' }
   | { kind: 'provider-management' }
   | { kind: 'legacy-settings'; returnTo: 'provider-management' }
+  | { kind: 'pairing'; returnTo: 'first-run' | 'provider-management' }
   | {
       kind: 'xtream-entry';
       returnTo: 'first-run' | 'provider-management';
@@ -89,6 +90,12 @@ export interface AppFirstRunViewPort {
   handleAction(action: FirstRunAction): void;
 }
 
+export interface AppPairingViewPort {
+  show(): Promise<void>;
+  hide(): void;
+  handleBack(): void;
+}
+
 export interface AppEntryViewPort<Action extends string> {
   show(): void;
   hide(): void;
@@ -137,6 +144,12 @@ export interface AppCompositionDependencies {
     xtream(callbacks: XtreamEntryCallbacks): AppEntryViewPort<XtreamEntryAction>;
     m3u(callbacks: M3uEntryCallbacks): AppEntryViewPort<M3uEntryAction>;
     providerManagement(callbacks: AppProviderManagementCallbacks): AppProviderManagementPort;
+  };
+  pairing?: {
+    view(callbacks: {
+      onBack(): void;
+      onCompleted(providerId: ProviderId): void;
+    }): AppPairingViewPort;
   };
   onboarding: {
     connectXtream(input: XtreamEntrySubmission): Promise<void>;
@@ -192,6 +205,7 @@ export class AppComposition {
   private currentRoute: AppRoute = { kind: 'first-run' };
   private readonly homeView: AppHomeViewPort;
   private readonly firstRunView: AppFirstRunViewPort;
+  private readonly pairingView: AppPairingViewPort | null;
   private readonly xtreamView: AppEntryViewPort<XtreamEntryAction>;
   private readonly m3uView: AppEntryViewPort<M3uEntryAction>;
   private readonly providerView: AppProviderManagementPort;
@@ -201,6 +215,10 @@ export class AppComposition {
   private firstRunReturnTo: 'legacy' | 'provider-management' = 'legacy';
 
   constructor(private readonly deps: AppCompositionDependencies) {
+    this.pairingView = deps.pairing?.view({
+      onBack: () => { void this.returnFromPairing(); },
+      onCompleted: () => { void this.showHome(); },
+    }) ?? null;
     this.homeView = deps.views.home({
       onIntent: (intent) => { void this.handleHomeIntent(intent); },
       onBack: () => deps.exitApp(),
@@ -212,6 +230,9 @@ export class AppComposition {
       onM3uSelected: () => {
         this.showM3u(this.firstRunDestination(), { kind: 'add' });
       },
+      ...(this.pairingView !== null
+        ? { onPairingSelected: () => { void this.showPairing(this.firstRunDestination()); } }
+        : {}),
       onBack: () => { void this.handleFirstRunBack(); },
     });
     this.xtreamView = deps.views.xtream({
@@ -327,6 +348,8 @@ export class AppComposition {
           await this.providerView.handleAction(action);
         }
         return;
+      case 'pairing':
+        return;
       case 'legacy-settings':
         this.deps.legacy.handleRemote(action, value);
         return;
@@ -365,6 +388,15 @@ export class AppComposition {
     this.firstRunReturnTo = returnTo;
     this.currentRoute = { kind: 'first-run' };
     this.firstRunView.show({ kind: 'empty' });
+  }
+
+  private async showPairing(returnTo: 'first-run' | 'provider-management'): Promise<void> {
+    if (this.pairingView === null) return;
+    this.hideModernViews();
+    this.deps.legacy.hideSettings();
+    this.deps.legacy.hidePlayerShell();
+    this.currentRoute = { kind: 'pairing', returnTo };
+    await this.pairingView.show();
   }
 
   private async showProviderManagement(): Promise<void> {
@@ -479,6 +511,9 @@ export class AppComposition {
       case 'first-run':
         await this.handleFirstRunBack();
         return;
+      case 'pairing':
+        this.pairingView?.handleBack();
+        return;
       case 'live-tv':
         if (this.liveTvMode === 'legacy' || this.liveTvRuntime === null) {
           this.deps.legacy.handleRemote('back');
@@ -500,6 +535,16 @@ export class AppComposition {
     this.liveTvRuntime = null;
     this.liveTvProviderId = null;
     this.deps.legacy.openPlayer();
+  }
+
+  private async returnFromPairing(): Promise<void> {
+    const route = this.currentRoute;
+    if (route.kind !== 'pairing') return;
+    if (route.returnTo === 'provider-management') {
+      await this.showProviderManagement();
+      return;
+    }
+    this.showProviderChooser('legacy');
   }
 
   private async returnFromEntry(): Promise<void> {
@@ -535,6 +580,7 @@ export class AppComposition {
   private hideModernViews(): void {
     this.homeView.hide();
     this.firstRunView.hide();
+    this.pairingView?.hide();
     this.xtreamView.hide();
     this.m3uView.hide();
     this.providerView.hide();
