@@ -27,17 +27,21 @@ jobs:
       - run: npm test
       - run: npm run typecheck
 
-  task6-red:
-    if: "${{ github.event.head_commit.message == 'chore(pairing): verify Task 6 RED' }}"
+  task6-exact:
+    if: "${{ github.event.head_commit.message == 'chore(pairing): verify Task 6 GREEN' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 339fcf336b7c158a302c8cab05a53df27178352d
-      - name: Assert Task 6 RED head
-        run: test "$(git rev-parse HEAD)" = "339fcf336b7c158a302c8cab05a53df27178352d"
+          ref: 4f2d154db0927dbcce958053af7fe256251b0364
+      - name: Assert Task 6 exact head
+        run: test "$(git rev-parse HEAD)" = "4f2d154db0927dbcce958053af7fe256251b0364"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Focused Task 6 RED
+          cache: npm
+      - run: npm ci
+      - name: Focused Task 6 regression
         run: node --test player/test/m3-live-tv-wiring.test.js
+      - name: Typecheck Task 6 exact head
+        run: npm run typecheck
