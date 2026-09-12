@@ -396,7 +396,7 @@ scenario('C03', 'Last Watched survives reload where browser playback can establi
     await assertNoCredentialLeaks(page);
     return {
       observedState: `headless browser playback did not establish durable Last Watched; playback status ${watch.playbackStatus}`,
-      reloadPersistence: 'watch durability NOT-AVAILABLE because no successful browser watch session was established',
+      reloadPersistence: 'watch durability NOT-AVAILABLE; HARNESS INTEGRATION REQUIRED because the H0 browser playback seam did not establish a successful watch session',
       leakage: 'clean',
       status: 'NOT-AVAILABLE',
     };
@@ -448,7 +448,7 @@ scenario('C05', 'same channelId watch state remains provider scoped', {
   if (!watch.available) {
     return {
       observedState: `watch isolation could not be exercised because browser playback did not establish a session; playback status ${watch.playbackStatus}`,
-      reloadPersistence: 'watch provider isolation NOT-AVAILABLE without browser-created watch state',
+      reloadPersistence: 'watch provider isolation NOT-AVAILABLE; HARNESS INTEGRATION REQUIRED without browser-created watch state',
       leakage: 'clean',
       status: 'NOT-AVAILABLE',
     };
@@ -570,31 +570,41 @@ scenario('C09', 'stale catalog survives degraded re-entry refresh', {
   return {
     observedState: epgAvailable
       ? 'degraded refresh preserved cached catalog, EPG and Favorite state'
-      : 'degraded refresh preserved cached catalog and Favorite; current browser path had no persisted EPG record to qualify',
+      : 'synthetic HTTP 500 degraded refresh preserved cached catalog and Favorite; current browser path had no persisted EPG record to qualify',
     reloadPersistence: epgAvailable
       ? 'stale catalog/EPG preservation PASS'
-      : 'stale catalog preservation PASS; persisted EPG sub-check NOT-AVAILABLE',
+      : 'stale catalog preservation PASS; persisted EPG sub-check NOT-AVAILABLE — HARNESS INTEGRATION REQUIRED for deterministic browser EPG seeding',
     leakage: 'clean',
     status: epgAvailable ? 'PASS' : 'NOT-AVAILABLE',
   };
 });
 
-scenario('C10', 'empty provider catalog remains reload-safe', {
-  startingState: 'clean browser storage; provider mocks configured for empty categories/channels/EPG',
-  actions: ['onboard synthetic Xtream provider with empty catalog', 'reload'],
-  expectedState: 'application reloads safely without uncaught errors and retains the configured provider',
+scenario('C10', 'empty provider and empty-catalog error state remain reload-safe', {
+  startingState: 'clean browser storage with no providers; provider mock returns an empty channel catalog',
+  actions: ['reload empty First Run state', 'attempt onboarding against empty catalog', 'verify compensated error state', 'reload again'],
+  expectedState: 'empty state stays usable; failed empty-catalog onboarding leaves no partial provider and reload returns safely to First Run',
   harnessOptions: { providerMocks: { xtream: { categories: 'empty', streams: 'empty', epg: 'empty' } } },
 }, async ({ page }) => {
-  const providerA = await onboardXtream(page);
-  let state = await readSafeStructuredState(page);
-  expect(providerCatalogSummary(state, providerA).channels).toBe(0);
-  await reloadToHome(page);
-  state = await readSafeStructuredState(page);
-  expect(providerIds(state)).toEqual([providerA]);
-  expect(providerCatalogSummary(state, providerA).channels).toBe(0);
+  await expect(page.locator('#first-run-page')).toBeVisible({ timeout: 10_000 });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#first-run-page')).toBeVisible({ timeout: 10_000 });
+  await pressRemote(page, 'SELECT');
+  await expect(page.locator('#xtream-entry-page')).toBeVisible({ timeout: 10_000 });
+  await page.locator('#xtream-server-url').fill(RC_ENDPOINTS.xtreamA);
+  await page.locator('#xtream-username').fill(RC_SECRETS.xtreamUsername);
+  await page.locator('#xtream-password').fill(RC_SECRETS.xtreamPassword);
+  await pressRemote(page, 'DOWN');
+  await pressRemote(page, 'DOWN');
+  await pressRemote(page, 'DOWN');
+  await pressRemote(page, 'SELECT');
+  await expect(page.locator('#xtream-status')).not.toHaveText('', { timeout: 15_000 });
+  await expect.poll(async () => providerIds(await readSafeStructuredState(page))).toEqual([]);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#first-run-page')).toBeVisible({ timeout: 10_000 });
+  expect(providerIds(await readSafeStructuredState(page))).toEqual([]);
   return {
-    observedState: 'empty catalog provider remained configured and Home reloaded without page error',
-    reloadPersistence: 'empty provider/catalog reload safety PASS',
+    observedState: 'empty First Run survived reload; empty-catalog onboarding failed safely, compensated partial provider state, and reloaded back to First Run',
+    reloadPersistence: 'empty provider/catalog/error reload safety PASS',
     leakage: 'clean',
     status: 'PASS',
   };
