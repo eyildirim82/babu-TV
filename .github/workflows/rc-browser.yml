@@ -1,0 +1,55 @@
+name: rc-browser
+
+on:
+  push:
+    branches:
+      - verification/v1-rc-browser
+
+permissions:
+  contents: write
+
+jobs:
+  h0-red-bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Regenerate lockfile for exact Playwright dependency
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Commit generated lockfile when needed
+        env:
+          BRANCH: verification/v1-rc-browser
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore(rc-browser): lock Playwright 1.63.0"
+          git push origin "HEAD:${BRANCH}"
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build production player
+        run: npm run build
+
+      - name: Prove H0 smoke is RED before implementation
+        run: npm run rc:browser -- tools/rc-browser/specs/harness-smoke.spec.mjs
