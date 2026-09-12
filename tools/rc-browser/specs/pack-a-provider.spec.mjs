@@ -163,7 +163,8 @@ scenario('A11', {
   await openProviderManagement(page); await chooseAddProvider(page); await openM3uEntry(page); h.providerMocks.setM3uMode('empty'); await submitM3u(page); await expect(page.locator('#m3u-status')).toHaveText(M3U_COPY.malformed); await pressRemote(page, 'BACK'); await expect(page.locator('#provider-management-page')).toBeVisible();
   let s = await providerState(page); expect(s.providers.map((p) => p.id)).toEqual([x]); expect(s.activeProviderId).toBe(x); expect(await durableUserState(page, x)).toEqual(user);
   h.providerMocks.setM3uMode('success'); const refreshFailure = await installXtreamRefreshFailureOverride(context, 500); await editXtreamProvider(page, x); await submitXtream(page); await expect(page.locator('#provider-management-page')).toBeVisible(); s = await providerState(page);
-  expect(refreshFailure.count()).toBeGreaterThanOrEqual(1); expect(s.providers.map((p) => p.id)).toEqual([x]); expect(s.activeProviderId).toBe(x); expect(s.channels.filter((c) => c.providerId === x)).toEqual(before.channels.filter((c) => c.providerId === x)); expect(await durableUserState(page, x)).toEqual(user); clean(h, { allow: [/Failed to load resource: the server responded with a status of 500\b/] });
+  expect(refreshFailure.count()).toBeGreaterThanOrEqual(1); expect(s.providers.map((p) => p.id)).toEqual([x]); expect(s.activeProviderId).toBe(x); expect(s.channels.filter((c) => c.providerId === x)).toEqual(before.channels.filter((c) => c.providerId === x)); expect(await durableUserState(page, x)).toEqual(user);
+  expect(h.events.pageErrors).toEqual([]); assertNoUnexplainedConsoleErrors(h.events, { allow: [/Failed to load resource: the server responded with a status of 500\b/] });
 });
 
 scenario('A12', {
