@@ -36,8 +36,6 @@ Thumbs.db
 
 # Tizen CLI staging output
 tizen/build/
-
-# RC browser qualification artifacts
 /test-results/
 /playwright-report/
 /rc-browser-artifacts/
