@@ -92,7 +92,7 @@ export class ProviderManagementPresenter {
   }
 
   async load(preferredFocusId: string | null = null): Promise<void> {
-    const previousFocusId = preferredFocusId ?? this.view.focusedId;
+    const previousFocusId = preferredFocusId;
     this.view = {
       ...this.view,
       status: 'loading',
