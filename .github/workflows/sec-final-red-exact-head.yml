@@ -1,0 +1,45 @@
+name: sec-final-red-exact-head
+
+on:
+  push:
+    branches:
+      - verification/sec-final-red-f16dda7
+
+permissions:
+  contents: read
+
+jobs:
+  red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: f16dda728a83b8d2dc17312d7731c991f48b2fb8
+          fetch-depth: 0
+
+      - name: Assert exact RED head
+        run: test "$(git rev-parse HEAD)" = "f16dda728a83b8d2dc17312d7731c991f48b2fb8"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Deterministic sanitizer RED
+        shell: bash
+        run: |
+          set +e
+          npx tsx --test player/test-ts/m7-security-privacy-audit.test.ts
+          rc=$?
+          set -e
+
+          echo "Expected RED test exit code: $rc"
+
+          if [ "$rc" -eq 0 ]; then
+            echo "ERROR: expected sanitizer RED did not reproduce"
+            exit 1
+          fi
+
+          echo "Expected sanitizer RED reproduced successfully"
