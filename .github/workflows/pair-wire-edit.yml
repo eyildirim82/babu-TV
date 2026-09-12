@@ -9,32 +9,45 @@ permissions:
   contents: write
 
 jobs:
-  task5-transport-path-fix:
-    if: "${{ github.event.head_commit.message == 'chore(pairing): stage Task 5 transport path fix' }}"
+  task6-green:
+    if: "${{ github.event.head_commit.message == 'chore(pairing): stage Task 6 GREEN edit' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - name: Fix Task 5 transport import path
+      - name: Apply Task 6 public runtime config boundary
         run: |
           python - <<'PY'
           from pathlib import Path
-          path = Path('player/src/app/browser-app-dependencies.ts')
+
+          path = Path('player/src/main.js')
           text = path.read_text()
-          old = "import { FetchPairingRelayTransport } from '../pairing/browser-relay-transport.js';"
-          new = "import { FetchPairingRelayTransport } from '../pairing/fetch-relay-transport.js';"
-          if text.count(old) != 1:
-              raise SystemExit(f'expected one old import, got {text.count(old)}')
-          path.write_text(text.replace(old, new, 1))
+
+          def replace_once(old, new):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected exactly one match, got {count}: {old[:100]!r}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+          """  const appComposition = createAppComposition(createBrowserAppDependencies({\n    indexedDb: window.indexedDB || null,""",
+          """  const pairingConfig = window.BABUSTV_PAIRING_CONFIG ?? null;\n  const appComposition = createAppComposition(createBrowserAppDependencies({\n    indexedDb: window.indexedDB || null,""")
+
+          replace_once(
+          """    legacyPlayer,\n    legacyAvplay,\n    setRemoteNumericMode: setAppRemoteNumericMode,""",
+          """    legacyPlayer,\n    legacyAvplay,\n    pairing: pairingConfig && typeof pairingConfig === 'object'\n      ? {\n          relayBaseUrl: pairingConfig.relayBaseUrl,\n          phoneBaseUrl: pairingConfig.phoneBaseUrl,\n          relayTimeoutMs: pairingConfig.relayTimeoutMs,\n          pollIntervalMs: pairingConfig.pollIntervalMs,\n        }\n      : undefined,\n    setRemoteNumericMode: setAppRemoteNumericMode,""")
+
+          path.write_text(text)
           PY
-      - name: Commit Task 5 transport path fix
+      - name: Commit Task 6 GREEN
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add player/src/app/browser-app-dependencies.ts
+          git add player/src/main.js
           git diff --cached --check
-          git commit -m "fix(app): use existing pairing fetch transport"
+          git commit -m "feat(app): forward public pairing runtime config"
           git push origin HEAD:integration/pairing-onboarding
 
 # temporary execution workflow; removed before final production head
