@@ -9,17 +9,17 @@ import { createPairingPhoneUrl } from '../src/pairing/bootstrap-link.js';
 const testDir = dirname(fileURLToPath(import.meta.url));
 const playerDir = resolve(testDir, '..');
 
-const USER = 'm7-sec-user';
-const PASSWORD = 'm7-sec-pass';
-const TOKEN = 'm7-sec-token';
-const FRAGMENT = 'm7-fragment-secret';
-const PROVIDER_URL = `https://${USER}:${PASSWORD}@example.invalid/player_api.php?username=${USER}&password=${PASSWORD}&token=${TOKEN}&quality=hd`;
-const STREAM_URL = `https://stream.example.invalid/live/${USER}/${PASSWORD}/42.ts?token=${TOKEN}&quality=hd`;
+const CANARY_A = 'audit-a';
+const CANARY_B = 'audit-b';
+const CANARY_C = 'audit-c';
+const FRAGMENT = 'audit-fragment';
+const PROVIDER_URL = `https://${CANARY_A}:${CANARY_B}@example.invalid/player_api.php?username=${CANARY_A}&password=${CANARY_B}&token=${CANARY_C}&quality=hd`;
+const STREAM_URL = `https://stream.example.invalid/live/${CANARY_A}/${CANARY_B}/42.ts?token=${CANARY_C}&quality=hd`;
 
 function assertNoCanary(value: string): void {
-  assert.equal(value.includes(USER), false);
-  assert.equal(value.includes(PASSWORD), false);
-  assert.equal(value.includes(TOKEN), false);
+  assert.equal(value.includes(CANARY_A), false);
+  assert.equal(value.includes(CANARY_B), false);
+  assert.equal(value.includes(CANARY_C), false);
 }
 
 void test('M7 SEC URL sanitizer removes user-info, sensitive query values and Xtream path credentials', () => {
@@ -35,7 +35,7 @@ void test('M7 SEC URL sanitizer removes user-info, sensitive query values and Xt
 });
 
 void test('M7 SEC URL sanitizer removes URL fragments completely', () => {
-  const sanitized = sanitizeUrlForLog(`https://example.invalid/path?token=${TOKEN}#${FRAGMENT}`);
+  const sanitized = sanitizeUrlForLog(`https://example.invalid/path?token=${CANARY_C}#${FRAGMENT}`);
   const parsed = new URL(sanitized);
 
   assert.equal(parsed.searchParams.get('token'), '[REDACTED]');
@@ -46,7 +46,7 @@ void test('M7 SEC URL sanitizer removes URL fragments completely', () => {
 void test('M7 SEC URL sanitizer removes fragments without queries and alongside user-info', () => {
   const noQuery = new URL(sanitizeUrlForLog(`https://example.invalid/path#${FRAGMENT}`));
   const withUserInfo = new URL(
-    sanitizeUrlForLog(`https://${USER}:${PASSWORD}@example.invalid/path#${FRAGMENT}`),
+    sanitizeUrlForLog(`https://${CANARY_A}:${CANARY_B}@example.invalid/path#${FRAGMENT}`),
   );
 
   assert.equal(noQuery.hash, '');
@@ -57,22 +57,22 @@ void test('M7 SEC URL sanitizer removes fragments without queries and alongside 
 });
 
 void test('M7 SEC URL sanitizer handles encoded credential values without losing safe diagnostics', () => {
-  const encodedUser = 'm7 encoded user';
-  const encodedPassword = 'm7 encoded password';
-  const encodedToken = 'm7 encoded token';
+  const encodedCanaryA = 'audit encoded a';
+  const encodedCanaryB = 'audit encoded b';
+  const encodedCanaryC = 'audit encoded c';
   const sanitized = sanitizeUrlForLog(
-    `https://stream.example.invalid/live/${encodeURIComponent(encodedUser)}/${encodeURIComponent(encodedPassword)}/42.ts?token=${encodeURIComponent(encodedToken)}&quality=hd#${encodeURIComponent(FRAGMENT)}`,
+    `https://stream.example.invalid/live/${encodeURIComponent(encodedCanaryA)}/${encodeURIComponent(encodedCanaryB)}/42.ts?token=${encodeURIComponent(encodedCanaryC)}&quality=hd#${encodeURIComponent(FRAGMENT)}`,
   );
   const parsed = new URL(sanitized);
   const decodedPath = decodeURIComponent(parsed.pathname);
 
-  assert.equal(decodedPath.includes(encodedUser), false);
-  assert.equal(decodedPath.includes(encodedPassword), false);
+  assert.equal(decodedPath.includes(encodedCanaryA), false);
+  assert.equal(decodedPath.includes(encodedCanaryB), false);
   assert.match(decodedPath, /^\/live\/\[REDACTED\]\/\[REDACTED\]\/42\.ts$/);
   assert.equal(parsed.searchParams.get('token'), '[REDACTED]');
   assert.equal(parsed.searchParams.get('quality'), 'hd');
   assert.equal(parsed.hash, '');
-  assert.equal(sanitized.includes(encodeURIComponent(encodedToken)), false);
+  assert.equal(sanitized.includes(encodeURIComponent(encodedCanaryC)), false);
 });
 
 void test('M7 SEC URL sanitizer preserves ordinary safe URL diagnostics', () => {
