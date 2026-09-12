@@ -81,16 +81,7 @@ player/src/live-tv/live-tv-controller.ts
 
 Workers also may not widen arbitrary shared contracts merely to make a hardening test convenient.
 
-If a deterministic RED proves that one of these hot-zone files must change, the worker stops production widening and reports:
-
-```text
-INTEGRATION FIX REQUIRED
-
-Failing test: <exact test command and test name>
-Minimum required hot-zone file: <one or more exact paths>
-Root cause: <bounded technical explanation>
-Why owned files cannot repair it: <bounded explanation>
-```
+If a deterministic RED proves that one of these hot-zone files must change, the worker stops production widening and reports `INTEGRATION FIX REQUIRED`. That report must include the exact failing test command and test name, the minimum required hot-zone path, the bounded root cause, and why no owned file can repair the defect.
 
 The controller may then create a separate `ROLE=M7-I` integration-fix lane from an approved exact base. The originating worker does not edit the hot zone itself.
 
@@ -163,6 +154,7 @@ player/src/focus/focus-reducer.ts
 player/src/home/home-view.ts
 player/src/first-run/first-run-view.ts
 player/src/provider-management/provider-management-presenter.ts
+player/src/app/provider-management-surface.ts
 player/src/live-tv/dom-live-tv-view.ts
 player/src/live-tv/live-tv-state.ts
 player/src/live-tv/epg-live-tv-presentation.ts
@@ -272,7 +264,7 @@ M7 hardening must preserve these product invariants:
 
 SEC has two phases:
 
-1. **SEC-EARLY:** run source/test/tooling audit against frozen base `0cdc1ed...`; create RED tests/tooling for concrete leaks; make only proven bounded fixes.
+1. **SEC-EARLY:** run source/test/tooling audit against frozen base `0cdc1ed240707b389d202d48efeaaf5822fe2316`; create RED tests/tooling for concrete leaks; make only proven bounded fixes.
 2. **SEC-FINAL:** after MIG, FAIL, PERF, NAV, PLAY and any required M7-I merges are accepted and the resulting exact `main` verify is GREEN, rerun the complete audit on that integrated exact head.
 
 Only SEC-FINAL may close the M7 security/privacy gate.
