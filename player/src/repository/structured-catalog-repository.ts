@@ -20,6 +20,37 @@ function categoryKey(providerId: ProviderId, categoryId: string): string {
   return `${providerId}:${categoryId}`;
 }
 
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string';
+}
+
+function isNullableFiniteNumber(value: unknown): value is number | null {
+  return value === null || (typeof value === 'number' && Number.isFinite(value));
+}
+
+function isStoredCategory(value: unknown): value is StoredCategory {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.key === 'string'
+    && typeof candidate.providerId === 'string'
+    && typeof candidate.id === 'string'
+    && typeof candidate.name === 'string'
+    && candidate.key === categoryKey(candidate.providerId, candidate.id);
+}
+
+function isStoredChannel(value: unknown): value is StoredChannel {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.key === 'string'
+    && typeof candidate.providerId === 'string'
+    && typeof candidate.id === 'string'
+    && typeof candidate.name === 'string'
+    && isNullableString(candidate.categoryId)
+    && isNullableString(candidate.logoUrl)
+    && isNullableFiniteNumber(candidate.number)
+    && candidate.key === makeChannelKey(candidate.providerId, candidate.id);
+}
+
 function storeCategory(providerId: ProviderId, category: Category): StoredCategory {
   return {
     key: categoryKey(providerId, category.id),
@@ -73,12 +104,16 @@ export class StructuredCatalogRepository implements CatalogRepository {
   }
 
   async listCategories(providerId: ProviderId): Promise<readonly Category[]> {
-    const categories = await this.store.getAllByIndex<StoredCategory>(
+    const categories = await this.store.getAllByIndex<unknown>(
       'categories',
       'providerId',
       providerId,
     );
-    return categories.map(categoryFromStored);
+    return categories
+      .filter((category): category is StoredCategory => (
+        isStoredCategory(category) && category.providerId === providerId
+      ))
+      .map(categoryFromStored);
   }
 
   async replaceChannels(providerId: ProviderId, channels: readonly Channel[]): Promise<void> {
@@ -91,20 +126,29 @@ export class StructuredCatalogRepository implements CatalogRepository {
   }
 
   async listChannels(providerId: ProviderId): Promise<readonly Channel[]> {
-    const channels = await this.store.getAllByIndex<StoredChannel>(
+    const channels = await this.store.getAllByIndex<unknown>(
       'channels',
       'providerId',
       providerId,
     );
-    return channels.map(channelFromStored);
+    return channels
+      .filter((channel): channel is StoredChannel => (
+        isStoredChannel(channel) && channel.providerId === providerId
+      ))
+      .map(channelFromStored);
   }
 
   async getChannel(providerId: ProviderId, channelId: ChannelId): Promise<Channel | null> {
-    const channel = await this.store.get<StoredChannel>(
+    const channel = await this.store.get<unknown>(
       'channels',
       makeChannelKey(providerId, channelId),
     );
-    return channel === null ? null : channelFromStored(channel);
+    if (!isStoredChannel(channel)
+      || channel.providerId !== providerId
+      || channel.id !== channelId) {
+      return null;
+    }
+    return channelFromStored(channel);
   }
 
   async removeProviderCatalog(providerId: ProviderId): Promise<void> {
