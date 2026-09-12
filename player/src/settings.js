@@ -54,11 +54,16 @@ export function navigate(dir) {
   const curIdx = focusOrder.indexOf(cur);
   const inNavZone = curIdx >= 0 && curIdx < navCount;
   const onBackButton = curIdx === navCount;
-  const contentStart = navCount + 1;
+  const contentStart = navCount + 1; // +1 for back button
 
   if (dir > 0) {
+    // DOWN
     if (inNavZone) {
-      focusIdx = curIdx === navCount - 1 ? navCount : curIdx + 1;
+      if (curIdx === navCount - 1) {
+        focusIdx = navCount;
+      } else {
+        focusIdx = curIdx + 1;
+      }
     } else if (onBackButton) {
       focusIdx = contentStart;
     } else if (curIdx >= contentStart) {
@@ -67,15 +72,22 @@ export function navigate(dir) {
     } else {
       focusIdx = Math.min(total - 1, focusIdx + 1);
     }
-  } else if (inNavZone) {
-    focusIdx = curIdx === 0 ? total - 1 : curIdx - 1;
-  } else if (onBackButton) {
-    focusIdx = navCount - 1;
-  } else if (curIdx >= contentStart) {
-    focusIdx = curIdx - 1;
-    if (focusIdx < contentStart) focusIdx = total - 1;
   } else {
-    focusIdx = Math.max(0, focusIdx - 1);
+    // UP
+    if (inNavZone) {
+      if (curIdx === 0) {
+        focusIdx = total - 1;
+      } else {
+        focusIdx = curIdx - 1;
+      }
+    } else if (onBackButton) {
+      focusIdx = navCount - 1;
+    } else if (curIdx >= contentStart) {
+      focusIdx = curIdx - 1;
+      if (focusIdx < contentStart) focusIdx = total - 1;
+    } else {
+      focusIdx = Math.max(0, focusIdx - 1);
+    }
   }
 
   applyFocus();
@@ -98,18 +110,11 @@ export function navigateNav(dir) {
     if (btnIdx >= 0) {
       if (dir > 0 && btnIdx < buttons.length - 1) {
         const newIdx = focusOrder.indexOf(buttons[btnIdx + 1]);
-        if (newIdx >= 0) {
-          focusIdx = newIdx;
-          applyFocus();
-        }
+        if (newIdx >= 0) { focusIdx = newIdx; applyFocus(); }
         return;
-      }
-      if (dir < 0 && btnIdx > 0) {
+      } else if (dir < 0 && btnIdx > 0) {
         const newIdx = focusOrder.indexOf(buttons[btnIdx - 1]);
-        if (newIdx >= 0) {
-          focusIdx = newIdx;
-          applyFocus();
-        }
+        if (newIdx >= 0) { focusIdx = newIdx; applyFocus(); }
         return;
       }
       if (dir < 0 && btnIdx === 0) {
@@ -118,20 +123,25 @@ export function navigateNav(dir) {
         const idx = tabs.indexOf(activeTab);
         focusIdx = idx >= 0 ? idx : 0;
         applyFocus();
+        return;
       }
       return;
     }
   }
 
-  if (dir > 0 && inNavZone) {
-    focusIdx = contentStart;
-    applyFocus();
-  } else if (dir < 0 && curIdx >= contentStart) {
-    const tabs = Array.from(document.querySelectorAll('.nav-item'));
-    const activeTab = document.querySelector('.nav-item.active');
-    const idx = tabs.indexOf(activeTab);
-    focusIdx = idx >= 0 ? idx : 0;
-    applyFocus();
+  if (dir > 0) {
+    if (inNavZone) {
+      focusIdx = contentStart;
+      applyFocus();
+    }
+  } else {
+    if (curIdx >= contentStart) {
+      const tabs = Array.from(document.querySelectorAll('.nav-item'));
+      const activeTab = document.querySelector('.nav-item.active');
+      const idx = tabs.indexOf(activeTab);
+      focusIdx = idx >= 0 ? idx : 0;
+      applyFocus();
+    }
   }
 }
 
@@ -140,7 +150,7 @@ export function selectFocused() {
   if (!el) return;
 
   if (el.classList.contains('nav-item')) {
-    document.querySelectorAll('.nav-item').forEach((item) => item.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     el.classList.add('active');
     activeSection = el.dataset.section;
     focusIdx = 0;
@@ -160,11 +170,16 @@ export function selectFocused() {
   }
 
   if (el.classList.contains('toggle')) {
+    // Trigger the click handler registered in render() — it saves the setting
+    // and applies it to the player. (classList.toggle alone never persisted.)
     el.click();
     return;
   }
 
   if (el.tagName === 'INPUT') {
+    // On TV the remote layer intercepts Enter/OK and routes it here, so the
+    // desktop-only keydown Enter handlers never run. Make OK inside a text
+    // field act like pressing Enter on a desktop form.
     if (el.id === 'settings-proxy-url') {
       handleProxySave();
     } else {
@@ -175,12 +190,13 @@ export function selectFocused() {
 
   if (el.classList.contains('btn')) {
     el.click();
+    return;
   }
 }
 
 function buildFocusOrder() {
   focusOrder = [];
-  document.querySelectorAll('.nav-item').forEach((el) => focusOrder.push(el));
+  document.querySelectorAll('.nav-item').forEach(el => focusOrder.push(el));
   focusOrder.push(document.getElementById('btn-back'));
 
   if (activeSection === 'source') {
@@ -197,31 +213,33 @@ function buildFocusOrder() {
 }
 
 function clearFocus() {
-  document.querySelectorAll('[data-focused]').forEach((el) => el.removeAttribute('data-focused'));
+  document.querySelectorAll('[data-focused]').forEach(el => el.removeAttribute('data-focused'));
 }
 
 function applyFocus() {
   clearFocus();
   buildFocusOrder();
-  if (focusIdx < 0 || focusIdx >= focusOrder.length) return;
-
-  const el = focusOrder[focusIdx];
-  if (!el) return;
-  el.setAttribute('data-focused', '');
-  el.scrollIntoView({ block: 'nearest' });
-  if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-    el.focus();
-  } else {
-    const activeEl = document.activeElement;
-    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
-      activeEl.blur();
+  if (focusIdx >= 0 && focusIdx < focusOrder.length) {
+    const el = focusOrder[focusIdx];
+    if (el) {
+      el.setAttribute('data-focused', '');
+      el.scrollIntoView({ block: 'nearest' });
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        el.focus();
+      } else {
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+          activeEl.blur();
+        }
+      }
     }
   }
 }
 
 function render() {
   const s = getSettings();
-  const navHtml = NAV_ITEMS.map((item) =>
+
+  const navHtml = NAV_ITEMS.map(item =>
     '<div class="nav-item' + (activeSection === item.id ? ' active' : '') + '" data-section="' + item.id + '">' +
       '<span class="nav-icon">' + item.icon + '</span> ' + item.label +
     '</div>'
@@ -229,7 +247,7 @@ function render() {
 
   let mainHtml = '';
   mainHtml += '<div class="page-title">';
-  mainHtml += '<button class="back-btn" id="btn-back" title="' + UI_COPY.cancel + '">\u2039</button>';
+  mainHtml += '<button class="back-btn" id="btn-back">\u2039</button>';
   mainHtml += UI_COPY.settings;
   mainHtml += '</div>';
 
@@ -276,9 +294,9 @@ function render() {
     if (onClose) onClose();
   });
 
-  document.querySelectorAll('.nav-item').forEach((item) => {
+  document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', () => {
-      document.querySelectorAll('.nav-item').forEach((navItem) => navItem.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
       item.classList.add('active');
       activeSection = item.dataset.section;
       focusIdx = 0;
@@ -296,12 +314,12 @@ function render() {
     }
   } else if (activeSection === 'connection') {
     document.getElementById('settings-proxy-save-btn').addEventListener('click', handleProxySave);
-    document.getElementById('settings-proxy-url').addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') handleProxySave();
+    document.getElementById('settings-proxy-url').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleProxySave();
     });
   } else if (activeSection === 'playback') {
-    document.querySelectorAll('.toggle').forEach((toggle) => {
-      toggle.addEventListener('click', function() {
+    document.querySelectorAll('.toggle').forEach(t => {
+      t.addEventListener('click', function() {
         this.classList.toggle('on');
         if (this.id === 'toggle-autoq') {
           const enabled = this.classList.contains('on');
@@ -369,7 +387,7 @@ function renderPlaybackCard() {
   html += '<div class="toggle' + (autoQ ? ' on' : '') + '" id="toggle-autoq"><div class="knob"></div></div>';
   html += '</div>';
   html += '<div class="toggle-row">';
-  html += '<div><div class="toggle-label">Oynatma listesini otomatik yenile</div><div class="toggle-desc">Sağlayıcı yenileme davranışını tercih olarak koru</div></div>';
+  html += '<div><div class="toggle-label">Oynatma listesini otomatik yenile</div><div class="toggle-desc">Uygulama açılışında kaynaktan indirip güncelle</div></div>';
   html += '<div class="toggle' + (autoRefresh ? ' on' : '') + '" id="toggle-auto-refresh"><div class="knob"></div></div>';
   html += '</div>';
   html += '<div class="toggle-row">';
