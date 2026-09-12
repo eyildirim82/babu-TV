@@ -12,6 +12,7 @@ const playerDir = resolve(testDir, '..');
 const USER = 'm7-sec-user';
 const PASSWORD = 'm7-sec-pass';
 const TOKEN = 'm7-sec-token';
+const FRAGMENT = 'm7-fragment-secret';
 const PROVIDER_URL = `https://${USER}:${PASSWORD}@example.invalid/player_api.php?username=${USER}&password=${PASSWORD}&token=${TOKEN}&quality=hd`;
 const STREAM_URL = `https://stream.example.invalid/live/${USER}/${PASSWORD}/42.ts?token=${TOKEN}&quality=hd`;
 
@@ -31,6 +32,15 @@ void test('M7 SEC URL sanitizer removes user-info, sensitive query values and Xt
   assert.match(provider, /quality=hd/);
   assert.match(stream, /^https:\/\/stream\.example\.invalid\/live\/\[REDACTED\]\/\[REDACTED\]\/42\.ts\?/);
   assert.match(stream, /quality=hd/);
+});
+
+void test('M7 SEC URL sanitizer removes URL fragments completely', () => {
+  const sanitized = sanitizeUrlForLog(`https://example.invalid/path?token=${TOKEN}#${FRAGMENT}`);
+  const parsed = new URL(sanitized);
+
+  assert.equal(parsed.searchParams.get('token'), '[REDACTED]');
+  assert.equal(parsed.hash, '');
+  assert.equal(sanitized.includes(FRAGMENT), false);
 });
 
 void test('M7 SEC URL sanitizer preserves ordinary safe URL diagnostics', () => {
