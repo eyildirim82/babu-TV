@@ -43,6 +43,38 @@ void test('M7 SEC URL sanitizer removes URL fragments completely', () => {
   assert.equal(sanitized.includes(FRAGMENT), false);
 });
 
+void test('M7 SEC URL sanitizer removes fragments without queries and alongside user-info', () => {
+  const noQuery = new URL(sanitizeUrlForLog(`https://example.invalid/path#${FRAGMENT}`));
+  const withUserInfo = new URL(
+    sanitizeUrlForLog(`https://${USER}:${PASSWORD}@example.invalid/path#${FRAGMENT}`),
+  );
+
+  assert.equal(noQuery.hash, '');
+  assert.equal(withUserInfo.hash, '');
+  assert.equal(withUserInfo.username, '');
+  assert.equal(withUserInfo.password, '');
+  assertNoCanary(withUserInfo.toString());
+});
+
+void test('M7 SEC URL sanitizer handles encoded credential values without losing safe diagnostics', () => {
+  const encodedUser = 'm7 encoded user';
+  const encodedPassword = 'm7 encoded password';
+  const encodedToken = 'm7 encoded token';
+  const sanitized = sanitizeUrlForLog(
+    `https://stream.example.invalid/live/${encodeURIComponent(encodedUser)}/${encodeURIComponent(encodedPassword)}/42.ts?token=${encodeURIComponent(encodedToken)}&quality=hd#${encodeURIComponent(FRAGMENT)}`,
+  );
+  const parsed = new URL(sanitized);
+  const decodedPath = decodeURIComponent(parsed.pathname);
+
+  assert.equal(decodedPath.includes(encodedUser), false);
+  assert.equal(decodedPath.includes(encodedPassword), false);
+  assert.match(decodedPath, /^\/live\/\[REDACTED\]\/\[REDACTED\]\/42\.ts$/);
+  assert.equal(parsed.searchParams.get('token'), '[REDACTED]');
+  assert.equal(parsed.searchParams.get('quality'), 'hd');
+  assert.equal(parsed.hash, '');
+  assert.equal(sanitized.includes(encodeURIComponent(encodedToken)), false);
+});
+
 void test('M7 SEC URL sanitizer preserves ordinary safe URL diagnostics', () => {
   assert.equal(
     sanitizeUrlForLog('https://example.invalid/guide/channel-42?quality=hd&lang=tr'),
