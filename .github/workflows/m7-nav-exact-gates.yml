@@ -1,0 +1,44 @@
+name: M7 NAV exact gates
+
+on:
+  push:
+    branches:
+      - verify/m7-nav-exact-gates
+
+permissions:
+  contents: read
+
+jobs:
+  exact-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact NAV head
+        uses: actions/checkout@v4
+        with:
+          ref: fbe3c500f9368d269f4f772f4e57a6a4f9f3ee42
+          fetch-depth: 0
+
+      - name: Verify exact head
+        run: test "$(git rev-parse HEAD)" = "fbe3c500f9368d269f4f772f4e57a6a4f9f3ee42"
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Brand check
+        run: npm run brand:check
+
+      - name: Build
+        run: npm run build
+
+      - name: Tizen build
+        run: npm run tizen:build
+
+      - name: Diff check
+        run: git diff --check 0cdc1ed240707b389d202d48efeaaf5822fe2316...HEAD
