@@ -43,6 +43,7 @@ export function sanitizeUrlForLog(value: string): string {
     }
   }
 
+  url.hash = '';
   return url.toString();
 }
 
