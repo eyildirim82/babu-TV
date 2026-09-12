@@ -30,6 +30,10 @@ function missingCredential(): ProviderError {
   return new ProviderError('UNAVAILABLE', null, 'Provider credential is unavailable.');
 }
 
+function emptyChannelCatalog(): ProviderError {
+  return new ProviderError('MALFORMED', null, 'Provider channel catalog was empty.');
+}
+
 export class ProviderSyncService {
   constructor(
     private readonly providers: ProviderRepository,
@@ -69,6 +73,7 @@ export class ProviderSyncService {
     try {
       const previousChannels = await this.catalog.listChannels(providerId);
       const nextChannels = await adapter.listChannels();
+      if (nextChannels.length === 0) throw emptyChannelCatalog();
       const reconciliation = reconcileChannels(previousChannels, nextChannels);
       await this.catalog.replaceChannels(providerId, nextChannels);
       channels = {
