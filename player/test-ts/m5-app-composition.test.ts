@@ -632,7 +632,7 @@ test('PAIR-I-WIRE first-run pairing route owns Back and completion without provi
   requireBound<FirstRunCallbacks>(firstRunCallbacks, 'first-run callbacks').onPairingSelected?.();
   await Promise.resolve();
   events.length = 0;
-  requireBound(pairingCallbacks, 'pairing callbacks').onCompleted('paired-provider');
+  requireBound<{ onBack(): void; onCompleted(providerId: string): void }>(pairingCallbacks, 'pairing callbacks').onCompleted('paired-provider');
   await Promise.resolve();
   assert.deepEqual(app.route(), { kind: 'home' });
   assert.ok(events.includes('home:load'));
@@ -691,7 +691,7 @@ test('PAIR-I-WIRE provider-management add pairing returns to management on Back'
 
   assert.deepEqual(app.route(), { kind: 'pairing', returnTo: 'provider-management' });
   events.length = 0;
-  requireBound(pairingCallbacks, 'pairing callbacks').onBack();
+  requireBound<{ onBack(): void; onCompleted(providerId: string): void }>(pairingCallbacks, 'pairing callbacks').onBack();
   await Promise.resolve();
   assert.deepEqual(app.route(), { kind: 'provider-management' });
   assert.equal(events.filter((event) => event === 'providers:show').length, 1);
