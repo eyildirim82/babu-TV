@@ -28,14 +28,14 @@ jobs:
       - run: npm run typecheck
 
   task5-exact:
-    if: "${{ github.event.head_commit.message == 'chore(pairing): verify Task 5 GREEN' }}"
+    if: "${{ github.event.head_commit.message == 'chore(pairing): verify Task 5 relay GREEN' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 69f4e495c6b51526c074d23575f8aa72c9fd83ac
+          ref: ee25cc32f4ba0a258395bc9f0e0b200c1e15be4c
       - name: Assert Task 5 exact head
-        run: test "$(git rev-parse HEAD)" = "69f4e495c6b51526c074d23575f8aa72c9fd83ac"
+        run: test "$(git rev-parse HEAD)" = "ee25cc32f4ba0a258395bc9f0e0b200c1e15be4c"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
