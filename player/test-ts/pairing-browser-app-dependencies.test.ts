@@ -19,27 +19,29 @@ test('PAIR-I-WIRE browser pairing stays optional and keeps keyboard onboarding a
   assert.match(text, /connectM3u:/s);
 });
 
-test('PAIR-I-WIRE browser pairing composes the frozen core factory with the existing onboarding authorities', () => {
+test('PAIR-I-WIRE browser pairing composes the frozen relay/core with existing onboarding authorities', () => {
   const text = source();
   const factoryText = readFileSync(CORE_FACTORY_URL, 'utf8');
 
   assert.match(text, /import \{ FetchPairingRelayTransport \} from '\.\.\/pairing\/browser-relay-transport\.js';/);
+  assert.match(text, /import \{ PairingRelayClient \} from '\.\.\/pairing\/relay-client\.js';/);
   assert.match(text, /import \{ createTvPairingCore \} from '\.\.\/pairing\/create-tv-pairing-core\.js';/);
   assert.match(text, /import \{ PairingTvView \} from '\.\.\/pairing\/tv-view\.js';/);
   assert.match(text, /const transport = new FetchPairingRelayTransport\(input\.fetchImpl\);/);
-  assert.match(text, /createTvPairingCore\(\{\s*transport,\s*relayBaseUrl: input\.pairing\.relayBaseUrl,\s*relayTimeoutMs: input\.pairing\.relayTimeoutMs,\s*onboarding:\s*\{/s);
+  assert.match(text, /const relay = new PairingRelayClient\(\s*input\.pairing\.relayBaseUrl,\s*transport,\s*input\.pairing\.relayTimeoutMs,\s*\);/s);
+  assert.match(text, /createTvPairingCore\(\{\s*relay,\s*relayBaseUrl: input\.pairing\.relayBaseUrl,\s*onboarding:\s*\{/s);
   assert.match(text, /connectXtream:\s*\(entry\)\s*=>\s*xtreamOnboarding\.connect\(entry\)/);
   assert.match(text, /connectM3u:\s*\(entry\)\s*=>\s*m3uOnboarding\.connect\(entry\)/);
 
-  assert.match(factoryText, /import \{ PairingRelayClient/);
-  assert.match(factoryText, /new PairingRelayClient\(/);
+  assert.match(factoryText, /import type \{ PairingRelayClient \} from '\.\/relay-client\.js';/);
+  assert.match(factoryText, /relay: input\.relay/);
 });
 
 test('PAIR-I-WIRE QR rendering is local with the exact approved qrcode options', () => {
   const text = source();
 
   assert.match(text, /from 'qrcode';/);
-  assert.match(text, /QRCode\.toDataURL\(\s*value,\s*\{\s*errorCorrectionLevel: 'M',\s*margin: 2,\s*width: 360,\s*\}\s*\)/s);
+  assert.match(text, /QRCode\.toDataURL\(\s*value,\s*\{\s*errorCorrectionLevel: 'M',\s*margin: 2,\s*width: 360,\s*\},?\s*\)/s);
   assert.match(text, /new PairingTvView\(/);
   assert.match(text, /phoneBaseUrl: input\.pairing\.phoneBaseUrl/);
   assert.match(text, /pollIntervalMs: input\.pairing\.pollIntervalMs/);
