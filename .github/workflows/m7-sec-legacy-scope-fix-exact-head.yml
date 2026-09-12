@@ -1,0 +1,77 @@
+name: M7 SEC-LEGACY scope-fix exact-head evidence
+
+on:
+  push:
+    branches:
+      - verification/m7-sec-legacy-scope-fix-20260912
+
+permissions:
+  contents: read
+
+jobs:
+  sec-legacy-scope-fix-exact-head-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact SEC-LEGACY production SHA
+        uses: actions/checkout@v4
+        with:
+          ref: 1326a997d47e8c5d2836f0b9ca511cbfc04bbdfa
+          fetch-depth: 0
+
+      - name: Assert exact SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "1326a997d47e8c5d2836f0b9ca511cbfc04bbdfa"
+          echo "SEC-LEGACY exact SHA: $actual"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Focused M7 SEC coverage
+        run: npm run test:ts -w player -- --test-name-pattern="M7 SEC"
+
+      - name: Player TypeScript tests
+        run: npm run test:ts -w player
+
+      - name: Player typecheck
+        run: npm run typecheck -w player
+
+      - name: Full tests
+        run: npm test
+
+      - name: Full typecheck
+        run: npm run typecheck
+
+      - name: Brand check
+        run: npm run brand:check
+
+      - name: Build
+        run: npm run build
+
+      - name: Tizen build
+        run: npm run tizen:build
+
+      - name: Frozen-base diff check
+        shell: bash
+        run: git diff --check 0cdc1ed240707b389d202d48efeaaf5822fe2316...HEAD
+
+      - name: Assert exact SEC-LEGACY production scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git diff --name-only 0cdc1ed240707b389d202d48efeaaf5822fe2316...HEAD | sort)"
+          expected="$(printf '%s\n' \
+            'player/src/config.js' \
+            'player/src/settings.js' \
+            'player/test-ts/m7-sec-legacy-persistence.test.ts' | sort)"
+          printf 'Expected scope:\n%s\nActual scope:\n%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
