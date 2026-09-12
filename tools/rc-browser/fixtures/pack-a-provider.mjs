@@ -289,7 +289,6 @@ export function widgetDataProviderIds(widgetData) {
   }
 }
 
-
 export async function installXtreamTrueTimeoutOverride(context, delayMs = 10_500) {
   let enabled = false;
   await context.route('https://provider-a.invalid/**', async (route) => {
@@ -315,9 +314,11 @@ export async function installXtreamTrueTimeoutOverride(context, delayMs = 10_500
 }
 
 export async function installXtreamRefreshFailureOverride(context, status = 500) {
+  let hitCount = 0;
   await context.route('https://provider-a.invalid/**', async (route) => {
     const url = new URL(route.request().url());
     if (url.searchParams.get('action') === 'get_live_categories') {
+      hitCount += 1;
       await route.fulfill({
         status,
         contentType: 'text/plain; charset=utf-8',
@@ -326,6 +327,9 @@ export async function installXtreamRefreshFailureOverride(context, status = 500)
       return;
     }
     await route.fallback();
+  });
+  return Object.freeze({
+    count() { return hitCount; },
   });
 }
 
