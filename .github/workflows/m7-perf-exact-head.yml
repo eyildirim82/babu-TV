@@ -1,0 +1,59 @@
+name: m7-perf-exact-head
+
+on:
+  push:
+    branches:
+      - verify/m7-perf-fd96a2d4
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PERF production head
+        uses: actions/checkout@v4
+        with:
+          ref: fd96a2d4a12dd83341fa9ece6be7531efbefc40e
+          fetch-depth: 0
+
+      - name: Assert exact production head
+        run: test "$(git rev-parse HEAD)" = "fd96a2d4a12dd83341fa9ece6be7531efbefc40e"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Focused M7 PERF tests
+        run: npm run test:ts -w player -- --test-name-pattern="M7 PERF"
+
+      - name: Full tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Brand check
+        run: npm run brand:check
+
+      - name: Build
+        run: npm run build
+
+      - name: Tizen build
+        run: npm run tizen:build
+
+      - name: Diff check
+        run: git diff --check 0cdc1ed240707b389d202d48efeaaf5822fe2316...HEAD
+
+      - name: Exact changed-file list
+        run: git diff --name-only 0cdc1ed240707b389d202d48efeaaf5822fe2316...HEAD
+
+      - name: Ensure verification did not modify tracked files
+        run: git diff --exit-code
