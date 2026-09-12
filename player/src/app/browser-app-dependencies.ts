@@ -23,12 +23,17 @@ import { createAppLiveTvFeaturePorts } from './live-tv-feature-ports.js';
 import { ProviderManagementSurface } from './provider-management-surface.js';
 import type { AppCompositionDependencies } from './app-composition.js';
 import type { WidgetDataLike } from '../credentials/samsung-widgetdata-credential-store.js';
+import QRCode from 'qrcode';
+import { FetchPairingRelayTransport } from '../pairing/browser-relay-transport.js';
+import { createTvPairingCore } from '../pairing/create-tv-pairing-core.js';
+import { PairingTvView } from '../pairing/tv-view.js';
 
 import '../ui/home.css';
 import '../ui/first-run.css';
 import '../ui/m3u-entry.css';
 import '../ui/provider-management.css';
 import '../ui/xtream-entry.css';
+import '../ui/pairing-tv.css';
 
 const EPG_QUERY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -43,6 +48,12 @@ export interface BrowserAppDependencyInput {
   setRemoteNumericMode(mode: 'buffered' | 'digits'): void;
   legacy: AppCompositionDependencies['legacy'];
   exitApp(): void;
+  pairing?: {
+    relayBaseUrl: string;
+    phoneBaseUrl: string;
+    relayTimeoutMs: number;
+    pollIntervalMs: number;
+  };
   nowMs?: () => number;
 }
 
@@ -140,6 +151,40 @@ export function createBrowserAppDependencies(
         }
       },
     },
+    pairing: input.pairing ? {
+      view: (callbacks) => {
+        const transport = new FetchPairingRelayTransport(input.fetchImpl);
+        const pairingCore = createTvPairingCore({
+          transport,
+          relayBaseUrl: input.pairing.relayBaseUrl,
+          relayTimeoutMs: input.pairing.relayTimeoutMs,
+          onboarding: {
+            connectXtream: (entry) => xtreamOnboarding.connect(entry),
+            connectM3u: (entry) => m3uOnboarding.connect(entry),
+          },
+        });
+        const qr = {
+          toDataUrl: (value: string) => QRCode.toDataURL(
+            value,
+            {
+              errorCorrectionLevel: 'M',
+              margin: 2,
+              width: 360,
+            },
+          ),
+        };
+        return new PairingTvView(
+          input.document,
+          pairingCore,
+          callbacks,
+          {
+            phoneBaseUrl: input.pairing.phoneBaseUrl,
+            pollIntervalMs: input.pairing.pollIntervalMs,
+          },
+          qr,
+        );
+      },
+    } : undefined,
     reentry: {
       reenter: (input) => providerReentry.reenter(input),
     },
