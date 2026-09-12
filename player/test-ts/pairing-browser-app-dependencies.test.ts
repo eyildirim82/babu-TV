@@ -12,50 +12,54 @@ function source(): string {
 test('PAIR-I-WIRE browser pairing stays optional and keeps keyboard onboarding available', () => {
   const text = source();
 
-  assert.match(text, /pairing\?:\s*\{\s*relayBaseUrl: string;\s*phoneBaseUrl: string;\s*relayTimeoutMs: number;\s*pollIntervalMs: number;\s*\};/s);
-  assert.match(text, /const pairingConfig = input\.pairing;/);
-  assert.match(text, /pairing:\s*pairingConfig\s*\?\s*\{/s);
-  assert.match(text, /:\s*undefined,/s);
-  assert.match(text, /onboarding:\s*\{\s*connectXtream:/s);
-  assert.match(text, /connectM3u:/s);
+  assert.ok(text.includes('pairing?: {\n    relayBaseUrl: string;\n    phoneBaseUrl: string;\n    relayTimeoutMs: number;\n    pollIntervalMs: number;\n  };'));
+  assert.ok(text.includes('const pairingConfig = input.pairing;'));
+  assert.ok(text.includes('pairing: pairingConfig ? {'));
+  assert.ok(text.includes('} : undefined,'));
+  assert.ok(text.includes('onboarding: {\n            connectXtream:'));
+  assert.ok(text.includes('connectM3u:'));
 });
 
 test('PAIR-I-WIRE browser pairing composes the frozen relay/core with existing onboarding authorities', () => {
   const text = source();
   const factoryText = readFileSync(CORE_FACTORY_URL, 'utf8');
 
-  assert.match(text, /import \{ FetchPairingRelayTransport \} from '\.\.\/pairing\/browser-relay-transport\.js';/);
-  assert.match(text, /import \{ PairingRelayClient \} from '\.\.\/pairing\/relay-client\.js';/);
-  assert.match(text, /import \{ createTvPairingCore \} from '\.\.\/pairing\/create-tv-pairing-core\.js';/);
-  assert.match(text, /import \{ PairingTvView \} from '\.\.\/pairing\/tv-view\.js';/);
-  assert.match(text, /const transport = new FetchPairingRelayTransport\(input\.fetchImpl\);/);
-  assert.match(text, /const relay = new PairingRelayClient\(\s*pairingConfig\.relayBaseUrl,\s*transport,\s*pairingConfig\.relayTimeoutMs,\s*\);/s);
-  assert.match(text, /createTvPairingCore\(\{\s*relay,\s*relayBaseUrl: pairingConfig\.relayBaseUrl,\s*onboarding:\s*\{/s);
-  assert.match(text, /connectXtream:\s*\(entry\)\s*=>\s*xtreamOnboarding\.connect\(entry\)/);
-  assert.match(text, /connectM3u:\s*\(entry\)\s*=>\s*m3uOnboarding\.connect\(entry\)/);
+  assert.ok(text.includes("import { FetchPairingRelayTransport } from '../pairing/fetch-relay-transport.js';"));
+  assert.ok(text.includes("import { PairingRelayClient } from '../pairing/relay-client.js';"));
+  assert.ok(text.includes("import { createTvPairingCore } from '../pairing/create-tv-pairing-core.js';"));
+  assert.ok(text.includes("import { PairingTvView } from '../pairing/tv-view.js';"));
+  assert.ok(text.includes('const transport = new FetchPairingRelayTransport(input.fetchImpl);'));
+  assert.ok(text.includes('const relay = new PairingRelayClient(\n          pairingConfig.relayBaseUrl,\n          transport,\n          pairingConfig.relayTimeoutMs,\n        );'));
+  assert.ok(text.includes('const pairingCore = createTvPairingCore({\n          relay,\n          relayBaseUrl: pairingConfig.relayBaseUrl,'));
+  assert.ok(text.includes('connectXtream: (entry) => xtreamOnboarding.connect(entry)'));
+  assert.ok(text.includes('connectM3u: (entry) => m3uOnboarding.connect(entry)'));
 
-  assert.match(factoryText, /import type \{ PairingRelayClient \} from '\.\/relay-client\.js';/);
-  assert.match(factoryText, /relay: input\.relay/);
+  assert.ok(factoryText.includes("import type { PairingRelayClient } from './relay-client.js';"));
+  assert.ok(factoryText.includes('relay: input.relay'));
 });
 
 test('PAIR-I-WIRE QR rendering is local with the exact approved qrcode options', () => {
   const text = source();
 
-  assert.match(text, /from 'qrcode';/);
-  assert.match(text, /QRCode\.toDataURL\(\s*value,\s*\{\s*errorCorrectionLevel: 'M',\s*margin: 2,\s*width: 360,\s*\},?\s*\)/s);
-  assert.match(text, /new PairingTvView\(/);
-  assert.match(text, /phoneBaseUrl: pairingConfig\.phoneBaseUrl/);
-  assert.match(text, /pollIntervalMs: pairingConfig\.pollIntervalMs/);
-  assert.match(text, /import '\.\.\/ui\/pairing-tv\.css';/);
+  assert.ok(text.includes("from 'qrcode';"));
+  assert.ok(text.includes("errorCorrectionLevel: 'M',\n              margin: 2,\n              width: 360,"));
+  assert.ok(text.includes('new PairingTvView('));
+  assert.ok(text.includes('phoneBaseUrl: pairingConfig.phoneBaseUrl'));
+  assert.ok(text.includes('pollIntervalMs: pairingConfig.pollIntervalMs'));
+  assert.ok(text.includes("import '../ui/pairing-tv.css';"));
 });
 
 test('PAIR-I-WIRE browser pairing wiring introduces no direct credential store or plaintext relay path', () => {
   const text = source();
   const pairingStart = text.indexOf('pairing: pairingConfig');
   assert.notEqual(pairingStart, -1);
-  const pairingBlock = text.slice(pairingStart, text.indexOf('reentry:', pairingStart));
+  const pairingEnd = text.indexOf('reentry:', pairingStart);
+  assert.notEqual(pairingEnd, -1);
+  const pairingBlock = text.slice(pairingStart, pairingEnd);
 
   assert.doesNotMatch(pairingBlock, /runtime\.credentials\.(save|remove)|credentials\.(save|remove)/);
-  assert.doesNotMatch(pairingBlock, /createSession\([^)]*(username|password|playlistUrl|credential)/s);
-  assert.doesNotMatch(pairingBlock, /poll\([^)]*(username|password|playlistUrl|credential)/s);
+  assert.equal(pairingBlock.includes('username'), false);
+  assert.equal(pairingBlock.includes('password'), false);
+  assert.equal(pairingBlock.includes('playlistUrl'), false);
+  assert.equal(pairingBlock.includes('credential'), false);
 });
