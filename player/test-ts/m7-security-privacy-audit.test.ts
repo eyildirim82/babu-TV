@@ -12,6 +12,7 @@ const playerDir = resolve(testDir, '..');
 const CANARY_A = 'audit-a';
 const CANARY_B = 'audit-b';
 const CANARY_C = 'audit-c';
+const FRAGMENT_CANARY = 'audit-fragment';
 const PROVIDER_URL = `https://${CANARY_A}:${CANARY_B}@example.invalid/player_api.php?username=${CANARY_A}&password=${CANARY_B}&token=${CANARY_C}&quality=hd`;
 const STREAM_URL = `https://stream.example.invalid/live/${CANARY_A}/${CANARY_B}/42.ts?token=${CANARY_C}&quality=hd`;
 
@@ -31,6 +32,15 @@ void test('M7 SEC URL sanitizer removes user-info, sensitive query values and Xt
   assert.match(provider, /quality=hd/);
   assert.match(stream, /^https:\/\/stream\.example\.invalid\/live\/\[REDACTED\]\/\[REDACTED\]\/42\.ts\?/);
   assert.match(stream, /quality=hd/);
+});
+
+void test('M7 SEC URL sanitizer removes URL fragments completely', () => {
+  const sanitized = sanitizeUrlForLog(`https://example.invalid/path?token=${CANARY_C}#${FRAGMENT_CANARY}`);
+  const parsed = new URL(sanitized);
+
+  assert.equal(parsed.searchParams.get('token'), '[REDACTED]');
+  assert.equal(parsed.hash, '');
+  assert.equal(sanitized.includes(FRAGMENT_CANARY), false);
 });
 
 void test('M7 SEC URL sanitizer preserves ordinary safe URL diagnostics', () => {
