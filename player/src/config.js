@@ -14,41 +14,71 @@ const settingsDefaults = {
   updateCheck: false,
 };
 
+const LEGACY_SOURCE_KEYS = [
+  'playlistUrl',
+  'playlists',
+  'activePlaylistIndex',
+  'channels',
+  'channelsFetched',
+];
+
+function asSettingsObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function sanitizePersistedSettings(value) {
+  const sanitized = { ...asSettingsObject(value) };
+  let changed = false;
+  for (const key of LEGACY_SOURCE_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(sanitized, key)) {
+      delete sanitized[key];
+      changed = true;
+    }
+  }
+  return { sanitized, changed };
+}
+
+function withRuntimeDefaults(value) {
+  return {
+    ...settingsDefaults,
+    ...value,
+    playlists: [],
+    activePlaylistIndex: -1,
+    channels: [],
+    channelsFetched: null,
+  };
+}
+
 export function getSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    const defaults = { ...settingsDefaults, playlists: [] };
-    const s = raw ? { ...defaults, ...JSON.parse(raw) } : { ...defaults };
-    // Migration from legacy single playlistUrl
-    if ((!s.playlists || s.playlists.length === 0) && s.playlistUrl) {
-      s.playlists = [{ name: 'Playlist 1', url: s.playlistUrl }];
-      s.activePlaylistIndex = 0;
-      delete s.playlistUrl;
-      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch {}
+    if (!raw) return withRuntimeDefaults({});
+
+    const { sanitized, changed } = sanitizePersistedSettings(JSON.parse(raw));
+    if (changed) {
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(sanitized));
+      } catch {}
     }
-    return s;
+    return withRuntimeDefaults(sanitized);
   } catch {
-    return { ...settingsDefaults, playlists: [] };
+    return withRuntimeDefaults({});
   }
 }
 
 export function getActivePlaylist() {
-  const s = getSettings();
-  if (s.activePlaylistIndex >= 0 && s.activePlaylistIndex < s.playlists.length) {
-    return s.playlists[s.activePlaylistIndex];
-  }
   return null;
 }
 
 export function saveSettings(partial) {
   const current = getSettings();
-  const merged = { ...current, ...partial };
+  const { sanitized } = sanitizePersistedSettings({ ...current, ...asSettingsObject(partial) });
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(sanitized));
   } catch (e) {
     console.warn('Failed to save settings:', e);
   }
-  return merged;
+  return withRuntimeDefaults(sanitized);
 }
 
 export function getProxyOverrides() {
