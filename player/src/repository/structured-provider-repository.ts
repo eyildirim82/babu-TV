@@ -12,6 +12,13 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+function isActiveProviderState(value: unknown): value is ActiveProviderState {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return candidate.key === 'activeProviderId'
+    && (candidate.value === null || typeof candidate.value === 'string');
+}
+
 function isProviderRecord(value: unknown): value is ProviderRecord {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
   const candidate = value as Record<string, unknown>;
@@ -58,8 +65,8 @@ export class StructuredProviderRepository implements ProviderRepository {
   }
 
   async getActiveProviderId(): Promise<ProviderId | null> {
-    const state = await this.store.get<ActiveProviderState>('app_state', 'activeProviderId');
-    return state?.value ?? null;
+    const state = await this.store.get<unknown>('app_state', 'activeProviderId');
+    return isActiveProviderState(state) ? state.value : null;
   }
 
   async setActiveProviderId(providerId: ProviderId | null): Promise<void> {
