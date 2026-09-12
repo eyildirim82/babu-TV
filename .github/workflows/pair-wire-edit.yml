@@ -9,14 +9,14 @@ permissions:
   contents: write
 
 jobs:
-  task5-green:
-    if: "${{ github.event.head_commit.message == 'chore(pairing): stage Task 5 GREEN edit' }}"
+  task5-relay-fix:
+    if: "${{ github.event.head_commit.message == 'chore(pairing): stage Task 5 relay fix' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - name: Apply Task 5 browser pairing wiring
+      - name: Align Task 5 with frozen relay factory
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -28,34 +28,29 @@ jobs:
               global text
               count = text.count(old)
               if count != 1:
-                  raise SystemExit(f'expected exactly one match, got {count}: {old[:100]!r}')
+                  raise SystemExit(f'expected exactly one match, got {count}: {old[:120]!r}')
               text = text.replace(old, new, 1)
 
           replace_once(
-          """import type { WidgetDataLike } from '../credentials/samsung-widgetdata-credential-store.js';\n\nimport '../ui/home.css';""",
-          """import type { WidgetDataLike } from '../credentials/samsung-widgetdata-credential-store.js';\nimport QRCode from 'qrcode';\nimport { FetchPairingRelayTransport } from '../pairing/browser-relay-transport.js';\nimport { createTvPairingCore } from '../pairing/create-tv-pairing-core.js';\nimport { PairingTvView } from '../pairing/tv-view.js';\n\nimport '../ui/home.css';""")
+          """import { FetchPairingRelayTransport } from '../pairing/browser-relay-transport.js';\nimport { createTvPairingCore } from '../pairing/create-tv-pairing-core.js';""",
+          """import { FetchPairingRelayTransport } from '../pairing/browser-relay-transport.js';\nimport { PairingRelayClient } from '../pairing/relay-client.js';\nimport { createTvPairingCore } from '../pairing/create-tv-pairing-core.js';""")
 
           replace_once(
-          """import '../ui/provider-management.css';\nimport '../ui/xtream-entry.css';""",
-          """import '../ui/provider-management.css';\nimport '../ui/xtream-entry.css';\nimport '../ui/pairing-tv.css';""")
+          """  const providerReentry = new ProviderReentryService({\n    providers: runtime.providers,\n    credentials: runtime.credentials,\n    adapters: runtime.adapters,\n    sync: runtime.sync,\n  });\n\n  return {""",
+          """  const providerReentry = new ProviderReentryService({\n    providers: runtime.providers,\n    credentials: runtime.credentials,\n    adapters: runtime.adapters,\n    sync: runtime.sync,\n  });\n  const pairingConfig = input.pairing;\n\n  return {""")
 
-          replace_once(
-          """  legacy: AppCompositionDependencies['legacy'];\n  exitApp(): void;\n  nowMs?: () => number;""",
-          """  legacy: AppCompositionDependencies['legacy'];\n  exitApp(): void;\n  pairing?: {\n    relayBaseUrl: string;\n    phoneBaseUrl: string;\n    relayTimeoutMs: number;\n    pollIntervalMs: number;\n  };\n  nowMs?: () => number;""")
-
-          replace_once(
-          """    reentry: {\n      reenter: (input) => providerReentry.reenter(input),\n    },""",
-          """    pairing: input.pairing ? {\n      view: (callbacks) => {\n        const transport = new FetchPairingRelayTransport(input.fetchImpl);\n        const pairingCore = createTvPairingCore({\n          transport,\n          relayBaseUrl: input.pairing.relayBaseUrl,\n          relayTimeoutMs: input.pairing.relayTimeoutMs,\n          onboarding: {\n            connectXtream: (entry) => xtreamOnboarding.connect(entry),\n            connectM3u: (entry) => m3uOnboarding.connect(entry),\n          },\n        });\n        const qr = {\n          toDataUrl: (value: string) => QRCode.toDataURL(\n            value,\n            {\n              errorCorrectionLevel: 'M',\n              margin: 2,\n              width: 360,\n            },\n          ),\n        };\n        return new PairingTvView(\n          input.document,\n          pairingCore,\n          callbacks,\n          {\n            phoneBaseUrl: input.pairing.phoneBaseUrl,\n            pollIntervalMs: input.pairing.pollIntervalMs,\n          },\n          qr,\n        );\n      },\n    } : undefined,\n    reentry: {\n      reenter: (input) => providerReentry.reenter(input),\n    },""")
-
+          old = """    pairing: input.pairing ? {\n      view: (callbacks) => {\n        const transport = new FetchPairingRelayTransport(input.fetchImpl);\n        const pairingCore = createTvPairingCore({\n          transport,\n          relayBaseUrl: input.pairing.relayBaseUrl,\n          relayTimeoutMs: input.pairing.relayTimeoutMs,\n          onboarding: {\n            connectXtream: (entry) => xtreamOnboarding.connect(entry),\n            connectM3u: (entry) => m3uOnboarding.connect(entry),\n          },\n        });\n        const qr = {\n          toDataUrl: (value: string) => QRCode.toDataURL(\n            value,\n            {\n              errorCorrectionLevel: 'M',\n              margin: 2,\n              width: 360,\n            },\n          ),\n        };\n        return new PairingTvView(\n          input.document,\n          pairingCore,\n          callbacks,\n          {\n            phoneBaseUrl: input.pairing.phoneBaseUrl,\n            pollIntervalMs: input.pairing.pollIntervalMs,\n          },\n          qr,\n        );\n      },\n    } : undefined,"""
+          new = """    pairing: pairingConfig ? {\n      view: (callbacks) => {\n        const transport = new FetchPairingRelayTransport(input.fetchImpl);\n        const relay = new PairingRelayClient(\n          pairingConfig.relayBaseUrl,\n          transport,\n          pairingConfig.relayTimeoutMs,\n        );\n        const pairingCore = createTvPairingCore({\n          relay,\n          relayBaseUrl: pairingConfig.relayBaseUrl,\n          onboarding: {\n            connectXtream: (entry) => xtreamOnboarding.connect(entry),\n            connectM3u: (entry) => m3uOnboarding.connect(entry),\n          },\n        });\n        const qr = {\n          toDataUrl: (value: string) => QRCode.toDataURL(\n            value,\n            {\n              errorCorrectionLevel: 'M',\n              margin: 2,\n              width: 360,\n            },\n          ),\n        };\n        return new PairingTvView(\n          input.document,\n          pairingCore,\n          callbacks,\n          {\n            phoneBaseUrl: pairingConfig.phoneBaseUrl,\n            pollIntervalMs: pairingConfig.pollIntervalMs,\n          },\n          qr,\n        );\n      },\n    } : undefined,"""
+          replace_once(old, new)
           path.write_text(text)
           PY
-      - name: Commit Task 5 GREEN
+      - name: Commit Task 5 relay fix
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add player/src/app/browser-app-dependencies.ts
           git diff --cached --check
-          git commit -m "feat(app): wire secure TV pairing dependencies"
+          git commit -m "fix(app): align pairing relay wiring with frozen core"
           git push origin HEAD:integration/pairing-onboarding
 
 # temporary execution workflow; removed before final production head
