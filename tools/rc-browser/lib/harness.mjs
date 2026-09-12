@@ -235,3 +235,5 @@ export async function attachScreenshot(page, testInfo, name) {
   await testInfo.attach(name, { path: outputPath, contentType: 'image/png' });
   return outputPath;
 }
+
+export { createEvidenceRecord, writeEvidence } from './evidence.mjs';
