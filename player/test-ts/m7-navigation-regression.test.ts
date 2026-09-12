@@ -15,7 +15,10 @@ import {
   type ProviderManagementOperations,
 } from '../src/provider-management/provider-management-presenter.js';
 import { ProviderManagementSurface } from '../src/app/provider-management-surface.js';
-import { handleSearchKeyboard } from '../src/search/search-input-boundary.js';
+import {
+  handleSearchKeyboard,
+  type SearchFocusState,
+} from '../src/search/search-input-boundary.js';
 import {
   createInitialLiveTvState,
   reduceLiveTv,
@@ -462,7 +465,7 @@ void test('M7 NAV Back closes Provider Management delete confirmation before par
 void test('M7 NAV Back Search moves focus without activation and closes without result intent', () => {
   const providerA = makeChannelKey('provider-a', 'shared');
   const providerB = makeChannelKey('provider-b', 'shared');
-  let state = { zone: 'input' as const, focusedResultKey: null, restoreResultKey: null };
+  let state: SearchFocusState = { zone: 'input', focusedResultKey: null, restoreResultKey: null };
 
   const firstMove = handleSearchKeyboard({
     state,
