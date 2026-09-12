@@ -12,8 +12,8 @@ const secretBoundaryPrefixes = [
 ];
 const generatedRoots = ['player/dist', 'tizen/build'];
 const syntheticCanaries = [
-  'm7-sec-pass',
-  'm7-sec-token',
+  'audit-b',
+  'audit-c',
 ];
 
 function addViolation(category, path) {
