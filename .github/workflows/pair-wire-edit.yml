@@ -9,178 +9,80 @@ permissions:
   contents: write
 
 jobs:
-  task4-red:
-    if: "${{ github.event.head_commit.message == 'chore(pairing): stage Task 4 RED edit' }}"
+  task4-green:
+    if: "${{ github.event.head_commit.message == 'chore(pairing): stage Task 4 GREEN edit' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - name: Append Task 4 RED composition coverage
+      - name: Apply Task 4 AppComposition pairing route
         run: |
           python - <<'PY'
           from pathlib import Path
-          path = Path('player/test-ts/m5-app-composition.test.ts')
+
+          path = Path('player/src/app/app-composition.ts')
           text = path.read_text()
-          marker = "PAIR-I-WIRE pairing unavailable keeps provider chooser keyboard-only"
-          if marker in text:
-              raise SystemExit('Task 4 RED marker already present')
-          text += r'''
 
-          test('PAIR-I-WIRE pairing unavailable keeps provider chooser keyboard-only', async () => {
-            const events: string[] = [];
-            const deps = makeDeps(events, 0);
-            let firstRunCallbacks: FirstRunCallbacks | null = null;
-            deps.views.firstRun = (callbacks) => {
-              firstRunCallbacks = callbacks;
-              return {
-                show() { events.push('first-run:show'); },
-                hide() { events.push('first-run:hide'); },
-                handleAction() {},
-              };
-            };
+          def replace_once(old, new):
+              global text
+              if text.count(old) != 1:
+                  raise SystemExit(f'expected exactly one match, got {text.count(old)}: {old[:80]!r}')
+              text = text.replace(old, new, 1)
 
-            const app = createAppComposition(deps);
-            await app.boot();
+          replace_once(
+          """  | { kind: 'legacy-settings'; returnTo: 'provider-management' }\n  | {\n      kind: 'xtream-entry';""",
+          """  | { kind: 'legacy-settings'; returnTo: 'provider-management' }\n  | { kind: 'pairing'; returnTo: 'first-run' | 'provider-management' }\n  | {\n      kind: 'xtream-entry';""")
 
-            assert.deepEqual(app.route(), { kind: 'first-run' });
-            assert.equal(requireBound<FirstRunCallbacks>(firstRunCallbacks, 'first-run callbacks').onPairingSelected, undefined);
-            assert.equal(events.some((event) => event.startsWith('pairing:')), false);
-          });
+          replace_once(
+          """export interface AppFirstRunViewPort {\n  show(state?: FirstRunPresentationState): void;\n  hide(): void;\n  handleAction(action: FirstRunAction): void;\n}\n\nexport interface AppEntryViewPort<Action extends string> {""",
+          """export interface AppFirstRunViewPort {\n  show(state?: FirstRunPresentationState): void;\n  hide(): void;\n  handleAction(action: FirstRunAction): void;\n}\n\nexport interface AppPairingViewPort {\n  show(): Promise<void>;\n  hide(): void;\n  handleBack(): void;\n}\n\nexport interface AppEntryViewPort<Action extends string> {""")
 
-          test('PAIR-I-WIRE first-run pairing route owns Back and completion without provider writes or playback', async () => {
-            const events: string[] = [];
-            const deps = makeDeps(events, 0);
-            let firstRunCallbacks: FirstRunCallbacks | null = null;
-            let pairingCallbacks: { onBack(): void; onCompleted(providerId: string): void } | null = null;
-            let pairingHandleBack = 0;
+          replace_once(
+          """    providerManagement(callbacks: AppProviderManagementCallbacks): AppProviderManagementPort;\n  };\n  onboarding: {""",
+          """    providerManagement(callbacks: AppProviderManagementCallbacks): AppProviderManagementPort;\n  };\n  pairing?: {\n    view(callbacks: {\n      onBack(): void;\n      onCompleted(providerId: ProviderId): void;\n    }): AppPairingViewPort;\n  };\n  onboarding: {""")
 
-            deps.views.firstRun = (callbacks) => {
-              firstRunCallbacks = callbacks;
-              return {
-                show() { events.push('first-run:show'); },
-                hide() { events.push('first-run:hide'); },
-                handleAction() {},
-              };
-            };
-            (deps as AppCompositionDependencies & {
-              pairing: {
-                view(callbacks: { onBack(): void; onCompleted(providerId: string): void }): {
-                  show(): Promise<void>;
-                  hide(): void;
-                  handleBack(): void;
-                };
-              };
-            }).pairing = {
-              view(callbacks) {
-                pairingCallbacks = callbacks;
-                return {
-                  async show() { events.push('pairing:show'); },
-                  hide() { events.push('pairing:hide'); },
-                  handleBack() { pairingHandleBack += 1; callbacks.onBack(); },
-                };
-              },
-            };
+          replace_once(
+          """  private readonly firstRunView: AppFirstRunViewPort;\n  private readonly xtreamView: AppEntryViewPort<XtreamEntryAction>;""",
+          """  private readonly firstRunView: AppFirstRunViewPort;\n  private readonly pairingView: AppPairingViewPort | null;\n  private readonly xtreamView: AppEntryViewPort<XtreamEntryAction>;""")
 
-            const app = createAppComposition(deps);
-            await app.boot();
-            events.length = 0;
-            requireBound<FirstRunCallbacks>(firstRunCallbacks, 'first-run callbacks').onPairingSelected?.();
-            await Promise.resolve();
+          replace_once(
+          """  constructor(private readonly deps: AppCompositionDependencies) {\n    this.homeView = deps.views.home({""",
+          """  constructor(private readonly deps: AppCompositionDependencies) {\n    this.pairingView = deps.pairing?.view({\n      onBack: () => { void this.returnFromPairing(); },\n      onCompleted: () => { void this.showHome(); },\n    }) ?? null;\n    this.homeView = deps.views.home({""")
 
-            assert.deepEqual(app.route(), { kind: 'pairing', returnTo: 'first-run' });
-            assert.equal(events.filter((event) => event === 'pairing:show').length, 1);
-            assert.ok(events.includes('first-run:hide'));
-            assert.equal(events.some((event) => event.startsWith('switch:')), false);
-            assert.equal(events.some((event) => event.startsWith('play:')), false);
+          replace_once(
+          """      onM3uSelected: () => {\n        this.showM3u(this.firstRunDestination(), { kind: 'add' });\n      },\n      onBack: () => { void this.handleFirstRunBack(); },""",
+          """      onM3uSelected: () => {\n        this.showM3u(this.firstRunDestination(), { kind: 'add' });\n      },\n      ...(this.pairingView !== null\n        ? { onPairingSelected: () => { void this.showPairing(this.firstRunDestination()); } }\n        : {}),\n      onBack: () => { void this.handleFirstRunBack(); },""")
 
-            events.length = 0;
-            await app.handleRemote('back');
-            await Promise.resolve();
-            assert.equal(pairingHandleBack, 1);
-            assert.deepEqual(app.route(), { kind: 'first-run' });
-            assert.equal(events.some((event) => event.startsWith('switch:')), false);
-            assert.equal(events.some((event) => event.includes(':connect')), false);
+          replace_once(
+          """      case 'provider-management':\n        if (action === 'up' || action === 'down' || action === 'select') {\n          await this.providerView.handleAction(action);\n        }\n        return;\n      case 'legacy-settings':""",
+          """      case 'provider-management':\n        if (action === 'up' || action === 'down' || action === 'select') {\n          await this.providerView.handleAction(action);\n        }\n        return;\n      case 'pairing':\n        return;\n      case 'legacy-settings':""")
 
-            requireBound<FirstRunCallbacks>(firstRunCallbacks, 'first-run callbacks').onPairingSelected?.();
-            await Promise.resolve();
-            events.length = 0;
-            requireBound(pairingCallbacks, 'pairing callbacks').onCompleted('paired-provider');
-            await Promise.resolve();
-            assert.deepEqual(app.route(), { kind: 'home' });
-            assert.ok(events.includes('home:load'));
-            assert.equal(events.some((event) => event.startsWith('play:')), false);
-            assert.equal(events.some((event) => event.startsWith('live:')), false);
-          });
+          replace_once(
+          """  private async showProviderManagement(): Promise<void> {\n    this.hideModernViews();""",
+          """  private async showPairing(returnTo: 'first-run' | 'provider-management'): Promise<void> {\n    if (this.pairingView === null) return;\n    this.hideModernViews();\n    this.deps.legacy.hideSettings();\n    this.deps.legacy.hidePlayerShell();\n    this.currentRoute = { kind: 'pairing', returnTo };\n    await this.pairingView.show();\n  }\n\n  private async showProviderManagement(): Promise<void> {\n    this.hideModernViews();""")
 
-          test('PAIR-I-WIRE provider-management add pairing returns to management on Back', async () => {
-            const events: string[] = [];
-            const deps = makeDeps(events);
-            let providerCallbacks: AppProviderManagementCallbacks | null = null;
-            let firstRunCallbacks: FirstRunCallbacks | null = null;
-            let pairingCallbacks: { onBack(): void; onCompleted(providerId: string): void } | null = null;
+          replace_once(
+          """      case 'first-run':\n        await this.handleFirstRunBack();\n        return;\n      case 'live-tv':""",
+          """      case 'first-run':\n        await this.handleFirstRunBack();\n        return;\n      case 'pairing':\n        this.pairingView?.handleBack();\n        return;\n      case 'live-tv':""")
 
-            deps.views.providerManagement = (callbacks) => {
-              providerCallbacks = callbacks;
-              return {
-                async show() { events.push('providers:show'); },
-                hide() { events.push('providers:hide'); },
-                async handleAction() {},
-              };
-            };
-            deps.views.firstRun = (callbacks) => {
-              firstRunCallbacks = callbacks;
-              return {
-                show() { events.push('first-run:show'); },
-                hide() { events.push('first-run:hide'); },
-                handleAction() {},
-              };
-            };
-            (deps as AppCompositionDependencies & {
-              pairing: {
-                view(callbacks: { onBack(): void; onCompleted(providerId: string): void }): {
-                  show(): Promise<void>;
-                  hide(): void;
-                  handleBack(): void;
-                };
-              };
-            }).pairing = {
-              view(callbacks) {
-                pairingCallbacks = callbacks;
-                return {
-                  async show() { events.push('pairing:show'); },
-                  hide() { events.push('pairing:hide'); },
-                  handleBack() { callbacks.onBack(); },
-                };
-              },
-            };
+          replace_once(
+          """  private async returnFromEntry(): Promise<void> {\n    const route = this.currentRoute;""",
+          """  private async returnFromPairing(): Promise<void> {\n    const route = this.currentRoute;\n    if (route.kind !== 'pairing') return;\n    if (route.returnTo === 'provider-management') {\n      await this.showProviderManagement();\n      return;\n    }\n    this.showProviderChooser('legacy');\n  }\n\n  private async returnFromEntry(): Promise<void> {\n    const route = this.currentRoute;""")
 
-            const app = createAppComposition(deps);
-            await app.boot();
-            await app.handleHomeIntent({ type: 'OPEN_SETTINGS' });
-            requireBound<AppProviderManagementCallbacks>(providerCallbacks, 'provider callbacks').onAddProvider();
-            requireBound<FirstRunCallbacks>(firstRunCallbacks, 'first-run callbacks').onPairingSelected?.();
-            await Promise.resolve();
+          replace_once(
+          """    this.firstRunView.hide();\n    this.xtreamView.hide();""",
+          """    this.firstRunView.hide();\n    this.pairingView?.hide();\n    this.xtreamView.hide();""")
 
-            assert.deepEqual(app.route(), { kind: 'pairing', returnTo: 'provider-management' });
-            events.length = 0;
-            requireBound(pairingCallbacks, 'pairing callbacks').onBack();
-            await Promise.resolve();
-            assert.deepEqual(app.route(), { kind: 'provider-management' });
-            assert.equal(events.filter((event) => event === 'providers:show').length, 1);
-            assert.equal(events.some((event) => event.startsWith('switch:')), false);
-            assert.equal(events.some((event) => event.includes(':connect')), false);
-            assert.equal(events.some((event) => event.startsWith('play:')), false);
-          });
-          '''
           path.write_text(text)
           PY
-      - name: Commit RED test only
+      - name: Commit Task 4 GREEN
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add player/test-ts/m5-app-composition.test.ts
-          git commit -m "test(app): add RED pairing route coverage"
+          git add player/src/app/app-composition.ts
+          git diff --cached --check
+          git commit -m "feat(app): add TV pairing route"
           git push origin HEAD:integration/pairing-onboarding
 
-# verification trigger only; removed before final production head
+# temporary execution workflow; removed before final production head
