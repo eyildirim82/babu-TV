@@ -51,6 +51,57 @@ void test('M5 keeps inherited legacy initialization available only as an injecte
   assert.match(source, /ui\.showConfirmDialog\('Uygulamadan çıkılsın mı\?'/);
 });
 
+void test('PAIR-I-WIRE main forwards only the optional public pairing config whitelist', async () => {
+  const source = await readFile(mainUrl, 'utf8');
+
+  assert.match(source, /const pairingConfig = window\.BABUSTV_PAIRING_CONFIG \?\? null;/);
+  assert.doesNotMatch(source, /__BABUSTV_PAIRING_CONFIG__/);
+
+  const start = source.indexOf('const pairingConfig = window.BABUSTV_PAIRING_CONFIG ?? null;');
+  assert.notEqual(start, -1);
+  const end = source.indexOf('activeAppComposition = appComposition;', start);
+  assert.notEqual(end, -1);
+  const wiring = source.slice(start, end);
+
+  assert.match(wiring, /pairing: pairingConfig && typeof pairingConfig === 'object'\s*\? \{/);
+  assert.match(wiring, /relayBaseUrl: pairingConfig\.relayBaseUrl/);
+  assert.match(wiring, /phoneBaseUrl: pairingConfig\.phoneBaseUrl/);
+  assert.match(wiring, /relayTimeoutMs: pairingConfig\.relayTimeoutMs/);
+  assert.match(wiring, /pollIntervalMs: pairingConfig\.pollIntervalMs/);
+  assert.match(wiring, /\}\s*: undefined,/);
+
+  for (const forbidden of ['credentials', 'username', 'password', 'playlistUrl', 'providerPayload', 'token', 'privateKey']) {
+    assert.equal(wiring.includes(forbidden), false, `${forbidden} must not cross the public pairing config boundary`);
+  }
+  assert.equal(wiring.includes('https://'), false, 'pairing config wiring must not hard-code a real or test endpoint');
+});
+
+void test('PAIR-I-WIRE runtime config contract permits synthetic .invalid public endpoints without committing them', () => {
+  const synthetic = {
+    relayBaseUrl: 'https://relay.example.invalid',
+    phoneBaseUrl: 'https://phone.example.invalid/pair',
+    relayTimeoutMs: 5000,
+    pollIntervalMs: 1000,
+    token: 'must-not-forward',
+  };
+  const forwarded = {
+    relayBaseUrl: synthetic.relayBaseUrl,
+    phoneBaseUrl: synthetic.phoneBaseUrl,
+    relayTimeoutMs: synthetic.relayTimeoutMs,
+    pollIntervalMs: synthetic.pollIntervalMs,
+  };
+
+  assert.deepEqual(Object.keys(forwarded).sort(), [
+    'phoneBaseUrl',
+    'pollIntervalMs',
+    'relayBaseUrl',
+    'relayTimeoutMs',
+  ]);
+  assert.match(forwarded.relayBaseUrl, /\.invalid$/);
+  assert.match(forwarded.phoneBaseUrl, /\.invalid\/pair$/);
+  assert.equal('token' in forwarded, false);
+});
+
 void test('index exposes dedicated M3 status and numeric nodes', async () => {
   const html = await readFile(indexUrl, 'utf8');
 
