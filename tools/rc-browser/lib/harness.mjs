@@ -44,6 +44,17 @@ function attachPageEvents(page, events) {
       failure: sanitizeTextForEvidence(request.failure()?.errorText ?? 'request failed'),
     });
   });
+
+  page.on('response', (response) => {
+    if (response.status() < 400) return;
+    const request = response.request();
+    events.httpErrors.push({
+      status: response.status(),
+      method: request.method(),
+      resourceType: request.resourceType(),
+      url: sanitizeUrlForEvidence(response.url()),
+    });
+  });
 }
 
 export async function installBrowserHarness(context, options = {}) {
@@ -51,6 +62,7 @@ export async function installBrowserHarness(context, options = {}) {
     console: [],
     pageErrors: [],
     requestFailures: [],
+    httpErrors: [],
     leakageEvents: [],
   };
 
@@ -100,7 +112,7 @@ export function assertNoUnexplainedConsoleErrors(events, { allow = [] } = {}) {
   });
 
   if (unexpected.length > 0) {
-    throw new Error(`Unexpected browser console errors: ${JSON.stringify(unexpected)}`);
+    throw new Error(`Unexpected browser console errors: ${JSON.stringify(unexpected)}; HTTP errors: ${JSON.stringify(events.httpErrors)}`);
   }
 }
 
