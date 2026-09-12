@@ -4,16 +4,7 @@ on:
   push:
     branches:
       - verification/v1-rc-browser
-  pull_request:
-    branches:
-      - verification/v1-rc-browser
-    types:
-      - opened
-      - synchronize
-      - reopened
-    paths:
-      - 'tools/rc-browser/specs/pack-*.spec.mjs'
-      - 'tools/rc-browser/fixtures/pack-*.mjs'
+      - 'verification/rc-browser-qualify/**'
 
 permissions:
   contents: read
@@ -26,95 +17,106 @@ jobs:
       RC_BROWSER_H0_SHA: 61cb2198fee982ae3b3a61398dc120738d3405b4
       RC_PRODUCTION_SHA: 409e416c88f0bd12666302fdaab533a626421a29
     steps:
-      - name: Resolve exact qualification head
+      - name: Checkout trusted trigger revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Resolve exact qualification target
         id: meta
         shell: bash
         env:
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          PUSH_SHA: ${{ github.sha }}
-          PUSH_REF: ${{ github.ref_name }}
+          TRIGGER_SHA: ${{ github.sha }}
+          TRIGGER_REF: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            if [[ "${PR_HEAD_REPO}" != "${GITHUB_REPOSITORY}" ]]; then
-              echo "RC browser qualification refuses non-repository PR heads."
+          mode=''
+          slug=''
+          worker_ref=''
+          spec=''
+          fixture=''
+          sha=''
+
+          case "${TRIGGER_REF}" in
+            verification/v1-rc-browser)
+              mode='integration'
+              slug='integration'
+              sha="${TRIGGER_SHA}"
+              ;;
+            verification/rc-browser-qualify/provider)
+              mode='worker'
+              slug='provider'
+              worker_ref='verification/rc-browser-provider'
+              spec='tools/rc-browser/specs/pack-a-provider.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-a-provider.mjs'
+              ;;
+            verification/rc-browser-qualify/live)
+              mode='worker'
+              slug='live'
+              worker_ref='verification/rc-browser-live'
+              spec='tools/rc-browser/specs/pack-b-live.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-b-live.mjs'
+              ;;
+            verification/rc-browser-qualify/play-nav)
+              mode='worker'
+              slug='play-nav'
+              worker_ref='verification/rc-browser-play-nav'
+              spec='tools/rc-browser/specs/pack-b-play-nav.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-b-play-nav.mjs'
+              ;;
+            verification/rc-browser-qualify/state)
+              mode='worker'
+              slug='state'
+              worker_ref='verification/rc-browser-state'
+              spec='tools/rc-browser/specs/pack-c-state.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-c-state.mjs'
+              ;;
+            verification/rc-browser-qualify/security-pairing)
+              mode='worker'
+              slug='security-pairing'
+              worker_ref='verification/rc-browser-security-pairing'
+              spec='tools/rc-browser/specs/pack-c-security-pairing.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-c-security-pairing.mjs'
+              ;;
+            *)
+              echo "Unapproved RC browser trigger branch: ${TRIGGER_REF}"
               exit 1
-            fi
-            sha="${PR_HEAD_SHA}"
-            ref="${PR_HEAD_REF}"
-            mode="worker"
-          else
-            sha="${PUSH_SHA}"
-            ref="${PUSH_REF}"
-            mode="integration"
+              ;;
+          esac
+
+          if [[ "${mode}" == 'worker' ]]; then
+            git fetch --no-tags origin "+refs/heads/${worker_ref}:refs/remotes/origin/${worker_ref}"
+            sha="$(git rev-parse "refs/remotes/origin/${worker_ref}")"
           fi
+
           if [[ ! "${sha}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "Invalid qualification SHA: ${sha}"
             exit 1
           fi
-          echo "sha=${sha}" >> "${GITHUB_OUTPUT}"
-          echo "ref=${ref}" >> "${GITHUB_OUTPUT}"
+
           echo "mode=${mode}" >> "${GITHUB_OUTPUT}"
+          echo "slug=${slug}" >> "${GITHUB_OUTPUT}"
+          echo "worker_ref=${worker_ref}" >> "${GITHUB_OUTPUT}"
+          echo "spec=${spec}" >> "${GITHUB_OUTPUT}"
+          echo "fixture=${fixture}" >> "${GITHUB_OUTPUT}"
+          echo "sha=${sha}" >> "${GITHUB_OUTPUT}"
 
-      - name: Checkout exact qualification head
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.meta.outputs.sha }}
-          fetch-depth: 0
+      - name: Checkout exact worker head
+        if: steps.meta.outputs.mode == 'worker'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach "${{ steps.meta.outputs.sha }}"
 
-      - name: Assert exact checkout
+      - name: Assert exact qualification checkout
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${{ steps.meta.outputs.sha }}"
 
-      - name: Resolve worker pack allowlist
-        id: worker
-        if: github.event_name == 'pull_request'
-        shell: bash
-        env:
-          HEAD_REF: ${{ steps.meta.outputs.ref }}
-        run: |
-          set -euo pipefail
-          case "${HEAD_REF}" in
-            verification/rc-browser-provider)
-              slug='provider'
-              spec='tools/rc-browser/specs/pack-a-provider.spec.mjs'
-              fixture='tools/rc-browser/fixtures/pack-a-provider.mjs'
-              ;;
-            verification/rc-browser-live)
-              slug='live'
-              spec='tools/rc-browser/specs/pack-b-live.spec.mjs'
-              fixture='tools/rc-browser/fixtures/pack-b-live.mjs'
-              ;;
-            verification/rc-browser-play-nav)
-              slug='play-nav'
-              spec='tools/rc-browser/specs/pack-b-play-nav.spec.mjs'
-              fixture='tools/rc-browser/fixtures/pack-b-play-nav.mjs'
-              ;;
-            verification/rc-browser-state)
-              slug='state'
-              spec='tools/rc-browser/specs/pack-c-state.spec.mjs'
-              fixture='tools/rc-browser/fixtures/pack-c-state.mjs'
-              ;;
-            verification/rc-browser-security-pairing)
-              slug='security-pairing'
-              spec='tools/rc-browser/specs/pack-c-security-pairing.spec.mjs'
-              fixture='tools/rc-browser/fixtures/pack-c-security-pairing.mjs'
-              ;;
-            *)
-              echo "Unapproved RC browser worker branch: ${HEAD_REF}"
-              exit 1
-              ;;
-          esac
-          echo "slug=${slug}" >> "${GITHUB_OUTPUT}"
-          echo "spec=${spec}" >> "${GITHUB_OUTPUT}"
-          echo "fixture=${fixture}" >> "${GITHUB_OUTPUT}"
-
       - name: Assert immutable H0 worker ancestry and exact scope
-        if: github.event_name == 'pull_request'
+        if: steps.meta.outputs.mode == 'worker'
         shell: bash
         run: |
           set -euo pipefail
@@ -124,7 +126,7 @@ jobs:
           git diff --check "${RC_BROWSER_H0_SHA}...HEAD"
 
           actual="$(git diff --name-only "${RC_BROWSER_H0_SHA}...HEAD" | LC_ALL=C sort)"
-          expected="$(printf '%s\n%s\n' '${{ steps.worker.outputs.spec }}' '${{ steps.worker.outputs.fixture }}' | LC_ALL=C sort)"
+          expected="$(printf '%s\n%s\n' '${{ steps.meta.outputs.spec }}' '${{ steps.meta.outputs.fixture }}' | LC_ALL=C sort)"
           if [[ "${actual}" != "${expected}" ]]; then
             echo 'Unexpected worker diff:'
             printf '%s\n' "${actual}"
@@ -175,19 +177,19 @@ jobs:
           NODE
 
       - name: Run focused worker browser qualification
-        if: github.event_name == 'pull_request'
-        run: npm run rc:browser -- "${{ steps.worker.outputs.spec }}"
+        if: steps.meta.outputs.mode == 'worker'
+        run: npm run rc:browser -- "${{ steps.meta.outputs.spec }}"
 
       - name: Run worker security/privacy audit
-        if: github.event_name == 'pull_request' && steps.worker.outputs.slug == 'security-pairing'
+        if: steps.meta.outputs.mode == 'worker' && steps.meta.outputs.slug == 'security-pairing'
         run: node tools/check-m7-security-privacy.mjs
 
       - name: Run H0 browser smoke
-        if: github.event_name == 'push'
+        if: steps.meta.outputs.mode == 'integration'
         run: npm run rc:browser -- tools/rc-browser/specs/harness-smoke.spec.mjs
 
       - name: Run all integrated browser packs present at exact head
-        if: github.event_name == 'push'
+        if: steps.meta.outputs.mode == 'integration'
         shell: bash
         run: |
           set -euo pipefail
@@ -198,7 +200,7 @@ jobs:
           done
 
       - name: Run integrated security/privacy audit when security pack is present
-        if: github.event_name == 'push'
+        if: steps.meta.outputs.mode == 'integration'
         shell: bash
         run: |
           set -euo pipefail
@@ -207,7 +209,7 @@ jobs:
           fi
 
       - name: Assert canonical qualification scope
-        if: github.event_name == 'push'
+        if: steps.meta.outputs.mode == 'integration'
         shell: bash
         run: |
           set -euo pipefail
@@ -230,16 +232,16 @@ jobs:
         run: git diff --exit-code
 
       - name: Upload exact-head worker evidence
-        if: always() && github.event_name == 'pull_request'
+        if: always() && steps.meta.outputs.mode == 'worker'
         uses: actions/upload-artifact@v4
         with:
-          name: rc-browser-${{ steps.worker.outputs.slug }}-${{ steps.meta.outputs.sha }}
+          name: rc-browser-${{ steps.meta.outputs.slug }}-${{ steps.meta.outputs.sha }}
           path: rc-browser-artifacts/
           if-no-files-found: warn
           retention-days: 14
 
       - name: Upload exact-head integration evidence
-        if: always() && github.event_name == 'push'
+        if: always() && steps.meta.outputs.mode == 'integration'
         uses: actions/upload-artifact@v4
         with:
           name: rc-browser-integration-${{ steps.meta.outputs.sha }}
