@@ -825,3 +825,56 @@ void test('M7 MIG partial provider partitions keep durable state while rebuildab
   assert.equal(await reopenedFavorites.has('provider-a', 'shared'), true);
   assert.equal((await reopenedWatch.getLastWatched('provider-a'))?.channelId, 'shared');
 });
+
+void test('M7 MIG activeProviderId corruption degrades locally without mutating provider or user-state partitions', async () => {
+  const store = new MemoryStructuredStore();
+  const providers = new StructuredProviderRepository(store);
+  const catalog = new StructuredCatalogRepository(store);
+  const epg = new StructuredEpgProgramRepository(store);
+  const favorites = new StructuredFavoriteRepository(store);
+  const watch = new StructuredWatchStateRepository(store);
+
+  await providers.saveProvider(provider('provider-a', 'A valid'));
+  await providers.saveProvider(provider('provider-b', 'B valid'));
+  await catalog.replaceCategories('provider-a', [category('provider-a')]);
+  await catalog.replaceCategories('provider-b', [category('provider-b')]);
+  await catalog.replaceChannels('provider-a', [channel('provider-a', 'shared', 'A valid')]);
+  await catalog.replaceChannels('provider-b', [channel('provider-b', 'shared', 'B valid')]);
+  await epg.replaceWindow('provider-a', WINDOW, [program('shared', 'A valid')]);
+  await epg.replaceWindow('provider-b', WINDOW, [program('shared', 'B valid')]);
+  await seedDurableUserState(store, 'provider-a');
+  await seedDurableUserState(store, 'provider-b');
+
+  await providers.setActiveProviderId('provider-a');
+  assert.equal(await providers.getActiveProviderId(), 'provider-a');
+
+  await providers.setActiveProviderId(null);
+  assert.equal(await providers.getActiveProviderId(), null);
+
+  await store.delete('app_state', 'activeProviderId');
+  assert.equal(await providers.getActiveProviderId(), null);
+
+  const corruptStates: readonly unknown[] = [
+    { key: 'activeProviderId' },
+    { key: 'activeProviderId', value: { providerId: 'provider-a' } },
+    { key: 'activeProviderId', value: ['provider-a'] },
+    { key: 'activeProviderId', value: 42 },
+    { key: 'activeProviderId', value: { key: 'provider-a', value: 'provider-a' } },
+  ];
+
+  for (const state of corruptStates) {
+    await store.put('app_state', state as never);
+    assert.equal(await providers.getActiveProviderId(), null);
+  }
+
+  assert.equal((await providers.getProvider('provider-a'))?.name, 'A valid');
+  assert.equal((await providers.getProvider('provider-b'))?.name, 'B valid');
+  assert.deepEqual(await catalog.listChannels('provider-a'), [channel('provider-a', 'shared', 'A valid')]);
+  assert.deepEqual(await catalog.listChannels('provider-b'), [channel('provider-b', 'shared', 'B valid')]);
+  assert.deepEqual(await epg.listPrograms('provider-a', 'shared', WINDOW), [program('shared', 'A valid')]);
+  assert.deepEqual(await epg.listPrograms('provider-b', 'shared', WINDOW), [program('shared', 'B valid')]);
+  assert.equal(await favorites.has('provider-a', 'shared'), true);
+  assert.equal(await favorites.has('provider-b', 'shared'), true);
+  assert.equal((await watch.getLastWatched('provider-a'))?.channelId, 'shared');
+  assert.equal((await watch.getLastWatched('provider-b'))?.channelId, 'shared');
+});
