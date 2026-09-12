@@ -4,6 +4,16 @@ on:
   push:
     branches:
       - verification/v1-rc-browser
+  pull_request:
+    branches:
+      - verification/v1-rc-browser
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths:
+      - 'tools/rc-browser/specs/pack-*.spec.mjs'
+      - 'tools/rc-browser/fixtures/pack-*.mjs'
 
 permissions:
   contents: read
@@ -11,16 +21,122 @@ permissions:
 jobs:
   browser-qualification:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
+    env:
+      RC_BROWSER_H0_SHA: 61cb2198fee982ae3b3a61398dc120738d3405b4
+      RC_PRODUCTION_SHA: 409e416c88f0bd12666302fdaab533a626421a29
     steps:
-      - name: Checkout exact branch head
+      - name: Resolve exact qualification head
+        id: meta
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PUSH_SHA: ${{ github.sha }}
+          PUSH_REF: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            if [[ "${PR_HEAD_REPO}" != "${GITHUB_REPOSITORY}" ]]; then
+              echo "RC browser qualification refuses non-repository PR heads."
+              exit 1
+            fi
+            sha="${PR_HEAD_SHA}"
+            ref="${PR_HEAD_REF}"
+            mode="worker"
+          else
+            sha="${PUSH_SHA}"
+            ref="${PUSH_REF}"
+            mode="integration"
+          fi
+          if [[ ! "${sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid qualification SHA: ${sha}"
+            exit 1
+          fi
+          echo "sha=${sha}" >> "${GITHUB_OUTPUT}"
+          echo "ref=${ref}" >> "${GITHUB_OUTPUT}"
+          echo "mode=${mode}" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout exact qualification head
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ steps.meta.outputs.sha }}
           fetch-depth: 0
 
       - name: Assert exact checkout
-        run: test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.meta.outputs.sha }}"
+
+      - name: Resolve worker pack allowlist
+        id: worker
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          HEAD_REF: ${{ steps.meta.outputs.ref }}
+        run: |
+          set -euo pipefail
+          case "${HEAD_REF}" in
+            verification/rc-browser-provider)
+              slug='provider'
+              spec='tools/rc-browser/specs/pack-a-provider.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-a-provider.mjs'
+              ;;
+            verification/rc-browser-live)
+              slug='live'
+              spec='tools/rc-browser/specs/pack-b-live.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-b-live.mjs'
+              ;;
+            verification/rc-browser-play-nav)
+              slug='play-nav'
+              spec='tools/rc-browser/specs/pack-b-play-nav.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-b-play-nav.mjs'
+              ;;
+            verification/rc-browser-state)
+              slug='state'
+              spec='tools/rc-browser/specs/pack-c-state.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-c-state.mjs'
+              ;;
+            verification/rc-browser-security-pairing)
+              slug='security-pairing'
+              spec='tools/rc-browser/specs/pack-c-security-pairing.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-c-security-pairing.mjs'
+              ;;
+            *)
+              echo "Unapproved RC browser worker branch: ${HEAD_REF}"
+              exit 1
+              ;;
+          esac
+          echo "slug=${slug}" >> "${GITHUB_OUTPUT}"
+          echo "spec=${spec}" >> "${GITHUB_OUTPUT}"
+          echo "fixture=${fixture}" >> "${GITHUB_OUTPUT}"
+
+      - name: Assert immutable H0 worker ancestry and exact scope
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${RC_BROWSER_H0_SHA}^{commit}"
+          merge_base="$(git merge-base "${RC_BROWSER_H0_SHA}" HEAD)"
+          test "${merge_base}" = "${RC_BROWSER_H0_SHA}"
+          git diff --check "${RC_BROWSER_H0_SHA}...HEAD"
+
+          actual="$(git diff --name-only "${RC_BROWSER_H0_SHA}...HEAD" | LC_ALL=C sort)"
+          expected="$(printf '%s\n%s\n' '${{ steps.worker.outputs.spec }}' '${{ steps.worker.outputs.fixture }}' | LC_ALL=C sort)"
+          if [[ "${actual}" != "${expected}" ]]; then
+            echo 'Unexpected worker diff:'
+            printf '%s\n' "${actual}"
+            echo 'Expected exactly:'
+            printf '%s\n' "${expected}"
+            exit 1
+          fi
+
+          if printf '%s\n' "${actual}" | grep -q '^player/src/'; then
+            echo 'Forbidden player/src change detected.'
+            exit 1
+          fi
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -43,13 +159,11 @@ jobs:
       - name: Run repository tests
         run: npm test
 
-      - name: Run H0 browser smoke
-        run: npm run rc:browser -- tools/rc-browser/specs/harness-smoke.spec.mjs
-
       - name: Typecheck
         run: npm run typecheck
 
       - name: Assert exact Playwright dependency
+        shell: bash
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
@@ -60,37 +174,75 @@ jobs:
           if (lock.packages?.['node_modules/@playwright/test']?.version !== '1.63.0') process.exit(1);
           NODE
 
-      - name: Diff check against frozen production base
-        run: git diff --check 409e416c88f0bd12666302fdaab533a626421a29...HEAD
+      - name: Run focused worker browser qualification
+        if: github.event_name == 'pull_request'
+        run: npm run rc:browser -- "${{ steps.worker.outputs.spec }}"
 
-      - name: Assert production source untouched
+      - name: Run worker security/privacy audit
+        if: github.event_name == 'pull_request' && steps.worker.outputs.slug == 'security-pairing'
+        run: node tools/check-m7-security-privacy.mjs
+
+      - name: Run H0 browser smoke
+        if: github.event_name == 'push'
+        run: npm run rc:browser -- tools/rc-browser/specs/harness-smoke.spec.mjs
+
+      - name: Run all integrated browser packs present at exact head
+        if: github.event_name == 'push'
+        shell: bash
         run: |
-          if git diff --name-only 409e416c88f0bd12666302fdaab533a626421a29...HEAD | grep -q '^player/src/'; then
+          set -euo pipefail
+          mapfile -t packs < <(find tools/rc-browser/specs -maxdepth 1 -type f -name 'pack-*.spec.mjs' | LC_ALL=C sort)
+          for spec in "${packs[@]}"; do
+            echo "Running integrated browser pack: ${spec}"
+            npm run rc:browser -- "${spec}"
+          done
+
+      - name: Run integrated security/privacy audit when security pack is present
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f tools/rc-browser/specs/pack-c-security-pairing.spec.mjs ]]; then
+            node tools/check-m7-security-privacy.mjs
+          fi
+
+      - name: Assert canonical qualification scope
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check "${RC_PRODUCTION_SHA}...HEAD"
+          changed="$(git diff --name-only "${RC_PRODUCTION_SHA}...HEAD")"
+          if printf '%s\n' "${changed}" | grep -q '^player/src/'; then
             echo 'Forbidden player/src change detected.'
             exit 1
           fi
 
-      - name: Assert H0-only scope before worker integration
-        run: |
-          if find tools/rc-browser/specs -maxdepth 1 -name 'pack-*.spec.mjs' -print -quit | grep -q .; then
-            echo 'Worker specs present; H0-only scope assertion is no longer applicable.'
-            exit 0
-          fi
-          allowed='^(package\.json|package-lock\.json|\.gitignore|\.github/workflows/rc-browser\.yml|tools/rc-browser/playwright\.config\.mjs|tools/rc-browser/lib/harness\.mjs|tools/rc-browser/lib/widgetdata-stub\.mjs|tools/rc-browser/lib/provider-mocks\.mjs|tools/rc-browser/lib/evidence\.mjs|tools/rc-browser/fixtures/common\.mjs|tools/rc-browser/specs/harness-smoke\.spec\.mjs)$'
-          unexpected="$(git diff --name-only 409e416c88f0bd12666302fdaab533a626421a29...HEAD | grep -Ev "$allowed" || true)"
-          if [ -n "$unexpected" ]; then
-            echo 'Unexpected H0 paths:'
-            echo "$unexpected"
+          allowed='^(package\.json|package-lock\.json|\.gitignore|\.github/workflows/rc-browser\.yml|tools/rc-browser/playwright\.config\.mjs|tools/rc-browser/lib/harness\.mjs|tools/rc-browser/lib/widgetdata-stub\.mjs|tools/rc-browser/lib/provider-mocks\.mjs|tools/rc-browser/lib/evidence\.mjs|tools/rc-browser/fixtures/common\.mjs|tools/rc-browser/specs/harness-smoke\.spec\.mjs|tools/rc-browser/specs/pack-[^/]+\.spec\.mjs|tools/rc-browser/fixtures/pack-[^/]+\.mjs|docs/verification/rc-browser-execution\.md)$'
+          unexpected="$(printf '%s\n' "${changed}" | grep -Ev "${allowed}" || true)"
+          if [[ -n "${unexpected}" ]]; then
+            echo 'Unexpected canonical qualification paths:'
+            printf '%s\n' "${unexpected}"
             exit 1
           fi
 
       - name: Ensure verification did not modify tracked files
         run: git diff --exit-code
 
-      - name: Upload sanitized H0 evidence
+      - name: Upload exact-head worker evidence
+        if: always() && github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: rc-browser-h0-evidence-${{ github.sha }}
+          name: rc-browser-${{ steps.worker.outputs.slug }}-${{ steps.meta.outputs.sha }}
           path: rc-browser-artifacts/
-          if-no-files-found: error
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload exact-head integration evidence
+        if: always() && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc-browser-integration-${{ steps.meta.outputs.sha }}
+          path: rc-browser-artifacts/
+          if-no-files-found: warn
           retention-days: 14
