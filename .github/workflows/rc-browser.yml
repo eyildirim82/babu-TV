@@ -40,6 +40,9 @@ jobs:
       - name: Build production player
         run: npm run build
 
+      - name: Run repository tests
+        run: npm test
+
       - name: Run H0 browser smoke
         run: npm run rc:browser -- tools/rc-browser/specs/harness-smoke.spec.mjs
 
