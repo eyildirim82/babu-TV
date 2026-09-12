@@ -229,7 +229,7 @@ function render() {
 
   let mainHtml = '';
   mainHtml += '<div class="page-title">';
-  mainHtml += '<button class="back-btn" id="btn-back">\u2039</button>';
+  mainHtml += '<button class="back-btn" id="btn-back" title="' + UI_COPY.cancel + '">\u2039</button>';
   mainHtml += UI_COPY.settings;
   mainHtml += '</div>';
 
