@@ -5,6 +5,8 @@ import { installProviderMocks } from './provider-mocks.mjs';
 import { installWidgetDataStub } from './widgetdata-stub.mjs';
 
 const WEBAPIS_SCRIPT = /\/(?:%24|\$)WEBAPIS\/webapis\/webapis\.js(?:\?.*)?$/i;
+const PREVIEW_PUBLIC_ASSET = /^http:\/\/127\.0\.0\.1:4173\/(?:brand\/[^?#]+|favicon\.png)(?:[?#].*)?$/i;
+const PREVIEW_BASE_PATH = '/babustv';
 const REMOTE_KEYS = Object.freeze({
   UP: 'ArrowUp',
   DOWN: 'ArrowDown',
@@ -57,6 +59,14 @@ function attachPageEvents(page, events) {
   });
 }
 
+async function installPreviewPublicAssetNormalization(context) {
+  await context.route(PREVIEW_PUBLIC_ASSET, async (route) => {
+    const requestUrl = new URL(route.request().url());
+    requestUrl.pathname = `${PREVIEW_BASE_PATH}${requestUrl.pathname}`;
+    await route.continue({ url: requestUrl.toString() });
+  });
+}
+
 export async function installBrowserHarness(context, options = {}) {
   const events = {
     console: [],
@@ -73,6 +83,7 @@ export async function installBrowserHarness(context, options = {}) {
       body: '/* RC browser: native Samsung webapis shim intentionally empty. */',
     });
   });
+  await installPreviewPublicAssetNormalization(context);
 
   const widgetData = await installWidgetDataStub(context, options.widgetData ?? {});
   const providerMocks = await installProviderMocks(context, options.providerMocks ?? {});
