@@ -1,5 +1,7 @@
 # BabuşTV V1 RC Readiness Board
 
+> **M7 CURRENT-TRUTH OVERLAY — 2026-09-12:** The historical RC-F0 / Wave 1 status below is retained as evidence but is no longer the current execution state. Wave 3C is CLOSED; `PAIR-I-WIRE` merged through PR #87; production `main` is exactly `0cdc1ed240707b389d202d48efeaaf5822fe2316`; post-merge verify `34685628558` is SUCCESS. Repository-complete RC implementation work is now **M7 Hardening**. The authoritative current M7 board is `docs/verification/m7-hardening-execution.md`. Six M7 workers (`PERF`, `FAIL`, `MIG`, `NAV`, `PLAY`, `SEC`) are `READY / PLAN-BACKED` from the exact frozen production base. Physical Samsung/Tizen evidence remains `PENDING` / `DEFERRED`; deterministic browser/build/test evidence is not physical PASS.
+
 **Date:** 2026-09-10  
 **Owner:** REVIEW / Integration Controller  
 **Status:** RC ROADMAP ACTIVE — RC-F0 CLOSED GREEN; 13 WAVE 1 CORE ROLES PLAN-BACKED AND OPEN  
