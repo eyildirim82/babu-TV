@@ -9,36 +9,53 @@ permissions:
   contents: write
 
 jobs:
-  task4-typecheck-fix:
-    if: "${{ github.event.head_commit.message == 'chore(pairing): stage Task 4 typecheck fix' }}"
+  task5-green:
+    if: "${{ github.event.head_commit.message == 'chore(pairing): stage Task 5 GREEN edit' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - name: Narrow pairing callback fixtures
+      - name: Apply Task 5 browser pairing wiring
         run: |
           python - <<'PY'
           from pathlib import Path
-          path = Path('player/test-ts/m5-app-composition.test.ts')
+
+          path = Path('player/src/app/browser-app-dependencies.ts')
           text = path.read_text()
-          callback_type = "{ onBack(): void; onCompleted(providerId: string): void }"
-          old_completed = "requireBound(pairingCallbacks, 'pairing callbacks').onCompleted('paired-provider');"
-          new_completed = f"requireBound<{callback_type}>(pairingCallbacks, 'pairing callbacks').onCompleted('paired-provider');"
-          old_back = "requireBound(pairingCallbacks, 'pairing callbacks').onBack();"
-          new_back = f"requireBound<{callback_type}>(pairingCallbacks, 'pairing callbacks').onBack();"
-          if text.count(old_completed) != 1 or text.count(old_back) != 1:
-              raise SystemExit('unexpected pairing callback fixture shape')
-          text = text.replace(old_completed, new_completed, 1).replace(old_back, new_back, 1)
+
+          def replace_once(old, new):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected exactly one match, got {count}: {old[:100]!r}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+          """import type { WidgetDataLike } from '../credentials/samsung-widgetdata-credential-store.js';\n\nimport '../ui/home.css';""",
+          """import type { WidgetDataLike } from '../credentials/samsung-widgetdata-credential-store.js';\nimport QRCode from 'qrcode';\nimport { FetchPairingRelayTransport } from '../pairing/browser-relay-transport.js';\nimport { createTvPairingCore } from '../pairing/create-tv-pairing-core.js';\nimport { PairingTvView } from '../pairing/tv-view.js';\n\nimport '../ui/home.css';""")
+
+          replace_once(
+          """import '../ui/provider-management.css';\nimport '../ui/xtream-entry.css';""",
+          """import '../ui/provider-management.css';\nimport '../ui/xtream-entry.css';\nimport '../ui/pairing-tv.css';""")
+
+          replace_once(
+          """  legacy: AppCompositionDependencies['legacy'];\n  exitApp(): void;\n  nowMs?: () => number;""",
+          """  legacy: AppCompositionDependencies['legacy'];\n  exitApp(): void;\n  pairing?: {\n    relayBaseUrl: string;\n    phoneBaseUrl: string;\n    relayTimeoutMs: number;\n    pollIntervalMs: number;\n  };\n  nowMs?: () => number;""")
+
+          replace_once(
+          """    reentry: {\n      reenter: (input) => providerReentry.reenter(input),\n    },""",
+          """    pairing: input.pairing ? {\n      view: (callbacks) => {\n        const transport = new FetchPairingRelayTransport(input.fetchImpl);\n        const pairingCore = createTvPairingCore({\n          transport,\n          relayBaseUrl: input.pairing.relayBaseUrl,\n          relayTimeoutMs: input.pairing.relayTimeoutMs,\n          onboarding: {\n            connectXtream: (entry) => xtreamOnboarding.connect(entry),\n            connectM3u: (entry) => m3uOnboarding.connect(entry),\n          },\n        });\n        const qr = {\n          toDataUrl: (value: string) => QRCode.toDataURL(\n            value,\n            {\n              errorCorrectionLevel: 'M',\n              margin: 2,\n              width: 360,\n            },\n          ),\n        };\n        return new PairingTvView(\n          input.document,\n          pairingCore,\n          callbacks,\n          {\n            phoneBaseUrl: input.pairing.phoneBaseUrl,\n            pollIntervalMs: input.pairing.pollIntervalMs,\n          },\n          qr,\n        );\n      },\n    } : undefined,\n    reentry: {\n      reenter: (input) => providerReentry.reenter(input),\n    },""")
+
           path.write_text(text)
           PY
-      - name: Commit Task 4 fixture fix
+      - name: Commit Task 5 GREEN
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add player/test-ts/m5-app-composition.test.ts
+          git add player/src/app/browser-app-dependencies.ts
           git diff --cached --check
-          git commit -m "test(app): narrow pairing callback fixtures"
+          git commit -m "feat(app): wire secure TV pairing dependencies"
           git push origin HEAD:integration/pairing-onboarding
 
 # temporary execution workflow; removed before final production head
