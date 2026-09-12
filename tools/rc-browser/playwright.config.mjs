@@ -30,6 +30,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run preview -w player -- --host 127.0.0.1',
+    cwd: process.cwd(),
     url: 'http://127.0.0.1:4173/babustv/',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
