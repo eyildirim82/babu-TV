@@ -376,6 +376,7 @@ async function init() {
     }
   });
 
+  const pairingConfig = window.BABUSTV_PAIRING_CONFIG ?? null;
   const appComposition = createAppComposition(createBrowserAppDependencies({
     indexedDb: window.indexedDB || null,
     widgetData: window.webapis && window.webapis.widgetdata
@@ -386,6 +387,14 @@ async function init() {
     document,
     legacyPlayer,
     legacyAvplay,
+    pairing: pairingConfig && typeof pairingConfig === 'object'
+      ? {
+          relayBaseUrl: pairingConfig.relayBaseUrl,
+          phoneBaseUrl: pairingConfig.phoneBaseUrl,
+          relayTimeoutMs: pairingConfig.relayTimeoutMs,
+          pollIntervalMs: pairingConfig.pollIntervalMs,
+        }
+      : undefined,
     setRemoteNumericMode: setAppRemoteNumericMode,
     legacy: {
       hidePlayerShell: () => hidePlayer(),
