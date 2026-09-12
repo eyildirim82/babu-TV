@@ -13,7 +13,9 @@
     "tizen:build": "node tizen/stage.mjs",
     "tizen:package": "node tizen/wgt.mjs",
     "tizen:emu": "npm run tizen:build && npm run tizen:package && node tizen/deploy.mjs",
-    "tizen:log": "node tizen/dlog.mjs"
+    "tizen:log": "node tizen/dlog.mjs",
+    "rc:browser": "playwright test -c tools/rc-browser/playwright.config.mjs",
+    "rc:browser:list": "playwright test -c tools/rc-browser/playwright.config.mjs --list"
   },
   "workspaces": [
     "player",
@@ -27,5 +29,8 @@
     "player"
   ],
   "author": "BabuşTV",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
 }
