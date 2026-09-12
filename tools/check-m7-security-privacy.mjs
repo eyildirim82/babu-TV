@@ -58,6 +58,14 @@ if (storesWholeSettings && acceptsPlaylistUrl) {
   addViolation('ordinary-localstorage-credential-url-source', 'player/src/settings.js');
 }
 
+// The approved logging contract requires fragments to be discarded after a URL
+// parses successfully. This narrow check maps directly to the deterministic SEC
+// reproducer and does not inspect or print fragment contents.
+const loggingSanitizer = read('player/src/logging/sanitize.ts');
+if (!/\burl\.hash\s*=\s*['"]['"]\s*;/.test(loggingSanitizer)) {
+  addViolation('url-fragment-not-stripped', 'player/src/logging/sanitize.ts');
+}
+
 // Console output is forbidden in credential/provider/pairing production
 // boundaries. The diagnostic reports only file/category, never matched text.
 for (const path of walk('player/src')) {
