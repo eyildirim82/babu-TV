@@ -8,6 +8,20 @@ interface ActiveProviderState {
   value: ProviderId | null;
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isProviderRecord(value: unknown): value is ProviderRecord {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.id === 'string'
+    && (candidate.kind === 'xtream' || candidate.kind === 'm3u')
+    && typeof candidate.name === 'string'
+    && isFiniteNumber(candidate.createdAtMs)
+    && (candidate.lastSuccessfulSyncAtMs === null || isFiniteNumber(candidate.lastSuccessfulSyncAtMs));
+}
+
 function copyProvider(provider: ProviderRecord): ProviderRecord {
   return {
     id: provider.id,
@@ -22,12 +36,14 @@ export class StructuredProviderRepository implements ProviderRepository {
   constructor(private readonly store: StructuredStore) {}
 
   async listProviders(): Promise<readonly ProviderRecord[]> {
-    return (await this.store.getAll<ProviderRecord>('providers')).map(copyProvider);
+    return (await this.store.getAll<unknown>('providers'))
+      .filter(isProviderRecord)
+      .map(copyProvider);
   }
 
   async getProvider(providerId: ProviderId): Promise<ProviderRecord | null> {
-    const provider = await this.store.get<ProviderRecord>('providers', providerId);
-    return provider === null ? null : copyProvider(provider);
+    const provider = await this.store.get<unknown>('providers', providerId);
+    return isProviderRecord(provider) ? copyProvider(provider) : null;
   }
 
   async saveProvider(provider: ProviderRecord): Promise<void> {
