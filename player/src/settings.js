@@ -179,7 +179,8 @@ export function selectFocused() {
   if (el.tagName === 'INPUT') {
     // On TV the remote layer intercepts Enter/OK and routes it here, so the
     // desktop-only keydown Enter handlers never run. Make OK inside a text
-    // field act like pressing Enter on a desktop form.
+    // field act like pressing Enter on a desktop form. Legacy M3U fields and
+    // their UI_COPY.cancel controls are no longer part of this screen.
     if (el.id === 'settings-proxy-url') {
       handleProxySave();
     } else {
