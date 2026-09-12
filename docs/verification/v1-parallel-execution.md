@@ -1,5 +1,7 @@
 # BabuşTV V1 Parallel Execution Board
 
+> **M7 CURRENT-TRUTH OVERLAY — 2026-09-12:** The Wave 1–6 status tables and “Current action” below are retained as historical execution evidence and are superseded as live state. Wave 3C is CLOSED; `PAIR-I-WIRE` merged through PR #87; production `main` is exactly `0cdc1ed240707b389d202d48efeaaf5822fe2316`; verify `34685628558` is SUCCESS. The live execution board is now `docs/verification/m7-hardening-execution.md`. `PERF`, `FAIL`, `MIG`, `NAV`, `PLAY`, and `SEC` are `READY / PLAN-BACKED`, all initially branch from exact `0cdc1ed240707b389d202d48efeaaf5822fe2316`, and may execute concurrently. Preferred controller merge order is `MIG → FAIL → PERF → NAV → PLAY → SEC-FINAL`. Physical-Tizen acceptance remains `PENDING` / `DEFERRED` and cannot be inferred from browser/build evidence.
+
 **Date:** 2026-09-10  
 **Owner:** REVIEW / Integration Controller  
 **Status:** RC-F0 CLOSED GREEN — WAVE 1 BASE FROZEN; 13 CORE ROLES PLAN-BACKED AND OPEN  
