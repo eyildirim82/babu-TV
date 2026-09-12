@@ -18,6 +18,7 @@ export const RC_ENDPOINTS = Object.freeze({
 });
 
 export const RC_SECRET_CANARIES = Object.freeze([
+  RC_SECRETS.xtreamUsername,
   RC_SECRETS.xtreamPassword,
   RC_SECRETS.m3uToken,
   RC_SECRETS.streamToken,
