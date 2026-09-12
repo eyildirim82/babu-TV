@@ -24,7 +24,7 @@ import { ProviderManagementSurface } from './provider-management-surface.js';
 import type { AppCompositionDependencies } from './app-composition.js';
 import type { WidgetDataLike } from '../credentials/samsung-widgetdata-credential-store.js';
 import QRCode from 'qrcode';
-import { FetchPairingRelayTransport } from '../pairing/browser-relay-transport.js';
+import { FetchPairingRelayTransport } from '../pairing/fetch-relay-transport.js';
 import { PairingRelayClient } from '../pairing/relay-client.js';
 import { createTvPairingCore } from '../pairing/create-tv-pairing-core.js';
 import { PairingTvView } from '../pairing/tv-view.js';
