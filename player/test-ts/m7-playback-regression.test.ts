@@ -201,6 +201,40 @@ void test('M7 PLAY rapid zap latest intent wins when A B C resolve or reject out
   assert.equal(events.some((event) => event.type === 'FAILED'), false);
 });
 
+void test('M7 PLAY repeated same provider and channel still obeys last-intent-wins', async () => {
+  const first = deferred<StreamRequest>();
+  const second = deferred<StreamRequest>();
+  let resolution = 0;
+  const resolver: ChannelStreamResolver = {
+    resolve() {
+      resolution += 1;
+      return resolution === 1 ? first.promise : second.promise;
+    },
+  };
+  const session = new RecordingSession(async () => ({ status: 'playing', engine: 'shaka' }));
+  const coordinator = new ChannelIntentCoordinator(resolver, session);
+
+  const older = coordinator.requestChannel({
+    providerId: 'p1',
+    channelId: 'shared',
+    previousChannelId: null,
+  });
+  const newer = coordinator.requestChannel({
+    providerId: 'p1',
+    channelId: 'shared',
+    previousChannelId: null,
+  });
+
+  second.resolve(stream('shared-newer'));
+  assert.equal(await newer, 'playing');
+  first.resolve(stream('shared-older'));
+  assert.equal(await older, 'stale');
+
+  assert.equal(session.requests.length, 1);
+  assert.equal(session.requests[0]?.targetChannelId, 'shared');
+  assert.equal(session.requests[0]?.initialRequest.url, 'https://stream.example.test/shared-newer');
+});
+
 void test('M7 PLAY stale playback completion and stale error cannot replace newer valid state', async () => {
   const firstEntered = deferred<void>();
   const firstResult = deferred<SessionSwitchResult>();
@@ -272,6 +306,41 @@ void test('M7 PLAY target failure performs one bounded rollback and restores pre
   assert.deepEqual(avplay.opened, ['https://stream.example.test/b']);
 });
 
+void test('M7 PLAY rollback failure is bounded and reports failed without oscillation', async () => {
+  const shaka = new QueueEngine('shaka', [
+    { ok: true, engine: 'shaka', error: null },
+    { ok: false, engine: null, error: 'ENGINE_FAILURE' },
+    { ok: false, engine: null, error: 'ENGINE_FAILURE' },
+  ]);
+  const avplay = new QueueEngine('avplay', [
+    { ok: false, engine: null, error: 'ENGINE_FAILURE' },
+    { ok: false, engine: null, error: 'ENGINE_FAILURE' },
+  ]);
+  const session = new PlayerSessionCoordinator(shaka, avplay, { sleep: async () => {} });
+
+  await session.switchTo(sessionRequest({ intentId: 1, providerId: 'p1', target: 'a' }));
+  assert.deepEqual(await session.switchTo(sessionRequest({
+    intentId: 2,
+    providerId: 'p1',
+    target: 'b',
+    previous: 'a',
+  })), {
+    status: 'failed',
+    error: 'ENGINE_FAILURE',
+    rollback: 'failed',
+  });
+
+  assert.deepEqual(shaka.opened, [
+    'https://stream.example.test/a',
+    'https://stream.example.test/b',
+    'https://stream.example.test/a',
+  ]);
+  assert.deepEqual(avplay.opened, [
+    'https://stream.example.test/b',
+    'https://stream.example.test/a',
+  ]);
+});
+
 void test('M7 PLAY stale rollback is inert after a newer C intent owns the session', async () => {
   const previous = deferred<StreamRequest>();
   const recovering = deferred<void>();
@@ -312,7 +381,7 @@ void test('M7 PLAY stale rollback is inert after a newer C intent owns the sessi
   ]);
 });
 
-void test('M7 PLAY cross-provider resolution failure preserves active A watch ownership', async () => {
+void test('M7 PLAY cross-provider resolution failure preserves active A watch ownership and sanitizes error', async () => {
   const clock = new FakeClock(1_000);
   const { service, observer } = watchHarness(clock);
   const inner = new PlannedSession(async (request) => {
@@ -320,6 +389,7 @@ void test('M7 PLAY cross-provider resolution failure preserves active A watch ow
     return { status: 'playing', engine: 'shaka' };
   });
   const watched = new WatchObservingPlayerSession(inner, observer);
+  const events: ChannelIntentEvent[] = [];
 
   await watched.switchTo(sessionRequest({ intentId: 1, providerId: 'provider-a', target: 'shared' }));
   inner.calls = 0;
@@ -328,11 +398,15 @@ void test('M7 PLAY cross-provider resolution failure preserves active A watch ow
   const coordinator = new ChannelIntentCoordinator({
     async resolve(providerId, channelId) {
       if (providerId === 'provider-b') {
-        throw new ProviderError('NOT_FOUND', 404, 'synthetic missing target');
+        throw new ProviderError(
+          'NOT_FOUND',
+          404,
+          'synthetic missing target https://user:secret@example.invalid/private',
+        );
       }
       return stream(`${providerId}-${channelId}`);
     },
-  }, watched);
+  }, watched, (event) => events.push(event));
 
   assert.equal(await coordinator.requestChannel({
     providerId: 'provider-b',
@@ -340,6 +414,15 @@ void test('M7 PLAY cross-provider resolution failure preserves active A watch ow
     previousChannelId: null,
   }), 'failed');
   assert.equal(inner.calls, 0);
+
+  const failure = events.find((event) => event.type === 'FAILED');
+  assert.deepEqual(failure, {
+    type: 'FAILED',
+    intent: { id: 1, channelId: 'shared', previousChannelId: null },
+    error: 'STREAM_NOT_FOUND',
+    rollback: 'not-needed',
+  });
+  assert.equal(JSON.stringify(events).includes('secret'), false);
 
   clock.advance(20_000);
   await watched.stop();
@@ -423,6 +506,30 @@ void test('M7 PLAY failed target with rollback never credits target watch and re
   assert.equal(await service.getAggregate('p1', 'b'), null);
 });
 
+void test('M7 PLAY watch ignores short zap and stale completion while crediting current meaningful session', async () => {
+  const clock = new FakeClock(1_000);
+  const { service, observer } = watchHarness(clock);
+
+  observer.playbackStarted({ sessionId: 1, providerId: 'p1', channelId: 'short' });
+  clock.advance(5_000);
+  observer.playbackStarted({ sessionId: 2, providerId: 'p1', channelId: 'current' });
+  clock.advance(35_000);
+
+  observer.playbackFinalized({ sessionId: 1, reason: 'ended' });
+  clock.advance(5_000);
+  observer.finalizeCurrent('stop');
+  await observer.flush();
+
+  assert.equal(await service.getAggregate('p1', 'short'), null);
+  assert.deepEqual(await service.getAggregate('p1', 'current'), {
+    providerId: 'p1',
+    channelId: 'current',
+    meaningfulWatchMs: 40_000,
+    meaningfulOpenCount: 1,
+    lastMeaningfulWatchAtMs: 46_000,
+  });
+});
+
 function provider(id: ProviderId): ProviderRecord {
   return {
     id,
@@ -440,8 +547,18 @@ void test('M7 PLAY provider resolver uses target provider record credential and 
     ['provider-b', provider('provider-b')],
   ]);
   const credentials = new Map<ProviderId, ProviderCredential>([
-    ['provider-a', { kind: 'xtream', serverUrl: 'https://a.invalid', username: 'user-a', password: 'secret-a' }],
-    ['provider-b', { kind: 'xtream', serverUrl: 'https://b.invalid', username: 'user-b', password: 'secret-b' }],
+    ['provider-a', {
+      kind: 'xtream',
+      serverUrl: 'https://a.invalid',
+      username: 'user-a',
+      password: 'secret-a',
+    }],
+    ['provider-b', {
+      kind: 'xtream',
+      serverUrl: 'https://b.invalid',
+      username: 'user-b',
+      password: 'secret-b',
+    }],
   ]);
   const repository: ProviderRepository = {
     async listProviders() { return [...records.values()]; },
@@ -513,7 +630,11 @@ class M7NumericTimers implements NumericZapTimers {
 }
 
 class M7Intent implements ChannelIntentPort {
-  readonly requests: Array<{ providerId: string; channelId: string; previousChannelId: string | null }> = [];
+  readonly requests: Array<{
+    providerId: string;
+    channelId: string;
+    previousChannelId: string | null;
+  }> = [];
 
   async requestChannel(input: {
     providerId: string;
@@ -536,7 +657,7 @@ function channel(id: string, number: number): Channel {
   };
 }
 
-void test('M7 PLAY highlight is inert while explicit Play numeric zap and CH navigation create logical intents', async () => {
+void test('M7 PLAY highlight is inert while explicit Play numeric zap and both CH directions create logical intents', async () => {
   const intent = new M7Intent();
   const timers = new M7NumericTimers();
   const controller = new LiveTvController({
@@ -561,23 +682,33 @@ void test('M7 PLAY highlight is inert while explicit Play numeric zap and CH nav
   });
 
   controller.openChannel('c2');
-  controller.openScope({ kind: 'favorites' });
-  assert.equal(intent.requests.length, 0);
+  assert.equal(intent.requests.length, 0, 'highlight alone must not start playback');
 
-  controller.openChannel('c1');
   await controller.handleInput({ type: 'ACTION', action: 'SELECT' });
-  assert.equal(intent.requests.length, 1);
-  assert.equal(intent.requests[0]?.channelId, 'c1');
-
+  assert.equal(intent.requests.at(-1)?.channelId, 'c2');
   controller.handleIntentEvent({
     type: 'PLAYING',
-    intent: { id: 1, channelId: 'c1', previousChannelId: null },
+    intent: { id: 1, channelId: 'c2', previousChannelId: null },
     engine: 'shaka',
   });
-  await controller.handleInput({ type: 'ACTION', action: 'CHANNEL_DOWN' });
-  assert.equal(intent.requests[intent.requests.length - 1]?.channelId, 'c2');
 
-  await controller.handleInput({ type: 'DIGIT', digit: 3 });
+  await controller.handleInput({ type: 'ACTION', action: 'CHANNEL_DOWN' });
+  assert.equal(intent.requests.at(-1)?.channelId, 'c3', 'CH- must move to next logical channel');
+  controller.handleIntentEvent({
+    type: 'PLAYING',
+    intent: { id: 2, channelId: 'c3', previousChannelId: 'c2' },
+    engine: 'shaka',
+  });
+
+  await controller.handleInput({ type: 'ACTION', action: 'CHANNEL_UP' });
+  assert.equal(intent.requests.at(-1)?.channelId, 'c2', 'CH+ must move to previous logical channel');
+  controller.handleIntentEvent({
+    type: 'PLAYING',
+    intent: { id: 3, channelId: 'c2', previousChannelId: 'c3' },
+    engine: 'shaka',
+  });
+
+  await controller.handleInput({ type: 'DIGIT', digit: 1 });
   timers.fire();
-  assert.equal(intent.requests[intent.requests.length - 1]?.channelId, 'c3');
+  assert.equal(intent.requests.at(-1)?.channelId, 'c1', 'numeric zap must emit logical channel intent');
 });
