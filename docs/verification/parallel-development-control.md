@@ -1,5 +1,7 @@
 # BabuşTV Parallel Development Control
 
+> **M7 CURRENT-TRUTH OVERLAY — 2026-09-12:** The RC-F0 / Wave 1 “current” state below is retained as historical evidence and superseded for live execution. Wave 3C is CLOSED; `PAIR-I-WIRE` merged through PR #87; production `main` is exactly `0cdc1ed240707b389d202d48efeaaf5822fe2316`; post-merge verify `34685628558` is SUCCESS. Repository-complete RC work is now M7 Hardening. The authoritative live board is `docs/verification/m7-hardening-execution.md`, with six workers (`PERF`, `FAIL`, `MIG`, `NAV`, `PLAY`, `SEC`) `READY / PLAN-BACKED` from the exact frozen base. The M7 all-worker forbidden hot zones are `player/src/main.js`, `player/src/app/app-composition.ts`, `player/src/app/browser-app-dependencies.ts`, `player/src/live-tv/create-live-tv-runtime.ts`, and `player/src/live-tv/live-tv-controller.ts`; arbitrary shared-contract widening is also forbidden. A RED requiring one of them must report `INTEGRATION FIX REQUIRED` instead of widening. Physical-Tizen release acceptance remains `PENDING` / `DEFERRED` and deterministic browser/build evidence is not physical PASS.
+
 Date: 2026-09-10  
 Owner: REVIEW / Integration Controller  
 Status: V1 RC ACTIVE — RC-F0 CLOSED GREEN; WAVE 1 BASE FROZEN; 13 CORE ROLES PLAN-BACKED AND OPEN; PHYSICAL-TIZEN RELEASE ACCEPTANCE DEFERRED
