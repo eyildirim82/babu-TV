@@ -61,7 +61,7 @@ export class ProviderManagementSurface {
     this.settingsFocused = false;
   }
 
-  async handleAction(action: ProviderManagementSurfaceAction): Promise<void> {
+  async handleAction(action: ProviderManagementSurfaceAction): Promise<boolean | void> {
     const state = this.presenter.state;
 
     if (state.confirmation !== null) {
@@ -71,7 +71,7 @@ export class ProviderManagementSurface {
         }
         await this.presenter.activateFocused();
         this.render();
-        return;
+        return true;
       }
       if (action === 'up' || action === 'down') {
         this.presenter.moveFocus(action === 'down' ? 'next' : 'previous');
