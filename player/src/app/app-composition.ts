@@ -110,7 +110,7 @@ export interface AppProviderManagementCallbacks extends ProviderManagementSurfac
 export interface AppProviderManagementPort {
   show(): Promise<void>;
   hide(): void;
-  handleAction(action: ProviderManagementSurfaceAction): Promise<void>;
+  handleAction(action: ProviderManagementSurfaceAction): Promise<boolean | void>;
 }
 
 export interface AppProviderReentryPort {
@@ -497,9 +497,13 @@ export class AppComposition {
       case 'home':
         this.deps.exitApp();
         return;
-      case 'provider-management':
-        await this.providerView.handleAction('back');
+      case 'provider-management': {
+        const handled = await this.providerView.handleAction('back');
+        if (handled !== true && this.currentRoute.kind === 'provider-management') {
+          await this.showHome();
+        }
         return;
+      }
       case 'legacy-settings':
         this.deps.legacy.hideSettings();
         await this.showProviderManagement();
