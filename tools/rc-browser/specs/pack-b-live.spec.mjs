@@ -190,7 +190,7 @@ async function assertNoPlayback(page) {
 async function cleanTelemetry(page, harness) {
   expect(harness.events.pageErrors).toEqual([]);
   await assertNoUnexplainedConsoleErrors(harness.events);
-  expect(harness.events.leakage).toEqual([]);
+  expect(harness.events.leakageEvents).toEqual([]);
   expect(await findSecretLeaks(page, RC_SECRET_CANARIES)).toEqual([]);
 }
 
@@ -216,7 +216,7 @@ async function scenario({ id, page, harness, starting, actions, expected, reload
     pageErrors: harness.events.pageErrors,
     requestFailures: harness.events.requestFailures,
     reloadPersistence: reload,
-    leakage: leaks.length === 0 && harness.events.leakage.length === 0 ? 'clean' : 'RED',
+    leakage: leaks.length === 0 && harness.events.leakageEvents.length === 0 ? 'clean' : 'RED',
     artifacts: [],
     status: failure === null ? 'PASS' : 'RED',
   }));
