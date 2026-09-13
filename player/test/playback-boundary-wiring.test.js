@@ -72,3 +72,15 @@ test('M3 Shaka request filter forwards arbitrary transient stream headers', asyn
     /const canon = lower === 'user-agent'[\s\S]*lower === 'referer'[\s\S]*lower === 'origin'[\s\S]*: k;\s*request\.headers\[canon\] = v;/,
   );
 });
+
+test('legacy stop keeps the shared video element and returns its awaited teardown', async () => {
+  const source = await readFile(playerUrl, 'utf8');
+  const stopBody = source.match(/export function stop\(\) \{([\s\S]*?)\n\}/);
+
+  assert.ok(stopBody, 'legacy stop() must remain exported');
+  // A fire-and-forget destroy that also drops the element lets a stale
+  // teardown clear the next Shaka player's media source after it attaches.
+  assert.doesNotMatch(stopBody[1], /destroyPlayer\(\)/);
+  assert.match(stopBody[1], /const teardown = destroyPlayer\(videoElement\)[\s\S]*return teardown;/);
+  assert.match(source, /async function destroyPlayer\(keepElement\) \{[\s\S]*?if \(!keepElement\) \{\s*videoElement = null;\s*\}/);
+});
