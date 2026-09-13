@@ -169,7 +169,15 @@ async function handleXtreamRoute(route, state) {
     return;
   }
   if (action === 'get_live_streams') {
-    if (state.streamGate !== null) await state.streamGate.promise;
+    const gate = state.streamGate;
+    if (gate !== null) {
+      gate.started = true;
+      if (gate.releaseRequested) {
+        state.streamGate = null;
+        gate.release();
+      }
+      await gate.promise;
+    }
     await json(route, state.channels);
     return;
   }
@@ -222,11 +230,14 @@ export function createPackBLiveFixture() {
       if (states[key].streamGate !== null) throw new Error(`Pack B stream refresh already paused for ${key}`);
       let release;
       const promise = new Promise((resolve) => { release = resolve; });
-      states[key].streamGate = { promise };
+      const gate = { promise, release, started: false, releaseRequested: false };
+      states[key].streamGate = gate;
       return () => {
-        const gate = states[key].streamGate;
+        if (states[key].streamGate !== gate) return;
+        gate.releaseRequested = true;
+        if (!gate.started) return;
         states[key].streamGate = null;
-        if (gate !== null) release();
+        release();
       };
     },
 
