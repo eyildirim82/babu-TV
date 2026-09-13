@@ -1,8 +1,48 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { test } from '@playwright/test';
 import {
   RC_ENDPOINTS,
   RC_SECRETS,
   RC_XTREAM_PROFILE,
 } from './common.mjs';
+
+function sanitizeFailureText(value) {
+  let text = String(value ?? 'unknown failure');
+  for (const secret of Object.values(RC_SECRETS)) {
+    if (typeof secret === 'string' && secret.length > 0) {
+      text = text.split(secret).join('[REDACTED]');
+    }
+  }
+  return text
+    .replace(/([?&](?:username|password|token|auth|authorization)=)[^&\s"'<>]+/gi, '$1[REDACTED]')
+    .slice(0, 20_000);
+}
+
+function failureEvidenceName(testInfo) {
+  const slug = testInfo.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'unnamed';
+  return `rc-browser-artifacts/live-failure-${slug}.json`;
+}
+
+test.afterEach(async ({}, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  const error = testInfo.error ?? testInfo.errors?.[0] ?? null;
+  const payload = {
+    kind: 'rc-browser-failure.v1',
+    pack: 'BROW-LIVE',
+    title: testInfo.title,
+    titlePath: testInfo.titlePath,
+    status: testInfo.status,
+    expectedStatus: testInfo.expectedStatus,
+    retry: testInfo.retry,
+    error: sanitizeFailureText(error?.message),
+  };
+  await mkdir('rc-browser-artifacts', { recursive: true });
+  await writeFile(failureEvidenceName(testInfo), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+});
 
 export const PACK_B_CHANNEL_IDS = Object.freeze({
   shared: '500',
