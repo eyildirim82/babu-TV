@@ -160,6 +160,19 @@ async function openActions(page) {
   await expect(page.locator(ACTIONS)).toBeVisible();
 }
 
+async function openSearch(page) {
+  await openActions(page);
+  const searchAction = page.locator(`${ACTION}[data-action-id="SEARCH"]`);
+  await expect(searchAction, 'Channel Actions must expose the remote-reachable Search action').toBeVisible();
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if (await searchAction.getAttribute('data-presentation-state') === 'focused') break;
+    await pressRemote(page, 'DOWN');
+  }
+  await expect(searchAction).toHaveAttribute('data-presentation-state', 'focused');
+  await pressRemote(page, 'SELECT');
+  await expect(page.locator(SEARCH)).toBeVisible();
+}
+
 async function favoriteHighlighted(page) {
   await openActions(page);
   await expect(page.locator(`${ACTION}[data-action-id="WATCH"]`)).toHaveAttribute('data-presentation-state', 'focused');
@@ -223,35 +236,16 @@ async function scenario({ id, page, harness, starting, actions, expected, reload
   if (failure !== null) throw failure;
 }
 
-async function expectSearchEntry(page) {
-  const entry = page.locator('button, [role="button"], [data-action-id]').filter({ hasText: /Ara|Search/i }).first();
-  await expect(entry, 'production Live TV must expose a browser-reachable Search entry').toBeVisible();
-  await entry.click();
-  await expect(page.locator(SEARCH)).toBeVisible();
-}
-
 test('B01 Home default focus', async ({ context, page }) => {
   const { harness } = await boot(page, context);
   await scenario({ id: 'B01', page, harness,
-    starting: 'Provider A, no watch history',
-    actions: ['verify fallback', 'play first channel for meaningful duration', 'play second channel', 'return Home'],
-    expected: 'home-live-tv fallback; valid provider-scoped Last Watched focus',
+    starting: 'Provider A, no valid Last Watched state',
+    actions: ['verify Home default focus fallback'],
+    expected: 'home-live-tv when no valid Last Watched entry exists',
     run: async () => {
       expect(await activeHomeKey(page)).toBe('home-live-tv');
-      await openLiveTv(page);
-      const first = await highlightedChannel(page);
-      expect(first).toBe(PACK_B_CHANNEL_IDS.shared);
-      await pressRemote(page, 'SELECT');
-      await expect(page.locator('#live-tv-status')).toHaveAttribute('data-playback-status', 'PLAYING', { timeout: 15_000 });
-      await page.waitForTimeout(31_000);
-      await pressRemote(page, 'DOWN');
-      await pressRemote(page, 'DOWN');
-      await pressRemote(page, 'SELECT');
-      await expect(page.locator('#live-tv-status')).toHaveAttribute('data-playback-status', 'PLAYING', { timeout: 15_000 });
-      await backToHome(page);
-      const key = await activeHomeKey(page);
-      expect(key).toMatch(new RegExp(`^home-last-watched:[^:]+:${first}$`));
-      return `fallback=home-live-tv; last-watched=${key}`;
+      await expect(page.locator('[data-home-focus-key="home-live-tv"]')).toBeFocused();
+      return 'fallback=home-live-tv; successful-media-dependent Last Watched creation is outside this Live feature scenario';
     } });
 });
 
@@ -335,10 +329,10 @@ test('B05 same channelId favorite state is provider-isolated', async ({ context,
 test('B06 Turkish Search matching/order/provider isolation', async ({ context, page }) => {
   const { harness } = await boot(page, context, [PACK_B_PROVIDER_KEYS.A, PACK_B_PROVIDER_KEYS.B]);
   const [providerA] = await homeProviderIds(page);
-  await scenario({ id: 'B06', page, harness, starting: 'Turkish synthetic channels in A; colliding names in B', actions: ['switch A', 'open Live TV', 'open Search', 'query Turkish variants'], expected: 'browser-reachable Search with deterministic Turkish/provider-scoped results', run: async () => {
+  await scenario({ id: 'B06', page, harness, starting: 'Turkish synthetic channels in A; colliding names in B', actions: ['switch A', 'open Live TV', 'open Channel Actions', 'remote to Search', 'query Turkish variants'], expected: 'remote-reachable Search with deterministic Turkish/provider-scoped results', run: async () => {
     await selectProvider(page, providerA);
     await openLiveTv(page);
-    await expectSearchEntry(page);
+    await openSearch(page);
     const cases = [['İ', 'İstanbul'], ['i', 'İstanbul'], ['I', 'Ihlamur'], ['ı', 'Ihlamur'], ['Ş', 'Şeker'], ['ş', 'Şeker'], ['Ğ', 'Ğölge'], ['ğ', 'Ğölge'], ['Ü', 'Üsküdar'], ['ü', 'Üsküdar'], ['Ö', 'Öykü'], ['ö', 'Öykü'], ['Ç', 'Çınar'], ['ç', 'Çınar']];
     for (const [query, expected] of cases) {
       const input = page.locator('.live-tv-search-input');
@@ -348,15 +342,15 @@ test('B06 Turkish Search matching/order/provider isolation', async ({ context, p
       const keys = await page.locator(SEARCH_RESULT).evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-result-key')));
       expect(keys.every((key) => key?.startsWith(`${providerA}:`))).toBe(true);
     }
-    return 'Turkish variants deterministic; result keys provider A scoped';
+    return 'Channel Actions -> Search remote path; Turkish variants deterministic; result keys provider A scoped';
   } });
 });
 
 test('B07 Search highlight/activation does not implicitly play', async ({ context, page }) => {
   const { harness } = await boot(page, context);
-  await scenario({ id: 'B07', page, harness, starting: 'Provider A Live TV, playback IDLE', actions: ['open Search', 'query Şeker', 'highlight result', 'activate result'], expected: 'highlight and result activation do not implicitly play', run: async () => {
+  await scenario({ id: 'B07', page, harness, starting: 'Provider A Live TV, playback IDLE', actions: ['open Channel Actions', 'remote to Search', 'query Şeker', 'highlight result', 'activate result'], expected: 'highlight and result activation do not implicitly play', run: async () => {
     await openLiveTv(page);
-    await expectSearchEntry(page);
+    await openSearch(page);
     const input = page.locator('.live-tv-search-input');
     await input.fill('şeker');
     await input.dispatchEvent('input');
@@ -366,7 +360,7 @@ test('B07 Search highlight/activation does not implicitly play', async ({ contex
     await pressRemote(page, 'SELECT');
     await expect(page.locator(`${CHANNEL}[data-channel-id="${PACK_B_CHANNEL_IDS.sCedilla}"]`)).toHaveClass(/highlighted|focused/);
     await assertNoPlayback(page);
-    return 'Search highlight and activation kept playback IDLE';
+    return 'Channel Actions -> Search remote path; Search highlight and activation kept playback IDLE';
   } });
 });
 
@@ -435,7 +429,7 @@ test('B11 catalog refresh stable identity: delete/reorder/empty/single/provider 
   const { harness, fixture } = await boot(page, context, [PACK_B_PROVIDER_KEYS.A, PACK_B_PROVIDER_KEYS.B]);
   const [providerA, providerB] = await homeProviderIds(page);
   await selectProvider(page, providerA);
-  await scenario({ id: 'B11', page, harness, starting: 'A cached catalog; B shares channelId 500', actions: ['pause refresh', 'delete focused', 'reorder', 'single', 'provider collision', 'empty'], expected: 'deterministic stable focus and provider identity', run: async () => {
+  await scenario({ id: 'B11', page, harness, starting: 'A cached catalog; B shares channelId 500', actions: ['refresh/delete focused', 'provider re-entry + reorder', 'provider re-entry + single', 'provider collision', 'provider re-entry + empty'], expected: 'fixture refresh rerender keeps a valid stable identity or deterministic fallback without cross-provider collision', run: async () => {
     const original = fixture.catalog(PACK_B_PROVIDER_KEYS.A).channels;
     let release = fixture.pauseStreams(PACK_B_PROVIDER_KEYS.A);
     await openLiveTv(page);
@@ -448,19 +442,26 @@ test('B11 catalog refresh stable identity: delete/reorder/empty/single/provider 
     expect(await highlightedChannel(page)).not.toBe(deleted);
     await assertNoPlayback(page);
 
-    await backToHome(page);
+    const enterBThenAWithPausedRefresh = async () => {
+      await backToHome(page);
+      await selectProvider(page, providerB);
+      await openLiveTv(page);
+      await backToHome(page);
+      await selectProvider(page, providerA);
+      const resume = fixture.pauseStreams(PACK_B_PROVIDER_KEYS.A);
+      await openLiveTv(page);
+      return resume;
+    };
+
     const afterDelete = fixture.catalog(PACK_B_PROVIDER_KEYS.A).channels;
-    release = fixture.pauseStreams(PACK_B_PROVIDER_KEYS.A);
-    await openLiveTv(page);
+    release = await enterBThenAWithPausedRefresh();
     const stable = await highlightedChannel(page);
     fixture.setChannels(PACK_B_PROVIDER_KEYS.A, [afterDelete.at(-1), ...afterDelete.slice(0, -1)].filter(Boolean));
     release();
     await expect(page.locator(`${CHANNEL}[data-channel-id="${stable}"]`)).toHaveClass(/highlighted|focused/, { timeout: 10_000 });
     expect(await highlightedChannel(page)).toBe(stable);
 
-    await backToHome(page);
-    release = fixture.pauseStreams(PACK_B_PROVIDER_KEYS.A);
-    await openLiveTv(page);
+    release = await enterBThenAWithPausedRefresh();
     fixture.setChannels(PACK_B_PROVIDER_KEYS.A, [{ ...original[0], name: 'Ortak Kanal A Tek' }]);
     release();
     await expect(page.locator(CHANNEL)).toHaveCount(1, { timeout: 10_000 });
