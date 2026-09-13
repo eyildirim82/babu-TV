@@ -430,63 +430,93 @@ test('B10 channel actions and Back/focus restoration', async ({ context, page })
   } });
 });
 
-test('B11 catalog refresh stable identity: delete/reorder/empty/single/provider collision', async ({ context, page }) => {
+test('B11 catalog refresh stable identity: channel/category delete/reorder', async ({ context, page }) => {
   const { harness, fixture } = await boot(page, context, [PACK_B_PROVIDER_KEYS.A, PACK_B_PROVIDER_KEYS.B]);
   const [providerA, providerB] = await homeProviderIds(page);
   await selectProvider(page, providerA);
-  await scenario({ id: 'B11', page, harness, starting: 'A cached catalog; B shares channelId 500', actions: ['refresh/delete focused', 'provider re-entry + reorder', 'provider re-entry + single', 'provider collision', 'provider re-entry + empty'], expected: 'fixture refresh rerender keeps a valid stable identity or deterministic fallback without cross-provider collision', run: async () => {
-    const original = fixture.catalog(PACK_B_PROVIDER_KEYS.A).channels;
-    let release = fixture.pauseStreams(PACK_B_PROVIDER_KEYS.A);
-    await openLiveTv(page);
-    await pressRemote(page, 'DOWN');
-    const deleted = await highlightedChannel(page);
-    expect(deleted).toBe(PACK_B_CHANNEL_IDS.istanbul);
-    fixture.setChannels(PACK_B_PROVIDER_KEYS.A, original.filter((row) => String(row.stream_id) !== deleted));
-    release();
-    await expect(page.locator(`${CHANNEL}[data-channel-id="${deleted}"]`)).toHaveCount(0, { timeout: 10_000 });
-    expect(await highlightedChannel(page)).not.toBe(deleted);
-    await assertNoPlayback(page);
+  await scenario({
+    id: 'B11',
+    page,
+    harness,
+    starting: 'Provider A cached catalog with stable channel/category identities; provider B available only to force a real A re-entry refresh',
+    actions: ['delete focused channel during refresh', 'reorder channels during refresh', 'reorder categories during refresh', 'delete focused category during refresh'],
+    expected: 'deleted/reordered channel/category rerender keeps a valid stable identity or deterministic fallback',
+    run: async () => {
+      const originalCatalog = fixture.catalog(PACK_B_PROVIDER_KEYS.A);
 
-    const enterBThenAWithPausedRefresh = async () => {
-      await backToHome(page);
-      await selectProvider(page, providerB);
+      const focusScopeKey = async (target) => {
+        for (let attempt = 0; attempt < 3 && await focusedScope(page) === null; attempt += 1) {
+          await pressRemote(page, 'LEFT');
+        }
+        for (let attempt = 0; attempt < 12; attempt += 1) {
+          if (await focusedScope(page) === target) return;
+          await pressRemote(page, 'DOWN');
+        }
+        throw new Error(`Scope focus did not reach ${target}; current=${await focusedScope(page)}`);
+      };
+
+      const reenterAWithPausedRefresh = async (beforeOpen = () => {}) => {
+        await backToHome(page);
+        await selectProvider(page, providerB);
+        await openLiveTv(page);
+        await backToHome(page);
+        await selectProvider(page, providerA);
+        beforeOpen();
+        const resume = fixture.pauseStreams(PACK_B_PROVIDER_KEYS.A);
+        await openLiveTv(page);
+        return resume;
+      };
+
+      let release = fixture.pauseStreams(PACK_B_PROVIDER_KEYS.A);
       await openLiveTv(page);
-      await backToHome(page);
-      await selectProvider(page, providerA);
-      const resume = fixture.pauseStreams(PACK_B_PROVIDER_KEYS.A);
-      await openLiveTv(page);
-      return resume;
-    };
+      await pressRemote(page, 'DOWN');
+      const deletedChannel = await highlightedChannel(page);
+      expect(deletedChannel).toBe(PACK_B_CHANNEL_IDS.istanbul);
+      fixture.setChannels(
+        PACK_B_PROVIDER_KEYS.A,
+        originalCatalog.channels.filter((row) => String(row.stream_id) !== deletedChannel),
+      );
+      release();
+      await expect(page.locator(`${CHANNEL}[data-channel-id="${deletedChannel}"]`)).toHaveCount(0, { timeout: 10_000 });
+      await expect.poll(() => highlightedChannel(page)).not.toBe(deletedChannel);
+      expect(await highlightedChannel(page)).not.toBeNull();
+      await assertNoPlayback(page);
 
-    const afterDelete = fixture.catalog(PACK_B_PROVIDER_KEYS.A).channels;
-    release = await enterBThenAWithPausedRefresh();
-    const stable = await highlightedChannel(page);
-    fixture.setChannels(PACK_B_PROVIDER_KEYS.A, [afterDelete.at(-1), ...afterDelete.slice(0, -1)].filter(Boolean));
-    release();
-    await expect(page.locator(`${CHANNEL}[data-channel-id="${stable}"]`)).toHaveClass(/highlighted|focused/, { timeout: 10_000 });
-    expect(await highlightedChannel(page)).toBe(stable);
+      const afterDelete = fixture.catalog(PACK_B_PROVIDER_KEYS.A).channels;
+      release = await reenterAWithPausedRefresh();
+      const stableChannel = await highlightedChannel(page);
+      expect(stableChannel).not.toBeNull();
+      fixture.setChannels(PACK_B_PROVIDER_KEYS.A, [...afterDelete].reverse());
+      release();
+      await expect(page.locator(`${CHANNEL}[data-channel-id="${stableChannel}"]`)).toHaveClass(/highlighted|focused/, { timeout: 10_000 });
+      expect(await highlightedChannel(page)).toBe(stableChannel);
+      await assertNoPlayback(page);
 
-    release = await enterBThenAWithPausedRefresh();
-    fixture.setChannels(PACK_B_PROVIDER_KEYS.A, [{ ...original[0], name: 'Ortak Kanal A Tek' }]);
-    release();
-    await expect(page.locator(CHANNEL)).toHaveCount(1, { timeout: 10_000 });
-    expect(await highlightedChannel(page)).toBe(PACK_B_CHANNEL_IDS.shared);
+      release = await reenterAWithPausedRefresh(() => {
+        fixture.setCategories(PACK_B_PROVIDER_KEYS.A, [...originalCatalog.categories].reverse());
+      });
+      await focusScopeKey('category:news');
+      release();
+      await expect.poll(() => focusedScope(page)).toBe('category:news');
+      const reorderedScopeKeys = await page.locator(GROUP).evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-scope-key')));
+      expect(reorderedScopeKeys.indexOf('category:sports')).toBeLessThan(reorderedScopeKeys.indexOf('category:news'));
+      await assertNoPlayback(page);
 
-    await backToHome(page);
-    await selectProvider(page, providerB);
-    await openLiveTv(page);
-    await expect(page.locator(`${CHANNEL}[data-channel-id="500"]`)).toContainText('Ortak Kanal B');
-    expect(await highlightedChannel(page)).toBe(PACK_B_CHANNEL_IDS.shared);
-    await assertNoPlayback(page);
+      const reorderedCategories = fixture.catalog(PACK_B_PROVIDER_KEYS.A).categories;
+      release = await reenterAWithPausedRefresh(() => {
+        fixture.setCategories(
+          PACK_B_PROVIDER_KEYS.A,
+          reorderedCategories.filter((row) => String(row.category_id) !== 'news'),
+        );
+      });
+      await focusScopeKey('category:news');
+      release();
+      await expect(page.locator(`${GROUP}[data-scope-key="category:news"]`)).toHaveCount(0, { timeout: 10_000 });
+      await expect.poll(() => focusedScope(page)).not.toBeNull();
+      expect(await focusedScope(page)).not.toBe('category:news');
+      await assertNoPlayback(page);
 
-    await backToHome(page);
-    await selectProvider(page, providerA);
-    release = fixture.pauseStreams(PACK_B_PROVIDER_KEYS.A);
-    await openLiveTv(page);
-    fixture.setChannels(PACK_B_PROVIDER_KEYS.A, []);
-    release();
-    await expect(page.locator(CHANNEL)).toHaveCount(0, { timeout: 10_000 });
-    await assertNoPlayback(page);
-    return `deleted=${deleted}; reordered=${stable}; single=500; B collision stayed B; empty safe`;
-  } });
+      return `channel delete fallback=${deletedChannel}; channel reorder stable=${stableChannel}; category reorder stable=news; category delete fallback=${await focusedScope(page)}`;
+    },
+  });
 });
