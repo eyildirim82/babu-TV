@@ -284,9 +284,29 @@ async function deleteProvider(page, providerId) {
   await expect(page.locator(`[id="provider:${providerId}:delete"]`)).toHaveCount(0, { timeout: 15_000 });
 }
 
-async function assertCleanBrowser(harness) {
+function isSyntheticProviderUrl(url) {
+  try {
+    return new URL(url).hostname.endsWith('.invalid');
+  } catch {
+    return false;
+  }
+}
+
+async function assertCleanBrowser(harness, { expectedProviderHttp500 = false } = {}) {
   expect(harness.events.pageErrors).toEqual([]);
-  assertNoUnexplainedConsoleErrors(harness.events);
+  if (!expectedProviderHttp500) {
+    assertNoUnexplainedConsoleErrors(harness.events);
+    return;
+  }
+  // Chromium logs every failed fetch to the console. Only the scenario's
+  // synthetic provider 500s are excused; an app or preview-server 500 is not.
+  const unexpectedHttp500 = harness.events.httpErrors.filter((entry) => (
+    entry.status === 500 && !isSyntheticProviderUrl(entry.url)
+  ));
+  expect(unexpectedHttp500).toEqual([]);
+  assertNoUnexplainedConsoleErrors(harness.events, {
+    allow: [/Failed to load resource: the server responded with a status of 500\b/],
+  });
 }
 
 async function assertNoCredentialLeaks(page) {
@@ -309,7 +329,7 @@ async function recordScenario(testInfo, page, harness, metadata, execute) {
     const leaks = await findSecretLeaks(page, RC_SECRET_CANARIES);
     expect(leaks).toEqual([]);
     outcome.leakage = 'clean';
-    await assertCleanBrowser(harness);
+    await assertCleanBrowser(harness, metadata.console);
   } catch (error) {
     failure = error;
     outcome = {
@@ -350,6 +370,7 @@ function scenario(id, title, metadata, body) {
       startingState: metadata.startingState,
       actions: metadata.actions,
       expectedState: metadata.expectedState,
+      console: metadata.console,
     }, () => body({ context, page, harness }));
   });
 }
@@ -558,6 +579,7 @@ scenario('C09', 'stale catalog survives degraded re-entry refresh', {
   startingState: 'provider A with usable cached catalog and Favorite',
   actions: ['record cached catalog', 'force synthetic categories refresh failure', 're-enter provider A', 'reload'],
   expectedState: 'provider identity, usable cached catalog and durable user state are not destroyed by degraded refresh',
+  console: { expectedProviderHttp500: true },
 }, async ({ page, harness }) => {
   const providerA = await onboardXtream(page);
   await toggleFavoriteForActiveProvider(page, providerA);
