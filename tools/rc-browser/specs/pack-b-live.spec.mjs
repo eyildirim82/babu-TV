@@ -145,10 +145,15 @@ async function openLiveTv(page) {
 
 async function backToHome(page) {
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    if (await page.locator('#home-page').count()) return;
+    if (await page.locator('#home-page').count()) {
+      await expect(page.locator('#home-page')).toBeVisible();
+      await page.waitForFunction(() => document.activeElement?.hasAttribute('data-home-focus-key') === true);
+      return;
+    }
     await pressRemote(page, 'BACK');
   }
   await expect(page.locator('#home-page')).toBeVisible();
+  await page.waitForFunction(() => document.activeElement?.hasAttribute('data-home-focus-key') === true);
 }
 
 async function openActions(page) {
