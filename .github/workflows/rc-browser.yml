@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - verification/v1-rc-browser
+      - verification/v1-rc-browser-h1
       - 'verification/rc-browser-qualify/**'
 
 permissions:
@@ -15,7 +16,7 @@ jobs:
     timeout-minutes: 35
     env:
       RC_BROWSER_H0_SHA: 61cb2198fee982ae3b3a61398dc120738d3405b4
-      RC_PRODUCTION_SHA: 409e416c88f0bd12666302fdaab533a626421a29
+      RC_PRODUCTION_SHA: 49c9e3e61331c2e9cb48fa7e22efe9c23371f7ab
     steps:
       - name: Checkout trusted trigger revision
         uses: actions/checkout@v4
@@ -39,7 +40,7 @@ jobs:
           sha=''
 
           case "${TRIGGER_REF}" in
-            verification/v1-rc-browser)
+            verification/v1-rc-browser|verification/v1-rc-browser-h1)
               mode='integration'
               slug='integration'
               sha="${TRIGGER_SHA}"
