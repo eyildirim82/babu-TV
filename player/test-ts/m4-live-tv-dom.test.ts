@@ -33,6 +33,7 @@ class FakeElement {
 
   append(...children: FakeElement[]): void { this.children.push(...children); }
   replaceChildren(...children: FakeElement[]): void { this.children = [...children]; }
+  addEventListener(_type: string, _listener: () => void): void {}
 }
 
 class FakeDocument {
@@ -184,7 +185,12 @@ void test('M4-COMP DOM renders Search stable keys, ACT-UI labels, and Program In
   featureRoot = document.getElementById('sidebar')!.children.find((item) => item.dataset.featureRoot === 'm4')!;
   const actions = featureRoot.children.find((item) => item.dataset.featureSection === 'actions')!;
   assert.ok(actions);
-  assert.deepEqual(actions.children.map((item) => item.textContent), ['İzle', 'Favoriye Ekle', 'Program Bilgisi']);
+  assert.deepEqual(actions.children.map((item) => item.textContent), [
+    'İzle',
+    'Favoriye Ekle',
+    'Program Bilgisi',
+    'Ara',
+  ]);
 
   composition.moveAction('NEXT');
   composition.moveAction('NEXT');

@@ -1,6 +1,6 @@
 import type { ChannelId, ProviderId } from '../domain/models.js';
 
-export type ChannelActionId = 'WATCH' | 'FAVORITE' | 'PROGRAM_INFO';
+export type ChannelActionId = 'WATCH' | 'FAVORITE' | 'PROGRAM_INFO' | 'SEARCH';
 
 export interface ChannelActionItem {
   id: ChannelActionId;
@@ -30,7 +30,8 @@ export type ChannelActionsReducerAction =
 export type ChannelActionIntent =
   | ({ type: 'PLAY_CHANNEL' } & ChannelActionContext)
   | ({ type: 'TOGGLE_FAVORITE' } & ChannelActionContext)
-  | ({ type: 'SHOW_PROGRAM_INFO' } & ChannelActionContext);
+  | ({ type: 'SHOW_PROGRAM_INFO' } & ChannelActionContext)
+  | ({ type: 'OPEN_SEARCH' } & ChannelActionContext);
 
 export function buildChannelActions(input: ChannelActionPresentationInput): readonly ChannelActionItem[] {
   const actions: ChannelActionItem[] = [
@@ -44,6 +45,7 @@ export function buildChannelActions(input: ChannelActionPresentationInput): read
   if (input.programInfoAvailable) {
     actions.push({ id: 'PROGRAM_INFO', label: 'Program Bilgisi' });
   }
+  actions.push({ id: 'SEARCH', label: 'Ara' });
 
   return actions;
 }
@@ -104,5 +106,7 @@ export function activateChannelAction(
       return { type: 'TOGGLE_FAVORITE', ...context };
     case 'PROGRAM_INFO':
       return { type: 'SHOW_PROGRAM_INFO', ...context };
+    case 'SEARCH':
+      return { type: 'OPEN_SEARCH', ...context };
   }
 }

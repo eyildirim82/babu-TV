@@ -440,6 +440,9 @@ export class LiveTvController {
     }
     if (!this.deps.features.closeTopLayer()) return false;
     this.featureState = this.deps.features.current();
+    if (this.featureState.layer === 'none' && this.current !== null) {
+      this.current = { ...this.current, overlayZone: 'CHANNEL' };
+    }
     this.render();
     return true;
   }
@@ -492,6 +495,14 @@ export class LiveTvController {
 
     if (intent.type === 'SHOW_PROGRAM_INFO') {
       this.featureState = this.deps.features.openProgramInfo();
+      this.render();
+      return;
+    }
+
+    if (intent.type === 'OPEN_SEARCH') {
+      const input = this.featureInput();
+      if (input === null) return;
+      this.featureState = this.deps.features.openSearch(input);
       this.render();
       return;
     }

@@ -11,12 +11,13 @@ import {
 const providerId = 'provider-1';
 const channelId = 'channel-1';
 
-test('builds watch and favorite actions with favorite label derived from state', () => {
+test('builds watch, favorite and search actions with favorite label derived from state', () => {
   assert.deepEqual(
     buildChannelActions({ providerId, channelId, isFavorite: false, programInfoAvailable: false }),
     [
       { id: 'WATCH', label: 'İzle' },
       { id: 'FAVORITE', label: 'Favoriye Ekle' },
+      { id: 'SEARCH', label: 'Ara' },
     ],
   );
 
@@ -25,17 +26,19 @@ test('builds watch and favorite actions with favorite label derived from state',
     [
       { id: 'WATCH', label: 'İzle' },
       { id: 'FAVORITE', label: 'Favorilerden Çıkar' },
+      { id: 'SEARCH', label: 'Ara' },
     ],
   );
 });
 
-test('includes program info only when it is available', () => {
+test('includes program info only when it is available while preserving Search', () => {
   assert.deepEqual(
     buildChannelActions({ providerId, channelId, isFavorite: false, programInfoAvailable: true }),
     [
       { id: 'WATCH', label: 'İzle' },
       { id: 'FAVORITE', label: 'Favoriye Ekle' },
       { id: 'PROGRAM_INFO', label: 'Program Bilgisi' },
+      { id: 'SEARCH', label: 'Ara' },
     ],
   );
 });
@@ -103,6 +106,12 @@ test('only watch activation emits a play intent', () => {
 
   assert.deepEqual(activateChannelAction('PROGRAM_INFO', { providerId, channelId }), {
     type: 'SHOW_PROGRAM_INFO',
+    providerId,
+    channelId,
+  });
+
+  assert.deepEqual(activateChannelAction('SEARCH', { providerId, channelId }), {
+    type: 'OPEN_SEARCH',
     providerId,
     channelId,
   });
