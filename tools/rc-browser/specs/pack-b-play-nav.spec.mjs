@@ -1,3 +1,4 @@
+import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import {
   assertNoUnexplainedConsoleErrors,
@@ -24,6 +25,94 @@ const featureRoot = (page) => page.locator('[data-feature-root="m4"]');
 const channel = (page, channelId) => page.locator(`.channel-item[data-channel-id="${channelId}"]`);
 const status = (page) => page.locator('#live-tv-status');
 const sidebar = (page) => page.locator('#sidebar.babu-live-tv-overlay');
+
+function sanitizeFailureText(value) {
+  let text = String(value ?? 'unknown failure');
+  for (const secret of RC_SECRET_CANARIES) {
+    if (typeof secret === 'string' && secret.length > 0) {
+      text = text.split(secret).join('[REDACTED]');
+    }
+  }
+  return text
+    .replace(/([?&](?:username|password|token|auth|authorization)=)[^&\s"'<>]+/gi, '$1[REDACTED]')
+    .slice(0, 20_000);
+}
+
+function failureEvidenceName(testInfo) {
+  const slug = testInfo.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'unnamed';
+  return `rc-browser-artifacts/play-nav-failure-${slug}.json`;
+}
+
+async function browserFailureSnapshot(page) {
+  try {
+    return await page.evaluate(() => {
+      const liveStatus = document.getElementById('live-tv-status');
+      const feature = document.querySelector('[data-feature-root="m4"]');
+      const focusedChannel = document.querySelector('.channel-item[data-presentation-state="focused"]');
+      const active = document.activeElement;
+      const video = document.getElementById('video');
+      const media = video instanceof HTMLMediaElement
+        ? {
+            currentSrc: video.currentSrc,
+            readyState: video.readyState,
+            networkState: video.networkState,
+            currentTime: video.currentTime,
+            duration: Number.isFinite(video.duration) ? video.duration : null,
+            paused: video.paused,
+            ended: video.ended,
+            error: video.error === null
+              ? null
+              : { code: video.error.code, message: video.error.message },
+          }
+        : null;
+      return {
+        url: location.href,
+        playbackStatus: liveStatus?.getAttribute('data-playback-status') ?? null,
+        playbackText: liveStatus?.textContent ?? null,
+        activeLayer: feature?.getAttribute('data-active-layer') ?? null,
+        focusedChannelId: focusedChannel?.getAttribute('data-channel-id') ?? null,
+        activeElement: active === null
+          ? null
+          : {
+              tagName: active.tagName,
+              id: active.id,
+              className: active.getAttribute('class'),
+              homeFocusKey: active.getAttribute('data-home-focus-key'),
+              channelId: active.getAttribute('data-channel-id'),
+              actionId: active.getAttribute('data-action-id'),
+              presentationState: active.getAttribute('data-presentation-state'),
+            },
+        video: media,
+      };
+    });
+  } catch (error) {
+    return { snapshotError: sanitizeFailureText(error instanceof Error ? error.message : error) };
+  }
+}
+
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  const error = testInfo.error ?? testInfo.errors?.[0] ?? null;
+  const payload = {
+    kind: 'rc-browser-failure.v2',
+    pack: 'BROW-PLAYNAV',
+    title: testInfo.title,
+    titlePath: testInfo.titlePath,
+    status: testInfo.status,
+    expectedStatus: testInfo.expectedStatus,
+    retry: testInfo.retry,
+    error: sanitizeFailureText(error?.message),
+    stack: sanitizeFailureText(error?.stack),
+    location: error?.location ?? null,
+    browser: await browserFailureSnapshot(page),
+  };
+  await mkdir('rc-browser-artifacts', { recursive: true });
+  await writeFile(failureEvidenceName(testInfo), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+});
 
 async function writeScenario(harness, input) {
   const evidence = createEvidenceRecord({
@@ -111,8 +200,21 @@ async function openOverlayAfterPlayback(page) {
 
 async function switchHomeProvider(page, providerId) {
   await expect(page.locator('#home-page')).toBeVisible();
-  await pressRemote(page, 'UP');
   const target = page.locator(`[data-home-focus-key="home-provider:${providerId}"]`);
+
+  for (let step = 0; step < 8; step += 1) {
+    const focusKey = await page.evaluate(
+      () => document.activeElement?.getAttribute('data-home-focus-key') ?? null,
+    );
+    if (focusKey?.startsWith('home-provider:')) break;
+    await pressRemote(page, 'UP');
+  }
+
+  const providerFocusKey = await page.evaluate(
+    () => document.activeElement?.getAttribute('data-home-focus-key') ?? null,
+  );
+  expect(providerFocusKey).toMatch(/^home-provider:/);
+
   if (!(await target.evaluate((element) => element === document.activeElement))) {
     await pressRemote(page, providerId === PLAYNAV_PROVIDER_B ? 'RIGHT' : 'LEFT');
   }
