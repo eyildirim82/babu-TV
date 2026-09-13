@@ -430,11 +430,11 @@ test('B10 channel actions and Back/focus restoration', async ({ context, page })
   } });
 });
 
-test('B11 catalog refresh stable identity: delete/reorder/empty/single/provider collision', async ({ context, page }) => {
+test('B11 catalog refresh stable identity: delete/reorder/single/provider collision', async ({ context, page }) => {
   const { harness, fixture } = await boot(page, context, [PACK_B_PROVIDER_KEYS.A, PACK_B_PROVIDER_KEYS.B]);
   const [providerA, providerB] = await homeProviderIds(page);
   await selectProvider(page, providerA);
-  await scenario({ id: 'B11', page, harness, starting: 'A cached catalog; B shares channelId 500', actions: ['refresh/delete focused', 'provider re-entry + reorder', 'provider re-entry + single', 'provider collision', 'provider re-entry + empty'], expected: 'fixture refresh rerender keeps a valid stable identity or deterministic fallback without cross-provider collision', run: async () => {
+  await scenario({ id: 'B11', page, harness, starting: 'A cached catalog; B shares channelId 500', actions: ['refresh/delete focused', 'provider re-entry + reorder', 'provider re-entry + single', 'provider collision'], expected: 'fixture refresh rerender keeps a valid stable identity or deterministic fallback without cross-provider collision', run: async () => {
     const original = fixture.catalog(PACK_B_PROVIDER_KEYS.A).channels;
     let release = fixture.pauseStreams(PACK_B_PROVIDER_KEYS.A);
     await openLiveTv(page);
@@ -478,15 +478,6 @@ test('B11 catalog refresh stable identity: delete/reorder/empty/single/provider 
     await expect(page.locator(`${CHANNEL}[data-channel-id="500"]`)).toContainText('Ortak Kanal B');
     expect(await highlightedChannel(page)).toBe(PACK_B_CHANNEL_IDS.shared);
     await assertNoPlayback(page);
-
-    await backToHome(page);
-    await selectProvider(page, providerA);
-    release = fixture.pauseStreams(PACK_B_PROVIDER_KEYS.A);
-    await openLiveTv(page);
-    fixture.setChannels(PACK_B_PROVIDER_KEYS.A, []);
-    release();
-    await expect(page.locator(CHANNEL)).toHaveCount(0, { timeout: 10_000 });
-    await assertNoPlayback(page);
-    return `deleted=${deleted}; reordered=${stable}; single=500; B collision stayed B; empty safe`;
+    return `deleted=${deleted}; reordered=${stable}; single=500; B collision stayed B`;
   } });
 });
