@@ -496,6 +496,14 @@ export class LiveTvController {
       return;
     }
 
+    if (intent.type === 'OPEN_SEARCH') {
+      const input = this.featureInput();
+      if (input === null) return;
+      this.featureState = this.deps.features.openSearch(input);
+      this.render();
+      return;
+    }
+
     const input = this.featureInput();
     if (input === null) return;
     const providerId = input.providerId;
