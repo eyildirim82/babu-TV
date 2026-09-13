@@ -125,7 +125,9 @@ export class ProviderManagementSurface {
 
     if (action === 'select') {
       await this.presenter.activateFocused();
-      this.render();
+      if (this.document.getElementById('provider-management-page') !== null) {
+        this.render();
+      }
     }
   }
 
