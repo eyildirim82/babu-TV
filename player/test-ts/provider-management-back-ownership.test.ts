@@ -50,14 +50,14 @@ function dependencies(
           handleAction() {},
         };
       },
-      providerManagement(callbacks) {
+      providerManagement(_callbacks) {
         return {
           async show() {},
           hide() {},
           async handleAction(action) {
             events.push(`provider:${action}`);
-            if (action === 'back' && !shouldConsumeProviderBack()) {
-              callbacks.onBack();
+            if (action === 'back' && shouldConsumeProviderBack()) {
+              return true;
             }
           },
         };
