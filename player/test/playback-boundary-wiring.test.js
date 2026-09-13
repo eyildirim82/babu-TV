@@ -84,3 +84,15 @@ test('legacy stop keeps the shared video element and returns its awaited teardow
   assert.match(stopBody[1], /const teardown = destroyPlayer\(videoElement\)[\s\S]*return teardown;/);
   assert.match(source, /async function destroyPlayer\(keepElement\) \{[\s\S]*?if \(!keepElement\) \{\s*videoElement = null;\s*\}/);
 });
+
+test('player teardown clears the kept video element without raising an empty-src media error', async () => {
+  const source = await readFile(playerUrl, 'utf8');
+  const destroyBody = source.match(/async function destroyPlayer\(keepElement\) \{([\s\S]*?)\n\}/);
+
+  assert.ok(destroyBody, 'destroyPlayer(keepElement) must remain defined');
+  // load() with an empty src attribute queues MEDIA_ERR_SRC_NOT_SUPPORTED
+  // ("Empty src attribute"). The kept element still has onVideoError attached,
+  // so that teardown artifact was reported and counted as a playback error.
+  assert.doesNotMatch(destroyBody[1], /videoElement\.src = ''/);
+  assert.match(destroyBody[1], /if \(videoElement\) \{\s*videoElement\.removeAttribute\('src'\);\s*videoElement\.load\(\);\s*\}/);
+});

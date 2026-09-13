@@ -750,8 +750,10 @@ async function destroyPlayer(keepElement) {
     }
     player = null;
   }
+  // An empty src attribute makes load() raise "Empty src attribute" on the
+  // kept element, which onVideoError would report as a playback failure.
   if (videoElement) {
-    videoElement.src = '';
+    videoElement.removeAttribute('src');
     videoElement.load();
   }
   currentChannel = null;
