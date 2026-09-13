@@ -33,21 +33,26 @@ test('RC-BROWSER phone route decodes only the public #pairing fragment contract'
   assert.equal(decodePairingPhoneFragment(encodeFragment({ ...bootstrap, extra: 'forbidden' })), null);
 });
 
-test('RC-BROWSER main starts phone pairing route before TV/player boot', async () => {
-  const mainUrl = new URL('../src/main.js', import.meta.url);
-  const source = await readFile(mainUrl, 'utf8');
+test('RC-BROWSER browser entry starts phone pairing route before normal TV boot', async () => {
+  const indexUrl = new URL('../index.html', import.meta.url);
+  const entryUrl = new URL('../src/browser-entry.ts', import.meta.url);
+  const [indexSource, entrySource] = await Promise.all([
+    readFile(indexUrl, 'utf8'),
+    readFile(entryUrl, 'utf8'),
+  ]);
 
+  assert.match(indexSource, /<script type="module" src="\/src\/browser-entry\.ts"><\/script>/);
   assert.match(
-    source,
-    /import \{ tryStartPairingPhoneBrowserRoute \} from '\.\/pairing\/phone-browser-entry\.ts';/,
+    entrySource,
+    /import \{ tryStartPairingPhoneBrowserRoute \} from '\.\/pairing\/phone-browser-entry\.js';/,
   );
-  assert.match(source, /import '\.\/ui\/pairing-phone\.css';/);
+  assert.match(entrySource, /import '\.\/ui\/pairing-phone\.css';/);
+  assert.match(entrySource, /hash: window\.location\.hash/);
 
-  const initStart = source.indexOf('async function init()');
-  const phoneRoute = source.indexOf('tryStartPairingPhoneBrowserRoute', initStart);
-  const playerBoot = source.indexOf('player.initPlayer', initStart);
-  assert.notEqual(initStart, -1);
+  const phoneRoute = entrySource.indexOf('tryStartPairingPhoneBrowserRoute({');
+  const normalBoot = entrySource.indexOf("import('./main.js')");
   assert.notEqual(phoneRoute, -1);
-  assert.notEqual(playerBoot, -1);
-  assert.ok(phoneRoute < playerBoot, 'phone route must short-circuit before TV/player boot');
+  assert.notEqual(normalBoot, -1);
+  assert.ok(phoneRoute < normalBoot, 'phone route must short-circuit before normal TV boot');
+  assert.match(entrySource, /if \(pairingPhoneStarted\) return;/);
 });
