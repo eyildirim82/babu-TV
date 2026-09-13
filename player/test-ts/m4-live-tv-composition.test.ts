@@ -319,6 +319,7 @@ void test('M4-COMP Channel Actions map WATCH only to PLAY and keep Program Info 
     ['WATCH', 'İzle'],
     ['FAVORITE', 'Favoriye Ekle'],
     ['PROGRAM_INFO', 'Program Bilgisi'],
+    ['SEARCH', 'Ara'],
   ]);
   assert.deepEqual(composition.activateFocusedAction(), {
     type: 'PLAY_CHANNEL',
