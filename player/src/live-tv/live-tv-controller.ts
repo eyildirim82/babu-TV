@@ -440,6 +440,9 @@ export class LiveTvController {
     }
     if (!this.deps.features.closeTopLayer()) return false;
     this.featureState = this.deps.features.current();
+    if (this.featureState.layer === 'none' && this.current !== null) {
+      this.current = { ...this.current, overlayZone: 'CHANNEL' };
+    }
     this.render();
     return true;
   }
