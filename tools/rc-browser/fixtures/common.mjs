@@ -1,4 +1,4 @@
-export const RC_PRODUCTION_SHA = '409e416c88f0bd12666302fdaab533a626421a29';
+export const RC_PRODUCTION_SHA = process.env.RC_PRODUCTION_SHA ?? '409e416c88f0bd12666302fdaab533a626421a29';
 
 const join = (...parts) => parts.join('');
 
