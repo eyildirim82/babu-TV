@@ -27,6 +27,7 @@ import { LiveTvController } from './live-tv-controller.js';
 import { ProviderStreamResolver } from './provider-stream-resolver.js';
 
 const MEANINGFUL_WATCH_MINIMUM_MS = 30_000;
+const EPG_WINDOW_RADIUS_MS = 24 * 60 * 60 * 1_000;
 
 export interface LiveTvRuntimeProviderPort {
   getActiveProviderId(): Promise<ProviderId | null>;
@@ -42,11 +43,27 @@ export interface LiveTvRuntimeCorePort {
   loadCached(providerId: ProviderId): Promise<ProviderSnapshot>;
 }
 
+export interface LiveTvRuntimeEpgPort {
+  refreshInBackground(
+    providerId: ProviderId,
+    window: { startMs: number; endMs: number },
+  ): Promise<unknown>;
+}
+
+interface LiveTvEpgRefreshDependencies {
+  epg?: LiveTvRuntimeEpgPort;
+  nowMs?: () => number;
+  core: LiveTvRuntimeCorePort;
+  controller: LiveTvController;
+}
+
 export interface LiveTvRuntimeDependencies {
   providers: LiveTvRuntimeProviderPort | Pick<ProviderRepository, 'getActiveProviderId'>;
   credentials: LiveTvRuntimeCredentialPort;
   core: LiveTvRuntimeCorePort;
   controller: LiveTvController;
+  epg?: LiveTvRuntimeEpgPort;
+  nowMs?: () => number;
 }
 
 export interface LiveTvProviderEntryDependencies {
@@ -54,6 +71,8 @@ export interface LiveTvProviderEntryDependencies {
   credentials: LiveTvRuntimeCredentialPort;
   core: LiveTvRuntimeCorePort;
   controller: LiveTvController;
+  epg?: LiveTvRuntimeEpgPort;
+  nowMs?: () => number;
 }
 
 export type LiveTvRuntimeStart =
@@ -80,6 +99,31 @@ export interface BrowserLiveTvRuntimeDependencies {
   featurePorts?: LiveTvFeaturePorts;
 }
 
+function refreshEpgAndReproject(
+  deps: LiveTvEpgRefreshDependencies,
+  providerId: ProviderId,
+): Promise<void> {
+  if (deps.epg === undefined) return Promise.resolve();
+
+  let nowMs: number;
+  try {
+    nowMs = deps.nowMs?.() ?? Date.now();
+  } catch {
+    return Promise.resolve();
+  }
+  if (!Number.isFinite(nowMs)) return Promise.resolve();
+
+  return deps.epg.refreshInBackground(providerId, {
+    startMs: nowMs - EPG_WINDOW_RADIUS_MS,
+    endMs: nowMs + EPG_WINDOW_RADIUS_MS,
+  }).then(async () => {
+    const refreshed = await deps.core.loadCached(providerId);
+    deps.controller.syncCatalog(refreshed);
+  }).catch(() => {
+    // EPG is derived cache. A failed background refresh must keep cached Live TV usable.
+  });
+}
+
 export function createLiveTvProviderEntry(
   deps: LiveTvProviderEntryDependencies,
 ): (providerId: ProviderId) => Promise<void> {
@@ -97,12 +141,14 @@ export function createLiveTvProviderEntry(
     const cacheFirst = await deps.core.loadCacheFirst(providerId);
     deps.controller.enter(cacheFirst.cached);
 
-    void cacheFirst.refresh.then(async () => {
+    const catalogRefresh = cacheFirst.refresh.then(async () => {
       const refreshed = await deps.core.loadCached(providerId);
       deps.controller.syncCatalog(refreshed);
     }).catch(() => {
       // Cache-first Live TV remains usable when background refresh fails.
     });
+    const epgRefresh = refreshEpgAndReproject(deps, providerId);
+    void Promise.all([catalogRefresh, epgRefresh]);
   };
 }
 
@@ -137,12 +183,14 @@ export async function createLiveTvRuntime(
 
   deps.controller.enter(cacheFirst.cached);
 
-  const refresh = cacheFirst.refresh.then(async () => {
+  const catalogRefresh = cacheFirst.refresh.then(async () => {
     const refreshed = await deps.core.loadCached(providerId);
     deps.controller.syncCatalog(refreshed);
   }).catch(() => {
     // Cache-first M3 remains usable when a background provider refresh fails.
   });
+  const epgRefresh = refreshEpgAndReproject(deps, providerId);
+  const refresh = Promise.all([catalogRefresh, epgRefresh]).then(() => undefined);
 
   return {
     mode: 'm3',
@@ -162,6 +210,7 @@ export async function createBrowserLiveTvRuntime(
       credentials,
       adapters,
       core,
+      epg,
     } = createBrowserProviderRuntime({
       indexedDb: deps.indexedDb,
       widgetData: deps.widgetData,
@@ -207,6 +256,7 @@ export async function createBrowserLiveTvRuntime(
       credentials,
       core,
       controller,
+      epg,
     });
     if (initial.mode === 'legacy') return initial;
 
@@ -215,6 +265,7 @@ export async function createBrowserLiveTvRuntime(
       credentials,
       core,
       controller: initial.controller,
+      epg,
     });
 
     return {
