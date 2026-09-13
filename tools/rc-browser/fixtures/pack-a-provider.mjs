@@ -24,13 +24,23 @@ export const M3U_COPY = Object.freeze({
   malformed: 'Oynatma listesi okunamadı.',
 });
 
+async function waitForFirstRunReady(page) {
+  await page.locator('#first-run-page').waitFor({ state: 'visible' });
+  await page.waitForFunction(() => document.activeElement?.id === 'first-run-xtream');
+}
+
 export async function openXtreamEntry(page) {
+  await waitForFirstRunReady(page);
   await pressRemote(page, 'SELECT');
+  await page.locator('#xtream-entry-page').waitFor({ state: 'visible' });
 }
 
 export async function openM3uEntry(page) {
+  await waitForFirstRunReady(page);
   await pressRemote(page, 'RIGHT');
+  await page.waitForFunction(() => document.activeElement?.id === 'first-run-m3u');
   await pressRemote(page, 'SELECT');
+  await page.locator('#m3u-entry-page').waitFor({ state: 'visible' });
 }
 
 export async function submitXtream(page, input = {}) {
@@ -142,6 +152,9 @@ export async function addM3uFromManagement(page) {
 export async function switchProvider(page, providerId) {
   await moveProviderFocusTo(page, `provider:${providerId}:switch`);
   await pressRemote(page, 'SELECT');
+  await page.waitForFunction((id) => (
+    document.getElementById(`provider:${id}:switch`)?.textContent?.trim() === 'Aktif'
+  ), providerId);
   await page.locator('#provider-management-page').waitFor({ state: 'visible' });
 }
 
@@ -155,6 +168,7 @@ export async function openDeleteConfirmation(page, providerId) {
   await moveProviderFocusTo(page, `provider:${providerId}:delete`);
   await pressRemote(page, 'SELECT');
   await page.locator('.provider-management-confirmation').waitFor({ state: 'visible' });
+  await page.waitForFunction(() => document.activeElement?.id === 'cancel-delete');
 }
 
 export async function confirmDelete(page) {
@@ -162,7 +176,9 @@ export async function confirmDelete(page) {
     throw new Error('Delete confirmation did not default focus to cancel.');
   }
   await pressRemote(page, 'DOWN');
+  await page.waitForFunction(() => document.activeElement?.id === 'confirm-delete');
   await pressRemote(page, 'SELECT');
+  await page.locator('.provider-management-confirmation').waitFor({ state: 'hidden' });
   await page.locator('#provider-management-page').waitFor({ state: 'visible' });
 }
 
