@@ -433,11 +433,14 @@ void test('M4-COMP controller maps only WATCH to requestPlayback and Back closes
   await controller.handleInput({ type: 'ACTION', action: 'BACK' });
   assert.equal(view.models.at(-1)?.features?.layer, 'actions');
   assert.equal(controller.state().overlayOpen, true);
+  assert.equal(controller.state().overlayZone, 'ACTIONS');
 
   await controller.handleInput({ type: 'ACTION', action: 'BACK' });
   assert.equal(view.models.at(-1)?.features?.layer, 'none');
   assert.equal(controller.state().overlayOpen, true);
+  assert.equal(controller.state().overlayZone, 'CHANNEL');
 
+  await controller.handleInput({ type: 'ACTION', action: 'RIGHT' });
   await controller.handleInput({ type: 'ACTION', action: 'SELECT' });
   assert.equal(view.models.at(-1)?.features?.layer, 'actions');
   await controller.handleInput({ type: 'ACTION', action: 'SELECT' });
