@@ -445,6 +445,9 @@ test('P08/P09/P10 repeated layers and Back close one owner at a time with stable
 
   await pressRemote(page, 'BACK');
   await expect(page.locator('#home-page')).toBeVisible();
+  // Home renders a loading state first; SELECT only acts once the ready model
+  // has placed default focus (Live TV, since nothing was watched).
+  await page.waitForFunction(() => document.activeElement?.getAttribute('data-home-focus-key') === 'home-live-tv');
 
   await pressRemote(page, 'SELECT');
   await expect(sidebar(page)).not.toHaveClass(/closed/);
@@ -472,13 +475,59 @@ test('P08/P09/P10 repeated layers and Back close one owner at a time with stable
     observedState: 'layer and overlay states were asserted after every Back; channel focus owner was restored before overlay close',
   });
 
+});
+
+test('P10 Search opened from Channel Actions closes with Back and restores the stable channel focus owner', async ({ context, page }) => {
+  const { harness } = await setup(page, context);
+  await openLiveTv(page);
+
+  // Move off the default owner so restoration to the prior owner is observable.
+  await expect(channel(page, '42')).toHaveAttribute('data-presentation-state', 'focused');
+  await pressRemote(page, 'DOWN');
+  await expect(channel(page, '43')).toHaveAttribute('data-presentation-state', 'focused');
+  const playbackBefore = await status(page).getAttribute('data-playback-status');
+
+  await pressRemote(page, 'RIGHT');
+  await pressRemote(page, 'SELECT');
+  await expect(featureRoot(page)).toHaveAttribute('data-active-layer', 'actions');
+  const searchAction = page.locator('.live-tv-action[data-action-id="SEARCH"]');
+  await expect(searchAction).toBeVisible();
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if (await searchAction.getAttribute('data-presentation-state') === 'focused') break;
+    await pressRemote(page, 'DOWN');
+  }
+  await expect(searchAction).toHaveAttribute('data-presentation-state', 'focused');
+
+  await pressRemote(page, 'SELECT');
+  await expect(featureRoot(page)).toHaveAttribute('data-active-layer', 'search');
+  await expect(page.locator('.live-tv-search-input')).toHaveAttribute('data-presentation-state', 'focused');
+  await expect(page.locator('.channel-item[data-presentation-state="focused"]')).toHaveCount(0);
+
+  await pressRemote(page, 'BACK');
+  await expect(featureRoot(page)).toHaveAttribute('data-active-layer', 'none');
+  await expect(page.locator('[data-feature-section="search"]')).toHaveCount(0);
+  await expect(sidebar(page)).not.toHaveClass(/closed/);
+  await expect(page.locator('.channel-item[data-presentation-state="focused"]')).toHaveCount(1);
+  await expect(channel(page, '43')).toHaveAttribute('data-presentation-state', 'focused');
+  expect(await status(page).getAttribute('data-playback-status')).toBe(playbackBefore);
+
+  await pressRemote(page, 'BACK');
+  await expect(sidebar(page)).toHaveClass(/closed/);
+
+  expect(harness.events.pageErrors).toEqual([]);
+  expect(harness.events.leakageEvents).toEqual([]);
+
   await writeScenario(harness, {
     scenarioId: 'P10-search-focus',
-    startingState: 'M3 Live TV browser remote surface',
-    actions: ['inspect browser-reachable remote interactions'],
-    expectedState: 'Search focus restoration executes only if Search is browser-reachable through production remote routing',
-    observedState: 'Search has no browser remote action in the production AppComposition mapping; no app-internal patching was used',
-    status: 'NOT-AVAILABLE',
+    startingState: 'Live TV overlay open on provider A with channel 43 as the focused owner',
+    actions: [
+      'open Channel Actions',
+      'move to Search and open it',
+      'Back Search -> overlay owner',
+      'Back overlay -> closed',
+    ],
+    expectedState: 'Search is reachable through production remote routing; Back closes only Search, restores focus to channel 43, and does not change playback',
+    observedState: `search layer opened with input focus; Back returned layer none with one focused owner (43); playback status stayed ${playbackBefore}; second Back closed the overlay`,
   });
 });
 
