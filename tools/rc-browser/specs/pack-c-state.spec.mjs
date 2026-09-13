@@ -17,7 +17,9 @@ import {
   RC_PRODUCTION_SHA,
   RC_SECRET_CANARIES,
   RC_SECRETS,
+  RC_XTREAM_CHANNELS,
 } from '../fixtures/common.mjs';
+import { PLAYNAV_SYNTHETIC_DASH } from '../fixtures/pack-b-play-nav.mjs';
 import {
   COLLIDING_CHANNEL_ID,
   activeProviderId,
@@ -64,11 +66,55 @@ async function reloadToHome(page) {
   await expect(page.locator('#home-page')).toBeVisible({ timeout: 10_000 });
 }
 
-async function createScenarioHarness(context, page, options = {}) {
+// Serves provider A channels as the synthetic VP9 DASH stream PLAYNAV already
+// decodes, so watch state comes from a real browser playback session. The
+// preview server has no /log endpoint; log calls are answered but their levels
+// are kept so an ERROR during successful playback still fails the scenario.
+async function installPlayableProviderMedia(page) {
+  const logLevels = [];
+  await page.route('http://127.0.0.1:4173/log', async (route) => {
+    let level = 'unparsed';
+    try {
+      level = JSON.parse(route.request().postData() ?? '{}').level ?? 'unparsed';
+    } catch {
+      // Keep the unparsed marker.
+    }
+    logLevels.push(level);
+    await route.fulfill({ status: 204, body: '' });
+  });
+  await page.route(`${RC_ENDPOINTS.xtreamA}/player_api.php**`, async (route) => {
+    if (new URL(route.request().url()).searchParams.get('action') !== 'get_live_streams') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json; charset=utf-8',
+      body: JSON.stringify(RC_XTREAM_CHANNELS.map((channel) => ({ ...channel, container_extension: 'mpd' }))),
+    });
+  });
+  await page.route(`${RC_ENDPOINTS.xtreamA}/live/**`, async (route) => {
+    const filename = new URL(route.request().url()).pathname.split('/').pop() ?? '';
+    if (filename.endsWith('.mpd')) {
+      await route.fulfill({ status: 200, contentType: 'application/dash+xml; charset=utf-8', body: PLAYNAV_SYNTHETIC_DASH.manifest });
+      return;
+    }
+    const asset = PLAYNAV_SYNTHETIC_DASH.assets[filename];
+    if (asset === undefined) {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: 'video/webm', body: Buffer.from(asset, 'base64') });
+  });
+  return { logLevels };
+}
+
+async function createScenarioHarness(context, page, options = {}, { playableMedia = false } = {}) {
   const harness = await installBrowserHarness(context, options);
+  const media = playableMedia ? await installPlayableProviderMedia(page) : null;
   await openFreshApp(page);
   await waitForAnySurface(page);
-  return harness;
+  return { harness, media };
 }
 
 async function submitXtream(page, serverUrl) {
@@ -364,14 +410,19 @@ async function recordScenario(testInfo, page, harness, metadata, execute) {
 
 function scenario(id, title, metadata, body) {
   test(`${id} ${title}`, async ({ context, page }, testInfo) => {
-    const harness = await createScenarioHarness(context, page, metadata.harnessOptions ?? {});
+    const { harness, media } = await createScenarioHarness(
+      context,
+      page,
+      metadata.harnessOptions ?? {},
+      { playableMedia: metadata.playableMedia === true },
+    );
     await recordScenario(testInfo, page, harness, {
       id,
       startingState: metadata.startingState,
       actions: metadata.actions,
       expectedState: metadata.expectedState,
       console: metadata.console,
-    }, () => body({ context, page, harness }));
+    }, () => body({ context, page, harness, media }));
   });
 }
 
@@ -414,22 +465,20 @@ scenario('C02', 'Favorite mutation survives reload', {
   };
 });
 
-scenario('C03', 'Last Watched survives reload where browser playback can establish a session', {
-  startingState: 'one active Xtream provider with deterministic stream mock',
-  actions: ['request playback for channel 42', 'observe durable Last Watched if playback reaches playing', 'reload'],
-  expectedState: 'browser-established Last Watched survives reload; otherwise classify the playback seam honestly',
-}, async ({ page }) => {
+function expectBrowserWatch(watch, media) {
+  expect(watch.available, `browser playback must establish Last Watched on synthetic DASH media; playback status ${watch.playbackStatus}`).toBe(true);
+  expect(media.logLevels.filter((level) => level === 'ERROR')).toEqual([]);
+}
+
+scenario('C03', 'Last Watched survives reload after a real browser playback session', {
+  startingState: 'one active Xtream provider whose channels resolve to a browser-decodable synthetic DASH stream',
+  actions: ['request playback for channel 42', 'wait for durable Last Watched', 'reload'],
+  expectedState: 'browser-established Last Watched survives reload with no ERROR-level player log',
+  playableMedia: true,
+}, async ({ page, media }) => {
   const providerA = await onboardXtream(page);
   const watch = await attemptBrowserWatch(page, providerA);
-  if (!watch.available) {
-    await assertNoCredentialLeaks(page);
-    return {
-      observedState: `headless browser playback did not establish durable Last Watched; playback status ${watch.playbackStatus}`,
-      reloadPersistence: 'watch durability NOT-AVAILABLE; HARNESS INTEGRATION REQUIRED because the H0 browser playback seam did not establish a successful watch session',
-      leakage: 'clean',
-      status: 'NOT-AVAILABLE',
-    };
-  }
+  expectBrowserWatch(watch, media);
   await reloadToHome(page);
   const after = await readSafeStructuredState(page);
   expect(lastWatchedRecord(after, providerA)?.channelId).toBe(COLLIDING_CHANNEL_ID);
@@ -468,20 +517,14 @@ scenario('C04', 'same channelId Favorites remain provider scoped', {
 });
 
 scenario('C05', 'same channelId watch state remains provider scoped', {
-  startingState: 'provider A active with channel 42 and browser playback seam available when possible',
-  actions: ['establish provider A Last Watched on channel 42', 'add provider B with colliding channel 42', 'reload'],
+  startingState: 'provider A active with channel 42 resolving to browser-decodable synthetic DASH media',
+  actions: ['establish provider A Last Watched on channel 42 through browser playback', 'add provider B with colliding channel 42', 'reload'],
   expectedState: 'provider A watch state never appears in provider B partition',
-}, async ({ page }) => {
+  playableMedia: true,
+}, async ({ page, media }) => {
   const providerA = await onboardXtream(page);
   const watch = await attemptBrowserWatch(page, providerA);
-  if (!watch.available) {
-    return {
-      observedState: `watch isolation could not be exercised because browser playback did not establish a session; playback status ${watch.playbackStatus}`,
-      reloadPersistence: 'watch provider isolation NOT-AVAILABLE; HARNESS INTEGRATION REQUIRED without browser-created watch state',
-      leakage: 'clean',
-      status: 'NOT-AVAILABLE',
-    };
-  }
+  expectBrowserWatch(watch, media);
   const providerB = await addSecondXtreamProvider(page);
   await reloadToHome(page);
   const state = await readSafeStructuredState(page);

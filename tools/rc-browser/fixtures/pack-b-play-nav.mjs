@@ -50,6 +50,9 @@ const MEDIA_ASSETS = Object.freeze({
   'chunk-stream0-00001.webm': 'H0O2dfzngQCjo4EAAICCSYNCAAPwAjYAOCQcGEIAADBgAAATv//9ZrxAAAAAo5OBAMgAhgBAkpwASUAAAyAAAFRwo5OBAZAAhgBAkpwASsAAAyAAAFRwo5OBAlgAhgBAkpwAScAAAyAAAFRwo5OBAyAAhgBAkpwASKAAAyAAAFRw',
 });
 
+// Shared with other packs that need a real browser-decodable playback session.
+export const PLAYNAV_SYNTHETIC_DASH = Object.freeze({ manifest: MEDIA_MPD, assets: MEDIA_ASSETS });
+
 function providerHost(providerId) {
   if (providerId === PLAYNAV_PROVIDER_A) return RC_ENDPOINTS.xtreamA;
   if (providerId === PLAYNAV_PROVIDER_B) return RC_ENDPOINTS.xtreamB;
