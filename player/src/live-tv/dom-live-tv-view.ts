@@ -16,6 +16,10 @@ function required(document: Document, id: string): HTMLElement {
   return element;
 }
 
+export interface DomLiveTvViewCallbacks {
+  onSearchQuery?(query: string): void;
+}
+
 export class DomLiveTvView implements LiveTvView {
   private readonly sidebar: HTMLElement;
   private readonly channelList: HTMLElement;
@@ -25,7 +29,10 @@ export class DomLiveTvView implements LiveTvView {
   private readonly numeric: HTMLElement;
   private readonly featureRoot: HTMLElement;
 
-  constructor(private readonly document: Document) {
+  constructor(
+    private readonly document: Document,
+    private readonly callbacks: DomLiveTvViewCallbacks = {},
+  ) {
     this.sidebar = required(document, 'sidebar');
     this.channelList = required(document, 'channel-list');
     this.groupList = required(document, 'group-list');
@@ -175,6 +182,9 @@ export class DomLiveTvView implements LiveTvView {
       input.type = 'search';
       input.value = features.search.query;
       input.dataset.presentationState = features.search.focusZone === 'input' ? 'focused' : 'idle';
+      input.addEventListener('input', () => {
+        this.callbacks.onSearchQuery?.(input.value);
+      });
       search.append(input);
 
       for (const item of features.search.items) {

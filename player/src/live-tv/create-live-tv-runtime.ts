@@ -234,11 +234,15 @@ export async function createBrowserLiveTvRuntime(
       watchObserver,
       terminalBinder,
     );
-    const view = new DomLiveTvView(deps.document);
+    let controller: LiveTvController | null = null;
+    const view = new DomLiveTvView(deps.document, {
+      onSearchQuery(query) {
+        controller?.updateSearchQuery(query);
+      },
+    });
     const features = deps.featurePorts === undefined
       ? undefined
       : createLiveTvFeatureComposition(deps.featurePorts);
-    let controller: LiveTvController | null = null;
     const intent = new ChannelIntentCoordinator(
       resolver,
       session,
