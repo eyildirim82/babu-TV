@@ -39,6 +39,8 @@ test.afterEach(async ({}, testInfo) => {
     expectedStatus: testInfo.expectedStatus,
     retry: testInfo.retry,
     error: sanitizeFailureText(error?.message),
+    stack: sanitizeFailureText(error?.stack),
+    location: error?.location ?? null,
   };
   await mkdir('rc-browser-artifacts', { recursive: true });
   await writeFile(failureEvidenceName(testInfo), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
