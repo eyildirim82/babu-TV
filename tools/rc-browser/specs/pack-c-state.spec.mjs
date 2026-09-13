@@ -554,7 +554,8 @@ scenario('C08', 'provider delete cleans target state and preserves unrelated pro
   await toggleFavoriteForActiveProvider(page, providerB);
   const beforeB = providerCatalogSummary(await readSafeStructuredState(page), providerB);
   await deleteProvider(page, providerA);
-  expect(credentialProviderIds(harness.widgetData)).toEqual([providerB]);
+  // The delete row can leave the DOM before the delete transaction settles.
+  await expect.poll(() => credentialProviderIds(harness.widgetData)).toEqual([providerB]);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('#home-page')).toBeVisible({ timeout: 10_000 });
   const state = await readSafeStructuredState(page);
@@ -627,7 +628,14 @@ scenario('C10', 'empty provider and empty-catalog error state remain reload-safe
   await pressRemote(page, 'DOWN');
   await pressRemote(page, 'DOWN');
   await pressRemote(page, 'SELECT');
-  await expect(page.locator('#xtream-status')).not.toHaveText('', { timeout: 15_000 });
+  // The Connecting copy is written before onboarding starts. Wait for the
+  // failed submit to finish (Connect re-enabled, failure copy shown) so the
+  // compensation check and reload cannot land mid-transaction.
+  await page.waitForFunction(() => {
+    const status = document.getElementById('xtream-status')?.textContent ?? '';
+    const connect = document.getElementById('xtream-connect');
+    return connect instanceof HTMLButtonElement && !connect.disabled && status !== '' && status !== 'Bağlanıyor…';
+  }, undefined, { timeout: 15_000 });
   await expect.poll(async () => providerIds(await readSafeStructuredState(page))).toEqual([]);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('#first-run-page')).toBeVisible({ timeout: 10_000 });
