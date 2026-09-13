@@ -162,6 +162,47 @@ void test('Shaka adapter normalizes raw inherited Shaka failures in TypeScript',
   );
 });
 
+void test('Shaka adapter stop resolves only after the inherited player teardown completes', async () => {
+  let stops = 0;
+  let finishTeardown!: () => void;
+  const teardown = new Promise<void>((resolve) => {
+    finishTeardown = resolve;
+  });
+  const legacyPlayer = {
+    async initPlayer() { return true; },
+    async loadChannel() { return false; },
+    async playShakaAttempt() { return { ok: false, failure: { m3Code: 'ENGINE_FAILURE' } }; },
+    stop() { stops += 1; return teardown; },
+    togglePlay() {},
+    reloadChannel() {},
+    onBuffering() {},
+    onTrackChange() {},
+    onChannelAdvance() {},
+    onProxySuggestion() {},
+    getActiveHeight() { return null; },
+    getActiveBandwidth() { return null; },
+    getBufferingPercent() { return 0; },
+    getPlayer() { return null; },
+    getResolutions() { return []; },
+    selectResolution() {},
+    getPlaybackEngine() { return null; },
+  };
+  const shaka = new ShakaAdapter(legacyPlayer);
+
+  let stopped = false;
+  const stopping = Promise.resolve(shaka.stop()).then(() => {
+    stopped = true;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(stops, 1);
+  assert.equal(stopped, false, 'engine stop must not settle while the old player teardown is still running');
+
+  finishTeardown();
+  await stopping;
+  assert.equal(stopped, true);
+});
+
 void test('AVPlay adapter preserves the inherited native API shape', async () => {
   const calls: unknown[][] = [];
   const legacyAvplay = {

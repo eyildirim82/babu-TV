@@ -1114,9 +1114,13 @@ export function reloadChannel() {
 export function stop() {
   avplay.stop();
   if (videoElement) videoElement.classList.remove('hidden');
-  destroyPlayer().catch(() => {});
+  // Keep the shared video element and hand the teardown back to the caller.
+  // A detached destroy resumed after the next Shaka player attached, emptied
+  // its media source and left the new playback stuck in PREPARING.
+  const teardown = destroyPlayer(videoElement).catch(() => {});
   showLoading(false);
   hideError();
+  return teardown;
 }
 
 let avplayPaused = false;

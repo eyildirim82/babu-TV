@@ -21,7 +21,7 @@ export interface LegacyPlayerPort {
   initPlayer(videoEl: unknown): boolean | Promise<boolean>;
   loadChannel(channel: unknown): Promise<boolean>;
   playShakaAttempt(channel: unknown): Promise<LegacyShakaAttemptResult>;
-  stop(): void;
+  stop(): Promise<void> | void;
   togglePlay(): void;
   reloadChannel(): void;
   onBuffering(callback: BufferingCallback): void;
@@ -121,9 +121,9 @@ export class ShakaAdapter implements PlaybackEnginePort {
     return this.legacy.loadChannel(channel);
   }
 
-  stop(): void {
+  stop(): Promise<void> | void {
     this.clearTerminalListeners();
-    this.legacy.stop();
+    return this.legacy.stop();
   }
 
   togglePlay(): void {
