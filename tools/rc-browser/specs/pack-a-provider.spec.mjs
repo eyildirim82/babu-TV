@@ -14,7 +14,11 @@ import {
 import { RC_ENDPOINTS, RC_SECRET_CANARIES } from '../fixtures/common.mjs';
 
 const REQUIRED = 'Sunucu, kullanıcı adı ve şifre gerekli.';
-const clean = (h) => { expect(h.events.pageErrors).toEqual([]); assertNoUnexplainedConsoleErrors(h.events); };
+const EXPECTED_SYNTHETIC_NETWORK_CONSOLE_ERRORS = [
+  /Failed to load resource: the server responded with a status of 401\b/,
+  /Failed to load resource: net::ERR_FAILED/,
+];
+const clean = (h, options) => { expect(h.events.pageErrors).toEqual([]); assertNoUnexplainedConsoleErrors(h.events, options); };
 const leaks = async (p) => expect(await findSecretLeaks(p, RC_SECRET_CANARIES)).toEqual([]);
 const calls = (h, category) => h.providerMocks.calls.filter((item) => item.category === category);
 
@@ -86,7 +90,8 @@ scenario('A03', {
     await expect(page.locator('#xtream-connect')).toBeEnabled(); await expect(page.locator('#xtream-password')).toHaveAttribute('type', 'password');
     expect(await focusedElementId(page)).toBe('xtream-connect');
   }
-  expect(h.events.httpErrors.some((x) => x.status === 401)).toBe(true); expect(h.events.requestFailures.length).toBeGreaterThanOrEqual(1); clean(h);
+  expect(h.events.httpErrors.some((x) => x.status === 401)).toBe(true); expect(h.events.requestFailures.length).toBeGreaterThanOrEqual(1);
+  clean(h, { allow: EXPECTED_SYNTHETIC_NETWORK_CONSOLE_ERRORS });
 });
 
 scenario('A04', {
