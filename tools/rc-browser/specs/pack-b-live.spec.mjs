@@ -176,6 +176,8 @@ async function openSearch(page) {
   await expect(searchAction).toHaveAttribute('data-presentation-state', 'focused');
   await pressRemote(page, 'SELECT');
   await expect(page.locator(SEARCH)).toBeVisible();
+  // Typing before the search layer owns input focus can be dropped by the render.
+  await expect(page.locator('.live-tv-search-input')).toHaveAttribute('data-presentation-state', 'focused');
 }
 
 async function favoriteHighlighted(page) {
@@ -359,6 +361,8 @@ test('B07 Search highlight/activation does not implicitly play', async ({ contex
     const input = page.locator('.live-tv-search-input');
     await input.fill('şeker');
     await input.dispatchEvent('input');
+    // DOWN only moves into results that are already rendered.
+    await expect(page.locator(SEARCH_RESULT).first()).toContainText('Şeker');
     await pressRemote(page, 'DOWN');
     await expect(page.locator(`${SEARCH_RESULT}[data-presentation-state="focused"]`)).toContainText('Şeker');
     await assertNoPlayback(page);
