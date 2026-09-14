@@ -205,64 +205,13 @@ function hideBootSplash() {
 
 const LAST_SEEN_KEY = 'en_last_seen_version';
 
+// BabuşTV's own release line. The inherited EN TV Player 1.x history is not
+// BabuşTV release news and is no longer listed.
 const CHANGELOG = [
   {
-    version: '1.10.1',
+    version: '1.0.0',
     sections: [
-      { type: 'fixed', items: ['Boş yeni kurulum artık sizi işlevsiz bir sayfada bırakmıyor', 'Çözünürlük rozeti her zaman gerçek kaliteyi gösteriyor', 'Geçmeli taramalı kanallar yerel oynatmayla açılıyor', 'Kararsız aktarımlar yeni bağlantıyla yeniden denenerek toparlanıyor'] },
-      { type: 'changed', items: ['Aşamalı yükleme: gösterge, ilk kare, ardından arabelleğe alma', 'Bekleme ipuçlarıyla kanal ve arabelleğe alma bildirimleri', 'Açılış ekranı daha sade ve hızlı kapanıyor'] },
-    ],
-  },
-  {
-    version: '1.10.0',
-    sections: [
-      { type: 'added', items: ['İsteğe bağlı güncelleme denetimi — bir kez izin verin, yeni sürümlerden haberdar olun', 'İletişim ve indirme istatistikleri yenilendi'] },
-    ],
-  },
-  {
-    version: '1.9.0',
-    sections: [
-      { type: 'fixed', items: ['Belirteçli canlı oynatma listeleri artık ilk kareden sonra düşmeden oynuyor', 'Erişimi reddedilen kanallar vazgeçmeden önce yeni bağlantıyla yeniden deneniyor', 'Canlı yayın kesintılarında daha anlaşılır mesajlar gösteriliyor'] },
-    ],
-  },
-  {
-    version: '1.8.0',
-    sections: [
-      { type: 'fixed', items: ['Kumandayla yapılan Ayarlar değişiklikleri artık kaydediliyor', 'Ayarlar metin alanında Enter artık TV’de kaydediyor', 'Çöken kanallar uyumluluk modunda otomatik yeniden deneniyor', 'Tanınmayan kanal bağlantıları artık belirlenip doğru şekilde yeniden deneniyor', 'Kanal hata mesajları artık daha doğru'] },
-      { type: 'changed', items: ['Proxy ipucu alt orta konuma düzeltildi', 'Ayarlar geri düğmesi aralığı düzeltildi'] },
-    ],
-  },
-  {
-    version: '1.7.0',
-    sections: [
-      { type: 'fixed', items: ['Bazı kanallardaki siyah ekran için yayın biçimi artık otomatik belirleniyor', 'Tarih-saat eşitlemesi gereken HLS yayınları artık doğru çalışıyor', 'Ham TS/MP4 yayın bağlantıları Samsung Tizen’da doğru oynuyor', 'TV kaynaklı video hataları yakalanıp kullanıcıya gösteriliyor', 'Çalışmayacak yayınlar artık daha hızlı sonuçlanıyor'] },
-      { type: 'changed', items: ['Hata mesajları daha sade ve anlaşılır hale getirildi', 'Proxy, internet ve çevrimdışı kanal durumları için daha iyi ipuçları eklendi'] },
-    ],
-  },
-  {
-    version: '1.6.0',
-    sections: [
-      { type: 'added', items: ['Logo animasyonu, yazı efekti ve gösterge içeren açılış ekranı', 'Açılış ekranında uygulama sürümü', 'Her güncellemeden sonra bir kez gösterilen Yenilikler penceresi', 'Uygulama açılışında oynatma listesini otomatik yenileme seçeneği'] },
-      { type: 'fixed', items: ['Yayın sırasında kanal listesini yenilemedeki aralıklı hata giderildi', 'Aktarım yedeği artık anlamlı hata mesajları gösteriyor', 'Yenileme düğmesi yükleme sırasında devre dışı kalıyor'] },
-    ],
-  },
-  {
-    version: '1.5.0',
-    sections: [
-      { type: 'changed', items: ['Uygulama logosu yeni tasarımla güncellendi'] },
-    ],
-  },
-  {
-    version: '1.4.0',
-    sections: [
-      { type: 'added', items: ['Uzun kanal adları için otomatik kaydırma'] },
-      { type: 'fixed', items: ['Kenar çubuğu gezinmesi ve kanal değiştirme iyileştirmeleri'] },
-    ],
-  },
-  {
-    version: '1.3.0',
-    sections: [
-      { type: 'added', items: ['Tüm ekran boyutları için uyarlanabilir TV ölçekleme'] },
+      { type: 'added', items: ['Ana Sayfa: sağlayıcı, son izlenen, favoriler ve sık izlenenler', 'Xtream ve M3U sağlayıcıları, telefonla güvenli eşleştirme', 'Canlı TV’de program rehberi, favoriler ve kanal araması'] },
     ],
   },
 ];
@@ -296,7 +245,6 @@ function showWhatsNew() {
     html += '</div>';
   }
   for (const entry of CHANGELOG) {
-    if (entry.version === '1.0.0') break;
     html += '<div class="wn-section">';
     html += '<div class="wn-section-title">v' + entry.version + '</div>';
     for (const sec of entry.sections) {
