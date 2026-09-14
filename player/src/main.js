@@ -21,6 +21,7 @@ import {
   LEGACY_OPTIONAL_TIZEN_KEYS,
   M3_NUMERIC_TIZEN_KEYS,
 } from './platform/create-platform.ts';
+import { isPairingPhoneRoute } from './pairing/phone-browser-entry.ts';
 
 const platform = createPlatform(window);
 const player = createPlaybackService(legacyPlayer);
@@ -1123,8 +1124,12 @@ export async function refreshChannels() {
 
 
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
-  init();
+// The IIFE build inlines browser-entry's dynamic import of this module, so it
+// is evaluated even when the phone pairing route owns the page.
+if (!isPairingPhoneRoute(window.location.hash)) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 }
