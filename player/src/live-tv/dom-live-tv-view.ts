@@ -2,6 +2,7 @@ import type { Channel } from '../domain/models.js';
 import type { LiveTvState } from './contracts.js';
 import { scopeKey } from './live-tv-state.js';
 import type { LiveTvView, LiveTvViewModel } from './live-tv-controller.js';
+import type { SearchViewModel } from '../search/search-view-model.js';
 import { UI_COPY } from '../ui/copy.js';
 
 function channelLabel(channel: Channel): string {
@@ -28,6 +29,9 @@ export class DomLiveTvView implements LiveTvView {
   private readonly status: HTMLElement;
   private readonly numeric: HTMLElement;
   private readonly featureRoot: HTMLElement;
+  private searchSection: HTMLElement | null = null;
+  private searchInput: HTMLInputElement | null = null;
+  private searchResults: HTMLElement[] = [];
 
   constructor(
     private readonly document: Document,
@@ -132,6 +136,7 @@ export class DomLiveTvView implements LiveTvView {
   private renderFeatures(model: LiveTvViewModel): void {
     const features = model.features;
     if (features === undefined) {
+      this.releaseSearch();
       this.featureRoot.replaceChildren();
       this.featureRoot.classList.add('hidden');
       return;
@@ -172,34 +177,9 @@ export class DomLiveTvView implements LiveTvView {
     sections.push(favorites);
 
     if (features.layer === 'search') {
-      const search = this.document.createElement('div');
-      search.className = 'live-tv-search';
-      search.dataset.featureSection = 'search';
-      search.dataset.presentationState = features.search.status;
-
-      const input = this.document.createElement('input');
-      input.className = 'live-tv-search-input';
-      input.type = 'search';
-      input.value = features.search.query;
-      input.dataset.presentationState = features.search.focusZone === 'input' ? 'focused' : 'idle';
-      input.addEventListener('input', () => {
-        this.callbacks.onSearchQuery?.(input.value);
-      });
-      search.append(input);
-
-      for (const item of features.search.items) {
-        const result = this.document.createElement('div');
-        result.className = 'live-tv-search-result';
-        result.dataset.resultKey = item.key;
-        result.dataset.presentationState = item.key === features.search.focusedResultKey
-          ? 'focused'
-          : 'idle';
-        result.textContent = item.numberText === null
-          ? item.primaryText
-          : `${item.numberText} ${item.primaryText}`;
-        search.append(result);
-      }
-      sections.push(search);
+      sections.push(this.renderSearch(features.search));
+    } else {
+      this.releaseSearch();
     }
 
     if (
@@ -234,9 +214,85 @@ export class DomLiveTvView implements LiveTvView {
       sections.push(programInfo);
     }
 
-    this.featureRoot.replaceChildren(...sections);
+    this.syncFeatureSections(sections);
     this.featureRoot.classList.remove('hidden');
     this.featureRoot.dataset.activeLayer = features.layer;
+    this.syncSearchFocus(features.layer === 'search' && features.search.focusZone === 'input');
+  }
+
+  // The Search layer keeps one section and input while it stays open. Every
+  // input event re-renders, and recreating or re-inserting the input would
+  // drop DOM focus (and a TV IME) after each character.
+  private renderSearch(search: SearchViewModel): HTMLElement {
+    let section = this.searchSection;
+    let input = this.searchInput;
+    if (section === null || input === null) {
+      section = this.document.createElement('div');
+      section.className = 'live-tv-search';
+      section.dataset.featureSection = 'search';
+      const created = this.document.createElement('input');
+      created.className = 'live-tv-search-input';
+      created.type = 'search';
+      created.autocomplete = 'off';
+      created.addEventListener('input', () => {
+        this.callbacks.onSearchQuery?.(created.value);
+      });
+      section.append(created);
+      input = created;
+      this.searchSection = section;
+      this.searchInput = input;
+    }
+
+    section.dataset.presentationState = search.status;
+    if (input.value !== search.query) input.value = search.query;
+    input.dataset.presentationState = search.focusZone === 'input' ? 'focused' : 'idle';
+
+    for (const result of this.searchResults) result.remove();
+    this.searchResults = search.items.map((item) => {
+      const result = this.document.createElement('div');
+      result.className = 'live-tv-search-result';
+      result.dataset.resultKey = item.key;
+      result.dataset.presentationState = item.key === search.focusedResultKey ? 'focused' : 'idle';
+      result.textContent = item.numberText === null
+        ? item.primaryText
+        : `${item.numberText} ${item.primaryText}`;
+      return result;
+    });
+    section.append(...this.searchResults);
+    return section;
+  }
+
+  private releaseSearch(): void {
+    this.searchSection = null;
+    this.searchInput = null;
+    this.searchResults = [];
+  }
+
+  // Keeps an already attached Search section in place: siblings are removed or
+  // inserted around it, so its focused input is never detached.
+  private syncFeatureSections(sections: readonly HTMLElement[]): void {
+    const kept = this.searchSection;
+    if (kept === null || !sections.includes(kept) || kept.parentElement !== this.featureRoot) {
+      this.featureRoot.replaceChildren(...sections);
+      return;
+    }
+    for (const child of Array.from(this.featureRoot.children)) {
+      if (!sections.includes(child as HTMLElement)) child.remove();
+    }
+    sections.forEach((section, index) => {
+      const current = this.featureRoot.children[index] ?? null;
+      if (current !== section) this.featureRoot.insertBefore(section, current);
+    });
+  }
+
+  private syncSearchFocus(inputOwnsFocus: boolean): void {
+    const input = this.searchInput;
+    if (input === null) return;
+    if (inputOwnsFocus) {
+      if (this.document.activeElement !== input) input.focus();
+    } else if (this.document.activeElement === input) {
+      input.blur();
+    }
   }
 
   private renderNowPlaying(state: LiveTvState, model: LiveTvViewModel): void {
