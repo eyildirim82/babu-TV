@@ -109,12 +109,45 @@ async function installPlayableProviderMedia(page) {
   return { logLevels };
 }
 
-async function createScenarioHarness(context, page, options = {}, { playableMedia = false } = {}) {
+// The shared Xtream EPG fixture uses 1970 timestamps, which the EPG window
+// discards, so nothing is persisted. Serve provider A a current/next pair
+// until the scenario hands EPG back to the harness failure modes.
+async function installCurrentProviderEpg(page) {
+  let enabled = true;
+  await page.route(`${RC_ENDPOINTS.xtreamA}/player_api.php**`, async (route) => {
+    const url = new URL(route.request().url());
+    if (!enabled || url.searchParams.get('action') !== 'get_short_epg') {
+      await route.fallback();
+      return;
+    }
+    const streamId = url.searchParams.get('stream_id') ?? '';
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const encode = (text) => Buffer.from(text, 'utf8').toString('base64');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json; charset=utf-8',
+      body: JSON.stringify({
+        epg_listings: [
+          { stream_id: streamId, title: encode(`Şimdi ${streamId}`), description: encode('Geçerli program'), start_timestamp: nowSeconds - 600, stop_timestamp: nowSeconds + 600 },
+          { stream_id: streamId, title: encode(`Sonraki ${streamId}`), description: encode('Sıradaki program'), start_timestamp: nowSeconds + 600, stop_timestamp: nowSeconds + 1800 },
+        ],
+      }),
+    });
+  });
+  return {
+    handBackToHarness() {
+      enabled = false;
+    },
+  };
+}
+
+async function createScenarioHarness(context, page, options = {}, { playableMedia = false, currentEpg = false } = {}) {
   const harness = await installBrowserHarness(context, options);
   const media = playableMedia ? await installPlayableProviderMedia(page) : null;
+  const epg = currentEpg ? await installCurrentProviderEpg(page) : null;
   await openFreshApp(page);
   await waitForAnySurface(page);
-  return { harness, media };
+  return { harness, media, epg };
 }
 
 async function submitXtream(page, serverUrl) {
@@ -410,11 +443,11 @@ async function recordScenario(testInfo, page, harness, metadata, execute) {
 
 function scenario(id, title, metadata, body) {
   test(`${id} ${title}`, async ({ context, page }, testInfo) => {
-    const { harness, media } = await createScenarioHarness(
+    const { harness, media, epg } = await createScenarioHarness(
       context,
       page,
       metadata.harnessOptions ?? {},
-      { playableMedia: metadata.playableMedia === true },
+      { playableMedia: metadata.playableMedia === true, currentEpg: metadata.currentEpg === true },
     );
     await recordScenario(testInfo, page, harness, {
       id,
@@ -422,7 +455,7 @@ function scenario(id, title, metadata, body) {
       actions: metadata.actions,
       expectedState: metadata.expectedState,
       console: metadata.console,
-    }, () => body({ context, page, harness, media }));
+    }, () => body({ context, page, harness, media, epg }));
   });
 }
 
@@ -620,16 +653,22 @@ scenario('C08', 'provider delete cleans target state and preserves unrelated pro
 });
 
 scenario('C09', 'stale catalog survives degraded re-entry refresh', {
-  startingState: 'provider A with usable cached catalog and Favorite',
-  actions: ['record cached catalog', 'force synthetic categories refresh failure', 're-enter provider A', 'reload'],
-  expectedState: 'provider identity, usable cached catalog and durable user state are not destroyed by degraded refresh',
+  startingState: 'provider A with usable cached catalog, persisted current/next EPG and Favorite',
+  actions: ['record cached catalog and EPG', 'force synthetic categories and EPG refresh failure', 're-enter provider A', 'reload'],
+  expectedState: 'provider identity, usable cached catalog, persisted EPG and durable user state are not destroyed by degraded refresh',
   console: { expectedProviderHttp500: true },
-}, async ({ page, harness }) => {
+  currentEpg: true,
+}, async ({ page, harness, epg }) => {
   const providerA = await onboardXtream(page);
   await toggleFavoriteForActiveProvider(page, providerA);
+  await expect.poll(
+    async () => providerCatalogSummary(await readSafeStructuredState(page), providerA).epgPrograms,
+    { message: 'current/next EPG must be persisted before the degraded refresh', timeout: 10_000 },
+  ).toBeGreaterThan(0);
   const before = await readSafeStructuredState(page);
   const beforeCatalog = providerCatalogSummary(before, providerA);
   expect(beforeCatalog.channels).toBeGreaterThan(0);
+  epg.handBackToHarness();
   harness.providerMocks.setXtreamMode('categories', 'http-500');
   harness.providerMocks.setXtreamMode('epg', 'http-500');
   await editXtreamProvider(page, providerA, { failCategories: true });
@@ -639,17 +678,12 @@ scenario('C09', 'stale catalog survives degraded re-entry refresh', {
   expect(providerCatalogSummary(after, providerA).channels).toBe(beforeCatalog.channels);
   expect(providerCatalogSummary(after, providerA).categories).toBe(beforeCatalog.categories);
   expect(favoriteRecords(after, providerA).some((record) => record.channelId === COLLIDING_CHANNEL_ID)).toBe(true);
-  const epgAvailable = beforeCatalog.epgPrograms > 0;
-  if (epgAvailable) expect(providerCatalogSummary(after, providerA).epgPrograms).toBe(beforeCatalog.epgPrograms);
+  expect(providerCatalogSummary(after, providerA).epgPrograms).toBe(beforeCatalog.epgPrograms);
   return {
-    observedState: epgAvailable
-      ? 'degraded refresh preserved cached catalog, EPG and Favorite state'
-      : 'synthetic HTTP 500 degraded refresh preserved cached catalog and Favorite; current browser path had no persisted EPG record to qualify',
-    reloadPersistence: epgAvailable
-      ? 'stale catalog/EPG preservation PASS'
-      : 'stale catalog preservation PASS; persisted EPG sub-check NOT-AVAILABLE — HARNESS INTEGRATION REQUIRED for deterministic browser EPG seeding',
+    observedState: `synthetic HTTP 500 degraded refresh preserved cached catalog, ${beforeCatalog.epgPrograms} persisted EPG programs and Favorite state`,
+    reloadPersistence: 'stale catalog/EPG preservation PASS',
     leakage: 'clean',
-    status: epgAvailable ? 'PASS' : 'NOT-AVAILABLE',
+    status: 'PASS',
   };
 });
 
