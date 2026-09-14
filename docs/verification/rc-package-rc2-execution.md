@@ -2,7 +2,7 @@
 
 Date: 2026-09-14
 Owner: REVIEW / Integration Controller
-Status: ACCEPTED — controller accepted `1.0.0-rc.2` on 2026-09-14 at package candidate `77b0a5b`; physical Samsung/Tizen install and runtime rows remain NOT VERIFIED / DEFERRED
+Status: CLOSED / GREEN — accepted 2026-09-14 for `1.0.0-rc.2` at package candidate `77b0a5b`; PR #140 merged to `main@e4a6bca`, post-merge verify `34861410744` SUCCESS; tagged `v1.0.0-rc.2`; physical Samsung/Tizen install and runtime rows remain NOT VERIFIED / DEFERRED
 
 Method and check definitions: `docs/verification/rc-package-execution.md` (rc.1). This board records only what differs and the rc.2 results. The controller's `ACCEPTED` decision is recorded under "Controller acceptance record"; `CLOSED / GREEN` follows once this branch is merged to `main` with a SUCCESS post-merge verify.
 
@@ -91,7 +91,7 @@ Unchanged from rc.1. Building, staging, signing and archive inspection do not pr
 | Accepted evidence head | `07cb5ce` (board), `verify` run `34861109862` SUCCESS; candidate head `77b0a5b` `verify` run `34860514185` SUCCESS |
 | Accepted local WGT | `babustv_beta_v1.0.0-rc.2_77b0a5b.wgt`, SHA-256 `ea127ca6ac2f8d47728ae603cb99409c7ed5fee96e057a703e6eb3df18acecf1` (not distributed) |
 | Merge method | merge commit, so `77b0a5b` stays reachable from `main` |
-| Release tag | controller approved annotated `v1.0.0-rc.2` at `77b0a5b`, no GitHub Release |
+| Release tag | annotated `v1.0.0-rc.2` at `77b0a5b` created and pushed (tag object `fda4f69`), no GitHub Release |
 | Next transition | `ACCEPTED → CLOSED / GREEN` when PR #140 merges and post-merge verify is SUCCESS |
 
 Acceptance does not change any `NOT VERIFIED / DEFERRED` physical-device row, and the open observations stay open.

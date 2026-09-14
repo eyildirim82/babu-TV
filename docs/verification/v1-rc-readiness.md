@@ -2,10 +2,10 @@
 
 **Date:** 2026-09-14\
 **Owner:** REVIEW / Integration Controller\
-**Status:** RC CANDIDATE `1.0.0-rc.1` PRODUCED — WAVES 0–5 CLOSED GREEN; RC-BROWSER CLOSED GREEN; RC-PACKAGE CLOSED GREEN; RELEASE TAG AWAITING CONTROLLER DECISION; PHYSICAL-TIZEN DEBT PENDING/DEFERRED\
+**Status:** RC CANDIDATE `1.0.0-rc.2` PRODUCED AND TAGGED (SUPERSEDES rc.1) — WAVES 0–5 CLOSED GREEN; RC-BROWSER CLOSED GREEN; RC-PACKAGE rc.1 AND rc.2 CLOSED GREEN; PHYSICAL-TIZEN DEBT PENDING/DEFERRED\
 **Starting baseline:** `main@f3061cbad574b507b1f80cf23e19b8af179e90b0`\
 **Baseline verify:** `34414698392` SUCCESS\
-**Latest evidence head:** `main@4afeef4` (RC-PACKAGE merge, PR #137); post-merge verify `34851391827` SUCCESS
+**Latest evidence head:** `main@e4a6bca` (RC-PACKAGE rc.2 merge, PR #140); post-merge verify `34861410744` SUCCESS
 
 ## Purpose
 
@@ -25,7 +25,7 @@ Live role/dependency board: `docs/verification/v1-parallel-execution.md`.
 
 RC-BROWSER evidence board: `docs/verification/rc-browser-execution.md`.
 
-RC-PACKAGE evidence board: `docs/verification/rc-package-execution.md`.
+RC-PACKAGE evidence boards: `docs/verification/rc-package-execution.md` (rc.1) and `docs/verification/rc-package-rc2-execution.md` (rc.2).
 
 Approved product spec: `docs/superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md`.
 
@@ -67,7 +67,11 @@ Approved product spec: `docs/superpowers/specs/2026-09-07-babustv-v1-product-and
 | RC FIX version prerelease | `CLOSED GREEN` | #135 `29c2e0f`; post-merge verify `34849186407` SUCCESS |
 | Control boards refresh | `CLOSED GREEN` | #136 `6773ca1`; post-merge verify `34849192504` SUCCESS |
 | RC-PACKAGE qualification | `CLOSED GREEN` | accepted 2026-09-14 for `1.0.0-rc.1` at package candidate `c3c9709` (verify `34849865998`); PR #137 merged to `main@4afeef4` by merge commit; post-merge verify `34851391827` SUCCESS (JS 62/62, TS 620/620) |
-| Open implementation blocker | none | release tag `v1.0.0-rc.1` awaits an explicit controller decision; physical-Tizen debt is not a repository blocker |
+| Release tag `v1.0.0-rc.1` | `CLOSED GREEN` | annotated tag at package candidate `c3c9709`; no GitHub Release; superseded by rc.2 |
+| RC FIX browser demo findings | `CLOSED GREEN` | #139 merged to `main@a7fe8f9` by merge commit (`f6809f1`, `b9d77d1`, `3fa7910`, `3dda382`, `569e2cc`); post-merge verify `34860215716` SUCCESS (JS 68/68, TS 628/628); local rc-browser 76/76 |
+| RC-PACKAGE qualification rc.2 | `CLOSED GREEN` | accepted 2026-09-14 for `1.0.0-rc.2` at package candidate `77b0a5b` (verify `34860514185`); PR #140 merged to `main@e4a6bca` by merge commit; post-merge verify `34861410744` SUCCESS (JS 68/68, TS 628/628) |
+| Release tag `v1.0.0-rc.2` | `CLOSED GREEN` | annotated tag at package candidate `77b0a5b`; no GitHub Release |
+| Open implementation blocker | none | physical-Tizen debt is not a repository blocker |
 
 Every PR listed on this board merged to `main` with a SUCCESS post-merge `verify` run. Per-role merge SHAs and run IDs are recorded in `v1-parallel-execution.md`.
 
@@ -91,7 +95,7 @@ This table remains product-level. Evidence lists the merged PRs that implement e
 | 11 | M6 Secure Pairing | `CLOSED GREEN` | No for protocol/browser development | ephemeral encrypted single-use pairing + public/self-host-compatible relay contract | #72 #73 #74 #79 #84 #87; RC fix #131 |
 | 12 | M7 Hardening | `CLOSED GREEN` | No for deterministic matrix | large/malformed/offline/migration/focus/security cases GREEN | #88 #90 #92 #93 #94 #95 #96 |
 | 13 | Browser Release Matrix | `CLOSED GREEN` | No | deterministic 1920×1080 release smoke GREEN | #132 → `main@450f681`; `docs/verification/rc-browser-execution.md` |
-| 14 | Tizen build/package RC gate | `CLOSED GREEN` | No for build; environment-dependent for package signing | available package/staging gates GREEN, unavailable paths honestly classified | #135 → #137 `main@4afeef4`; `docs/verification/rc-package-execution.md` |
+| 14 | Tizen build/package RC gate | `CLOSED GREEN` | No for build; environment-dependent for package signing | available package/staging gates GREEN, unavailable paths honestly classified | #135 → #137 `main@4afeef4` (rc.1); #139 → #140 `main@e4a6bca` (rc.2); `docs/verification/rc-package-execution.md`, `docs/verification/rc-package-rc2-execution.md` |
 | 15 | V1 RC versioning decision | `CLOSED GREEN` | No | explicit choice: independent `1.0.0-rc.1` line or inherited version continuation | controller decision 2026-09-14: independent `1.0.0-rc.1`; constraints below |
 
 Product defects found by RC-BROWSER qualification were fixed on `main` through #105, #119, #129, #130, #131 and #134; #119 integrated a set of product fixes across several packages. #133 is WidgetData credential-store hardening.
@@ -243,10 +247,13 @@ Current controller state (2026-09-14):
 - V1 RC versioning decision taken: independent `1.0.0-rc.1` → `1.0.0` line (queue row 15);
 - RC FIX #135 merged (`29c2e0f`, verify `34849186407`); control boards refreshed by #136 (`6773ca1`, verify `34849192504`);
 - RC-PACKAGE was accepted on 2026-09-14 for `1.0.0-rc.1` at package candidate `c3c9709`; PR #137 merged to `main@4afeef4` with a merge commit; post-merge verify `34851391827` SUCCESS; RC-PACKAGE is `CLOSED GREEN`;
-- per the RC completion rule, RC candidate `1.0.0-rc.1` is produced: all TV-optional V1 work and deterministic release gates are GREEN, physical-Tizen rows remain `PENDING`/`DEFERRED`;
-- a local author+distributor signed WGT (`babustv_beta_v1.0.0-rc.1_c3c9709.wgt`, SHA-256 `7601527b…99173e`) exists on the controller machine only and has not been distributed;
-- release tag `v1.0.0-rc.1` has not been created and requires an explicit controller decision;
-- open non-blocking RC-PACKAGE observations: legacy What's New list has no `1.0.0-rc.1` entry (legacy shell path only); `tizen/wgt.mjs` defaults to a `dev` signing profile;
+- per the RC completion rule, RC candidate `1.0.0-rc.1` was produced and tagged `v1.0.0-rc.1` at `c3c9709`;
+- a desktop-browser run of rc.1 at 1920×1080 found defects the RC-BROWSER matrix had not caught (First Run logo path, IndexedDB key-ordered channels/categories, unpinned Home/Provider Management, `inset` and undefined tokens, unstyled Live TV feature panel, indistinguishable M3U providers); they were root-caused and fixed in #139 (`main@a7fe8f9`);
+- RC candidate `1.0.0-rc.2` was accepted at package candidate `77b0a5b`, merged by #140 (`main@e4a6bca`, post-merge verify `34861410744`), and tagged `v1.0.0-rc.2`; it supersedes rc.1;
+- local author+distributor signed WGTs exist on the controller machine only and have not been distributed: rc.1 `babustv_beta_v1.0.0-rc.1_c3c9709.wgt` (SHA-256 `7601527b…99173e`), rc.2 `babustv_beta_v1.0.0-rc.2_77b0a5b.wgt` (SHA-256 `ea127ca6…18acecf1`);
+- rc.1 and rc.2 both carry Tizen widget version `1.0.0`; same-version install behaviour is a physical-device check;
+- open non-blocking #139 follow-ups: Search results beyond ~5 rows do not scroll into view; Home "Sık İzlenenler" has no empty-state message; legacy root-absolute backend routes (`/log`, `/api/fetch`, `/proxy/`); other IndexedDB `getAll` reads may share the key-order effect; editing an Xtream server keeps the old host label;
+- open non-blocking RC-PACKAGE observations: legacy What's New list has no RC entry (legacy shell path only); `tizen/wgt.mjs` defaults to a `dev` signing profile;
 - open non-blocking RC-BROWSER observations: interrupted onboarding (a mid-transaction reload under artificial sync delay can leave a registered provider; not investigated), phone relay HTTP 500 shown with the network copy (product wording decision), B06 Search passed without retry in the RC-PACKAGE local run;
 - physical-Tizen debt rows are unchanged and remain `PENDING`/`DEFERRED`;
 - old B0/M3G/Xtream worker branches and the Wave 1 base are historical evidence, not implementation bases;
