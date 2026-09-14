@@ -4,6 +4,7 @@ import type { ProviderProfile } from './contracts.js';
 import { ProviderError } from './errors.js';
 import type { ProviderCoreService, ProviderSnapshot } from './provider-core-service.js';
 import type { ProviderSyncService } from './provider-sync-service.js';
+import { xtreamServerLabel } from './xtream/xtream-server-label.js';
 
 export interface XtreamConnectInput {
   serverUrl: string;
@@ -39,15 +40,6 @@ function initialChannelSyncFailed(code: ConstructorParameters<typeof ProviderErr
   return new ProviderError(code, null, 'Initial provider channel sync failed.');
 }
 
-function safeServerLabel(serverUrl: string): string {
-  try {
-    const url = new URL(serverUrl);
-    return url.host || 'Xtream';
-  } catch {
-    return 'Xtream';
-  }
-}
-
 export class XtreamOnboardingService {
   constructor(private readonly deps: XtreamOnboardingDependencies) {}
 
@@ -62,7 +54,7 @@ export class XtreamOnboardingService {
     const provider: ProviderRecord = {
       id: providerId,
       kind: 'xtream',
-      name: safeServerLabel(serverUrl),
+      name: xtreamServerLabel(serverUrl),
       createdAtMs: this.deps.now(),
       lastSuccessfulSyncAtMs: null,
     };
