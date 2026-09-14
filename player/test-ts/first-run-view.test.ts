@@ -107,6 +107,32 @@ test('remote focus starts on Xtream, moves spatially, and restores the last prov
   assert.equal(document.activeElement?.id, 'first-run-m3u');
 });
 
+test('brand wordmark resolves relative to the document so it loads under /babustv/ and from the Tizen WGT root', async () => {
+  const firstRun = await loadFirstRun();
+  assert.ok(firstRun, 'FIRST-UI presentation module should exist');
+
+  const document = new FakeDocument();
+  const view = new firstRun.FirstRunView(asDocument(document), {
+    onXtreamSelected: () => {},
+    onM3uSelected: () => {},
+    onBack: () => {},
+  });
+  view.show({ kind: 'empty' });
+
+  const findByClass = (node: FakeElement, className: string): FakeElement | null => {
+    if (node.className === className) return node;
+    for (const child of node.children) {
+      const found = findByClass(child, className);
+      if (found) return found;
+    }
+    return null;
+  };
+  const brand = findByClass(document.body, 'first-run-brand');
+  assert.ok(brand, 'first-run brand image should render');
+  assert.equal(brand.getAttribute('src'), './brand/babustv-wordmark.svg');
+  assert.doesNotMatch(firstRun.renderFirstRunMarkup({ kind: 'empty' }), /(?:src|href)="\//);
+});
+
 test('Select invokes only the focused provider handoff callback and never activates anything itself', async () => {
   const firstRun = await loadFirstRun();
   assert.ok(firstRun, 'FIRST-UI presentation module should exist');

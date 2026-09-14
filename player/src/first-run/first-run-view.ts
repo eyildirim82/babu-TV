@@ -48,7 +48,7 @@ export function renderFirstRunMarkup(state: FirstRunPresentationState = { kind: 
   return [
     '<section id="first-run-page" class="first-run-page">',
     '<div class="first-run-panel">',
-    '<img class="first-run-brand" src="/brand/babustv-wordmark.svg" alt="BabuşTV">',
+    '<img class="first-run-brand" src="./brand/babustv-wordmark.svg" alt="BabuşTV">',
     `<h1 class="first-run-title">${COPY.title}</h1>`,
     `<p class="first-run-value">${COPY.value}</p>`,
     `<p class="first-run-provider-prompt">${COPY.providerPrompt}</p>`,
@@ -126,7 +126,8 @@ export class FirstRunView {
 
     const brand = this.document.createElement('img');
     brand.className = 'first-run-brand';
-    brand.setAttribute('src', '/brand/babustv-wordmark.svg');
+    // Relative to the document: resolves under /babustv/ on the web and from the WGT root on Tizen.
+    brand.setAttribute('src', './brand/babustv-wordmark.svg');
     brand.setAttribute('alt', 'BabuşTV');
     panel.appendChild(brand);
 
