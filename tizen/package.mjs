@@ -2,7 +2,7 @@ import { execSync } from 'child_process';
 import { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { artifactName } from './product-identity.mjs';
+import { artifactName, tizenWidgetVersion } from './product-identity.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -100,7 +100,7 @@ console.log('\n Building .wgt...');
 mkdirSync(TEMP, { recursive: true });
 
 const configXml = readFileSync(join(TIZEN, 'config.xml'), 'utf-8')
-  .replace(/(<widget\b[\s\S]*?\bversion=")[^"]*(")/, `$1${APP_VERSION}$2`);
+  .replace(/(<widget\b[\s\S]*?\bversion=")[^"]*(")/, `$1${tizenWidgetVersion(APP_VERSION)}$2`);
 writeFileSync(join(TEMP, 'config.xml'), configXml);
 
 cpSync(DIST, TEMP, { recursive: true });
