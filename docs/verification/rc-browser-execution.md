@@ -2,12 +2,12 @@
 
 Date: 2026-09-14
 Owner: REVIEW / Integration Controller
-Status: READY FOR CONTROLLER ACCEPTANCE — integrated browser qualification GREEN on the exact production SHA with no open deterministic production defect; physical Samsung/Tizen rows remain NOT VERIFIED / DEFERRED
+Status: ACCEPTED — controller accepted RC-BROWSER under Task 13 on 2026-09-14 against production `eaa928c`; physical Samsung/Tizen rows remain NOT VERIFIED / DEFERRED
 
 Plan: `docs/superpowers/plans/2026-09-12-rc-browser-parallel-execution.md`
 Design: `docs/superpowers/specs/2026-09-12-rc-browser-qualification-design.md`
 
-This board records what the deterministic 1920×1080 Chromium qualification proved, what it changed, and what it cannot prove. It does not mark RC-BROWSER `ACCEPTED`; that transition belongs to the controller under Task 13.
+This board records what the deterministic 1920×1080 Chromium qualification proved, what it changed, and what it cannot prove. The controller's `ACCEPTED` decision is recorded under "Controller acceptance record" below; `CLOSED / GREEN` follows once this branch is merged to `main`.
 
 ## Exact identities
 
@@ -197,6 +197,23 @@ Nothing on this board converts a physical-device row to PASS. The following rema
 | Zero `player/src/**` changes in the qualification diff | confirmed |
 | Clean working tree | CI `git diff --exit-code` PASS; `tools/rc-browser/test-results/` now ignored |
 | Exact-head CI GREEN | `aca5f44` SUCCESS |
+
+## Controller acceptance record
+
+| Item | Value |
+| --- | --- |
+| Decision | `RC-BROWSER — IN PROGRESS → ACCEPTED` |
+| Date | 2026-09-14 |
+| Decided by | Controller (repository owner) |
+| Accepted production SHA | `eaa928c6b0d9b71b1ae91f9f0424ffd166b7c03f` |
+| Accepted qualification head | `aca5f44e928ceae7568acc28ad11f112d6745f1f` (integrated suite 76/76, run `34838069268` attempts 1 and 2) |
+| Final production SHA rule | not `409e416`: qualification found deterministic production defects, fixed on `main` by #129, #130, #131 and #134 and requalified |
+| Next transition | `ACCEPTED → CLOSED / GREEN` when PR #132 merges to `main`; only then RC-PACKAGE starts |
+| RC-PACKAGE handoff | versioning decision taken: independent `1.0.0-rc.1` line (Tizen `config.xml` stays numeric `1.0.0`); implementation belongs to RC-PACKAGE |
+
+GitGuardian on PR #132 reports one "Generic Password" (incident `37220448`) at `tools/rc-browser/fixtures/common.mjs:7`, first introduced by `2fc9964`. The value is the synthetic `RC_SECRETS.xtreamPassword` leak canary, used only against `.invalid` endpoints so that the leakage checks can prove it never reaches evidence or logs. It is not a real credential and needs no rotation. The controller resolves the incident as a test credential in the GitGuardian dashboard before merge.
+
+Acceptance does not change any `NOT VERIFIED / DEFERRED` physical-device row, and the open observations above stay open.
 
 ## Scenario matrix
 
