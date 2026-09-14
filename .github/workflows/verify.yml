@@ -37,5 +37,8 @@ jobs:
       - name: Build production player
         run: npm run build
 
+      - name: Build pairing relay
+        run: npm run relay:build
+
       - name: Ensure verification did not modify tracked files
         run: git diff --exit-code

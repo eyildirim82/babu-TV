@@ -1,0 +1,19 @@
+{
+  "name": "@babustv/relay",
+  "version": "1.0.0-rc.2",
+  "private": true,
+  "type": "module",
+  "description": "BabuşTV ciphertext-only pairing relay (self-hostable)",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
