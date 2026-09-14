@@ -35,11 +35,41 @@ export function setConsented(allowed) {
   saveSettings({ updateCheck: !!allowed });
 }
 
-function compareVersions(a, b) {
-  const pa = String(a).split('.').map(Number);
-  const pb = String(b).split('.').map(Number);
+function parseVersion(value) {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(String(value));
+  if (!match) return null;
+  return {
+    core: [Number(match[1]), Number(match[2]), Number(match[3])],
+    prerelease: match[4] ? match[4].split('.') : [],
+  };
+}
+
+function comparePrereleaseIdentifiers(a, b) {
+  const aNumeric = /^\d+$/.test(a);
+  const bNumeric = /^\d+$/.test(b);
+  if (aNumeric && bNumeric) return Number(a) - Number(b);
+  if (aNumeric !== bNumeric) return aNumeric ? -1 : 1;
+  return a === b ? 0 : a < b ? -1 : 1;
+}
+
+// Semver precedence: 1.0.0-rc.1 < 1.0.0-rc.2 < 1.0.0 < 1.10.1. Build metadata
+// is ignored, and an unparseable version never ranks as newer.
+export function compareVersions(a, b) {
+  const pa = parseVersion(a);
+  const pb = parseVersion(b);
+  if (!pa || !pb) return 0;
   for (let i = 0; i < 3; i++) {
-    const diff = (pa[i] || 0) - (pb[i] || 0);
+    const diff = pa.core[i] - pb.core[i];
+    if (diff !== 0) return diff;
+  }
+  if (!pa.prerelease.length || !pb.prerelease.length) {
+    return pb.prerelease.length - pa.prerelease.length;
+  }
+  const length = Math.max(pa.prerelease.length, pb.prerelease.length);
+  for (let i = 0; i < length; i++) {
+    if (pa.prerelease[i] === undefined) return -1;
+    if (pb.prerelease[i] === undefined) return 1;
+    const diff = comparePrereleaseIdentifiers(pa.prerelease[i], pb.prerelease[i]);
     if (diff !== 0) return diff;
   }
   return 0;

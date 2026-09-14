@@ -4,6 +4,7 @@ import { execFileSync } from 'child_process';
 import { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { tizenWidgetVersion } from './product-identity.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -41,9 +42,9 @@ mkdirSync(BUILD, { recursive: true });
 // 3. App files.
 cpSync(DIST, BUILD, { recursive: true });
 
-// 4. config.xml with the widget version synced to package.json.
+// 4. config.xml with the widget version synced to package.json (numeric x.y.z only).
 const config = readFileSync(join(__dirname, 'config.xml'), 'utf-8')
-  .replace(/(<widget\b[\s\S]*?\bversion=")[^"]*(")/, `$1${version}$2`);
+  .replace(/(<widget\b[\s\S]*?\bversion=")[^"]*(")/, `$1${tizenWidgetVersion(version)}$2`);
 writeFileSync(join(BUILD, 'config.xml'), config);
 
 // 5. Icon referenced by config.xml as icon.png.
