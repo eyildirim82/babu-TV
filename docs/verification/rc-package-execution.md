@@ -2,7 +2,7 @@
 
 Date: 2026-09-14
 Owner: REVIEW / Integration Controller
-Status: ACCEPTED — controller accepted RC-PACKAGE on 2026-09-14 for `1.0.0-rc.1` at package candidate `c3c9709`; physical Samsung/Tizen install and runtime rows remain NOT VERIFIED / DEFERRED
+Status: CLOSED / GREEN — accepted 2026-09-14 for `1.0.0-rc.1` at package candidate `c3c9709`; PR #137 merged to `main@4afeef4`, post-merge verify `34851391827` SUCCESS; physical Samsung/Tizen install and runtime rows remain NOT VERIFIED / DEFERRED
 
 Design: `docs/superpowers/specs/2026-09-10-babustv-v1-maximum-parallel-execution-design.md` §9.2
 Readiness board: `docs/verification/v1-rc-readiness.md` (queue row 14)
