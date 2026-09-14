@@ -360,7 +360,13 @@ async function deleteProvider(page, providerId) {
   await pressRemote(page, 'DOWN');
   await expect(page.locator('#confirm-delete')).toBeFocused();
   await pressRemote(page, 'SELECT');
-  await expect(page.locator(`[id="provider:${providerId}:delete"]`)).toHaveCount(0, { timeout: 15_000 });
+  // The confirmation replaces every provider row, so row absence alone is
+  // already true before Sil is handled. The dialog only closes after the
+  // delete settled and the list reloaded; a failed delete keeps it open.
+  await expect(page.locator('#confirm-delete')).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByText('Sağlayıcı silinemedi.')).toHaveCount(0);
+  await expect(page.locator('#add-provider')).toBeVisible();
+  await expect(page.locator(`[id="provider:${providerId}:delete"]`)).toHaveCount(0);
 }
 
 function isSyntheticProviderUrl(url) {
@@ -630,8 +636,7 @@ scenario('C08', 'provider delete cleans target state and preserves unrelated pro
   await toggleFavoriteForActiveProvider(page, providerB);
   const beforeB = providerCatalogSummary(await readSafeStructuredState(page), providerB);
   await deleteProvider(page, providerA);
-  // The delete row can leave the DOM before the delete transaction settles.
-  await expect.poll(() => credentialProviderIds(harness.widgetData)).toEqual([providerB]);
+  expect(credentialProviderIds(harness.widgetData)).toEqual([providerB]);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('#home-page')).toBeVisible({ timeout: 10_000 });
   const state = await readSafeStructuredState(page);
