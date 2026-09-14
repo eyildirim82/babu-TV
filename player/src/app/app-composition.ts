@@ -136,6 +136,7 @@ export interface AppCompositionDependencies {
   providers: Pick<ProviderRepository, 'listProviders' | 'getActiveProviderId'>;
   core: {
     switchActiveProvider(providerId: ProviderId): Promise<void>;
+    discardIncompleteRegistrations(): Promise<void>;
   };
   homeData: HomeDataSource;
   views: {
@@ -282,6 +283,7 @@ export class AppComposition {
   }
 
   async boot(): Promise<void> {
+    await this.deps.core.discardIncompleteRegistrations();
     const providers = await this.deps.providers.listProviders();
     if (providers.length === 0) {
       this.showProviderChooser('legacy');

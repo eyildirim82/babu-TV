@@ -7,6 +7,8 @@ import { ProviderCoreService } from '../src/providers/provider-core-service.js';
 import { ProviderUserStateCleanup } from '../src/providers/provider-user-state-cleanup.js';
 import type { ProviderSyncReport } from '../src/providers/provider-sync-service.js';
 import { ProviderError } from '../src/providers/errors.js';
+import type { ProviderAdapterFactory } from '../src/providers/contracts.js';
+import { XtreamOnboardingService } from '../src/providers/xtream-onboarding-service.js';
 import { StructuredCatalogRepository } from '../src/repository/structured-catalog-repository.js';
 import { StructuredProviderRepository } from '../src/repository/structured-provider-repository.js';
 import { MemoryStructuredStore } from '../src/storage/memory-structured-store.js';
@@ -383,4 +385,89 @@ void test('cache-first load rejects missing provider without starting refresh', 
     return true;
   });
   assert.deepEqual(sync.calls, []);
+});
+
+// Onboarding saves the credential and provider record first and runs the first
+// sync afterwards; a failed sync is compensated by deleteProvider. If the app is
+// closed or reloaded in between, compensation never runs. Only such an
+// interrupted registration leaves a provider that never completed a sync.
+async function interruptedStores() {
+  const store = new MemoryStructuredStore();
+  const providers = new StructuredProviderRepository(store);
+  const catalog = new StructuredCatalogRepository(store);
+  const credentials = new MemoryCredentialStore();
+  const core = (sync: { refresh(providerId: string): Promise<ProviderSyncReport> }, adapters: ProviderAdapterFactory | null = null) =>
+    new ProviderCoreService(providers, catalog, credentials, sync, adapters, null, noOpUserStateCleanup());
+  return { providers, catalog, credentials, core };
+}
+
+void test('discarding incomplete registrations removes never-synced providers with their credential and catalog only', async () => {
+  const { providers, catalog, credentials, core } = await interruptedStores();
+  await providers.saveProvider({ ...provider('provider-synced'), lastSuccessfulSyncAtMs: 50 });
+  await providers.saveProvider(provider('provider-interrupted'));
+  await providers.setActiveProviderId('provider-synced');
+  await credentials.save('provider-synced', credential('s'));
+  await credentials.save('provider-interrupted', credential('i'));
+  await catalog.replaceChannels('provider-synced', [channel('provider-synced', 'kept')]);
+  await catalog.replaceChannels('provider-interrupted', [channel('provider-interrupted', 'partial')]);
+
+  await core(new DeferredSync()).discardIncompleteRegistrations();
+
+  assert.deepEqual((await providers.listProviders()).map((item) => item.id), ['provider-synced']);
+  assert.equal(await credentials.load('provider-interrupted'), null);
+  assert.deepEqual(await catalog.listChannels('provider-interrupted'), []);
+  assert.notEqual(await credentials.load('provider-synced'), null);
+  assert.deepEqual((await catalog.listChannels('provider-synced')).map((item) => item.id), ['kept']);
+  assert.equal(await providers.getActiveProviderId(), 'provider-synced');
+});
+
+void test('discarding incomplete registrations continues past a provider that cannot be removed', async () => {
+  const { providers, credentials, core } = await interruptedStores();
+  await providers.saveProvider(provider('provider-stuck'));
+  await providers.saveProvider(provider('provider-interrupted'));
+  const remove = credentials.remove.bind(credentials);
+  credentials.remove = async (providerId) => {
+    if (providerId === 'provider-stuck') throw new Error('WidgetData remove failed for https://example.com?password=x');
+    await remove(providerId);
+  };
+
+  await core(new DeferredSync()).discardIncompleteRegistrations();
+
+  assert.deepEqual((await providers.listProviders()).map((item) => item.id), ['provider-stuck']);
+});
+
+void test('an Xtream onboarding closed before its first sync finishes leaves no provider or credential after discard', async () => {
+  const { providers, credentials, core } = await interruptedStores();
+  const neverFinishingSync = { refresh: () => new Promise<ProviderSyncReport>(() => {}) };
+  const adapters: ProviderAdapterFactory = {
+    create: (record) => ({
+      providerId: record.id,
+      kind: record.kind,
+      async getProfile() {
+        return { providerId: record.id, kind: record.kind, accountName: null, expiresAtMs: null, maxConnections: null };
+      },
+      async listCategories() { return []; },
+      async listChannels() { return []; },
+      async resolveStream() { throw new Error('not used'); },
+    }),
+  };
+  const onboarding = new XtreamOnboardingService({
+    core: core(neverFinishingSync, adapters),
+    sync: neverFinishingSync,
+    createProviderId: () => 'xtream-new',
+    now: () => 1,
+  });
+
+  void onboarding.connect({ serverUrl: 'https://provider.invalid', username: 'user', password: 'secret' });
+  for (let turn = 0; turn < 50 && await providers.getProvider('xtream-new') === null; turn += 1) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.notEqual(await providers.getProvider('xtream-new'), null);
+  assert.notEqual(await credentials.load('xtream-new'), null);
+
+  // The app restarts: a new service instance over the same persisted stores.
+  await core(neverFinishingSync, adapters).discardIncompleteRegistrations();
+
+  assert.equal(await providers.getProvider('xtream-new'), null);
+  assert.equal(await credentials.load('xtream-new'), null);
 });

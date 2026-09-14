@@ -5,7 +5,7 @@
 **Status:** RC CANDIDATE `1.0.0-rc.2` PRODUCED AND TAGGED (SUPERSEDES rc.1) — WAVES 0–5 CLOSED GREEN; RC-BROWSER CLOSED GREEN; RC-PACKAGE rc.1 AND rc.2 CLOSED GREEN; PHYSICAL-TIZEN DEBT PENDING/DEFERRED\
 **Starting baseline:** `main@f3061cbad574b507b1f80cf23e19b8af179e90b0`\
 **Baseline verify:** `34414698392` SUCCESS\
-**Latest evidence head:** `main@e4a6bca` (RC-PACKAGE rc.2 merge, PR #140); post-merge verify `34861410744` SUCCESS
+**Latest evidence head:** `main@3f86fa4` (RC FIX rc.2 follow-ups merge, PR #142); post-merge verify `34866709641` SUCCESS
 
 ## Purpose
 
@@ -71,6 +71,8 @@ Approved product spec: `docs/superpowers/specs/2026-09-07-babustv-v1-product-and
 | RC FIX browser demo findings | `CLOSED GREEN` | #139 merged to `main@a7fe8f9` by merge commit (`f6809f1`, `b9d77d1`, `3fa7910`, `3dda382`, `569e2cc`); post-merge verify `34860215716` SUCCESS (JS 68/68, TS 628/628); local rc-browser 76/76 |
 | RC-PACKAGE qualification rc.2 | `CLOSED GREEN` | accepted 2026-09-14 for `1.0.0-rc.2` at package candidate `77b0a5b` (verify `34860514185`); PR #140 merged to `main@e4a6bca` by merge commit; post-merge verify `34861410744` SUCCESS (JS 68/68, TS 628/628) |
 | Release tag `v1.0.0-rc.2` | `CLOSED GREEN` | annotated tag at package candidate `77b0a5b`; no GitHub Release |
+| RC FIX rc.2 follow-ups | `CLOSED GREEN` | #142 merged to `main@3f86fa4` by merge commit (`00449dc`, `487f8dd`, `9385168`, `be6e8f4`); post-merge verify `34866709641` SUCCESS (JS 68/68, TS 637/637); local rc-browser 76/76; not yet packaged |
+| RC FIX onboarding and cleanups | `IN PROGRESS` | branch `fix/rc3-onboarding-cleanups`: interrupted-onboarding discard (`e4e8727`), BabuşTV-only What's New (`bf8ebb3`), Tizen signing-profile preflight (`c5b3f37`); merge pending user approval |
 | Open implementation blocker | none | physical-Tizen debt is not a repository blocker |
 
 Every PR listed on this board merged to `main` with a SUCCESS post-merge `verify` run. Per-role merge SHAs and run IDs are recorded in `v1-parallel-execution.md`.
@@ -252,9 +254,10 @@ Current controller state (2026-09-14):
 - RC candidate `1.0.0-rc.2` was accepted at package candidate `77b0a5b`, merged by #140 (`main@e4a6bca`, post-merge verify `34861410744`), and tagged `v1.0.0-rc.2`; it supersedes rc.1;
 - local author+distributor signed WGTs exist on the controller machine only and have not been distributed: rc.1 `babustv_beta_v1.0.0-rc.1_c3c9709.wgt` (SHA-256 `7601527b…99173e`), rc.2 `babustv_beta_v1.0.0-rc.2_77b0a5b.wgt` (SHA-256 `ea127ca6…18acecf1`);
 - rc.1 and rc.2 both carry Tizen widget version `1.0.0`; same-version install behaviour is a physical-device check;
-- open non-blocking #139 follow-ups: Search results beyond ~5 rows do not scroll into view; Home "Sık İzlenenler" has no empty-state message; legacy root-absolute backend routes (`/log`, `/api/fetch`, `/proxy/`); other IndexedDB `getAll` reads may share the key-order effect; editing an Xtream server keeps the old host label;
-- open non-blocking RC-PACKAGE observations: legacy What's New list has no RC entry (legacy shell path only); `tizen/wgt.mjs` defaults to a `dev` signing profile;
-- open non-blocking RC-BROWSER observations: interrupted onboarding (a mid-transaction reload under artificial sync delay can leave a registered provider; not investigated), phone relay HTTP 500 shown with the network copy (product wording decision), B06 Search passed without retry in the RC-PACKAGE local run;
+- #139 follow-ups closed by #142: Live TV channel, category and Search rows now scroll into view (the channel list had the same defect, found with a 60-channel playlist; the RC matrix uses 11 channels); Home "Sık İzlenenler" empty-state message; Xtream server edit relabels the provider; IndexedDB `getAll` audit found no other order-dependent read, and `MemoryStructuredStore` now lists rows in primary-key order;
+- legacy root-absolute routes (`/log`, `/api/fetch`, `/proxy/`) investigated 2026-09-14, no change: in the staged `file://` build all three resolve to package-local URLs and are rejected without any network request; `/log` failures are swallowed and rc-browser uses `/log` levels as its playback-error signal; `/proxy/` rewriting only applies to `https:` pages; the legacy-shell proxy toggle cannot work on a TV with no proxy server (unchanged);
+- RC-PACKAGE observations fixed on `fix/rc3-onboarding-cleanups` (merge pending): legacy What's New listed inherited EN TV Player 1.x history under the BabuşTV version; `tizen/wgt.mjs` ran a missing `dev` signing profile without naming it;
+- open non-blocking RC-BROWSER observations: interrupted onboarding fixed on `fix/rc3-onboarding-cleanups` (merge pending; boot discards providers that never completed a first sync), phone relay HTTP 500 shown with the network copy (product wording decision), B06 Search passed without retry in the RC-PACKAGE local run;
 - physical-Tizen debt rows are unchanged and remain `PENDING`/`DEFERRED`;
 - old B0/M3G/Xtream worker branches and the Wave 1 base are historical evidence, not implementation bases;
 - merge authority remains Controller / explicit user instruction.

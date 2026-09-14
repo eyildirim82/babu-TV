@@ -69,7 +69,7 @@ Ardından:
 npm run tizen:package
 ```
 
-`TIZEN_PROFILE` verilmezse `dev` signing profile kullanılır. Tizen CLI exactly one `.wgt` üretmelidir; `tizen/wgt.mjs` bu dosyayı canonical artifact adıyla `tizen/build/` altında yeniden adlandırır.
+`TIZEN_PROFILE` verilmezse `dev` signing profile kullanılır. Profil Tizen Studio'da yoksa `tizen/wgt.mjs` imzalamadan önce durur ve mevcut profilleri listeler (`TIZEN_PROFILE=<ad> npm run tizen:package`). Tizen CLI exactly one `.wgt` üretmelidir; `tizen/wgt.mjs` bu dosyayı canonical artifact adıyla `tizen/build/` altında yeniden adlandırır.
 
 Feature branch örneği:
 

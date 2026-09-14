@@ -16,6 +16,7 @@ function dependencies(
     },
     core: {
       async switchActiveProvider() {},
+      async discardIncompleteRegistrations() {},
     },
     homeData: {
       async load() { return {} as never; },
