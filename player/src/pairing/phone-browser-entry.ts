@@ -112,6 +112,15 @@ function unavailableRelay(): PairingPhoneRelayPort {
   };
 }
 
+// The Tizen build strips type="module" from the entry script, which Vite places
+// in <head>. The script then runs before <body> exists, so wait for parsing.
+function documentBodyReady(document: Document): Promise<void> {
+  if (document.readyState !== 'loading') return Promise.resolve();
+  return new Promise((resolve) => {
+    document.addEventListener('DOMContentLoaded', () => resolve(), { once: true });
+  });
+}
+
 export async function tryStartPairingPhoneBrowserRoute(
   input: PairingPhoneBrowserRouteInput,
 ): Promise<boolean> {
@@ -135,6 +144,7 @@ export async function tryStartPairingPhoneBrowserRoute(
     await controller.submit();
   }
 
+  await documentBodyReady(input.document);
   input.document.body.replaceChildren();
   const view = new PairingPhoneView(input.document, controller);
   view.show();
