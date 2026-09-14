@@ -27,15 +27,9 @@ function failureEvidenceName(testInfo) {
   return `rc-browser-artifacts/live-failure-${slug}.json`;
 }
 
-test.afterEach(async ({ page }, testInfo) => {
+test.afterEach(async ({}, testInfo) => {
   if (testInfo.status === testInfo.expectedStatus) return;
   const error = testInfo.error ?? testInfo.errors?.[0] ?? null;
-  // TEMPORARY H2 B11 diagnostic: DOM/key timeline without values or URLs.
-  const diagnostic = await page.evaluate(() => ({
-    timeline: (window.__rcLiveDiag ?? []).slice(-150),
-    surfaces: window.__rcLiveDiagSurfaces?.() ?? null,
-    active: window.__rcLiveDiagActive?.() ?? null,
-  })).catch((diagError) => ({ unavailable: String(diagError?.message ?? diagError).slice(0, 200) }));
   const payload = {
     kind: 'rc-browser-failure.v1',
     pack: 'BROW-LIVE',
@@ -47,7 +41,6 @@ test.afterEach(async ({ page }, testInfo) => {
     error: sanitizeFailureText(error?.message),
     stack: sanitizeFailureText(error?.stack),
     location: error?.location ?? null,
-    diagnostic: JSON.parse(sanitizeFailureText(JSON.stringify(diagnostic))),
   };
   await mkdir('rc-browser-artifacts', { recursive: true });
   await writeFile(failureEvidenceName(testInfo), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
@@ -260,59 +253,6 @@ export function createPackBLiveFixture() {
     },
 
     async install(context) {
-      // TEMPORARY H2 B11 diagnostic recorder.
-      await context.addInitScript(() => {
-        const log = [];
-        const t0 = performance.now();
-        const push = (kind, detail = {}) => {
-          log.push({ t: Math.round(performance.now() - t0), kind, ...detail });
-          if (log.length > 600) log.shift();
-        };
-        const surfaces = () => {
-          const visible = ['home-page', 'first-run-page', 'provider-management-page', 'xtream-entry-page', 'm3u-entry-page', 'pairing-tv-root']
-            .filter((id) => {
-              const element = document.getElementById(id);
-              return element !== null && !element.classList.contains('hidden');
-            });
-          const sidebar = document.getElementById('sidebar');
-          if (sidebar && !sidebar.classList.contains('closed')) visible.push('sidebar-open');
-          const player = document.getElementById('player-container');
-          if (player && !player.classList.contains('hidden')) visible.push('player-shell');
-          const dialog = document.getElementById('confirm-dialog');
-          if (dialog && !dialog.classList.contains('hidden')) visible.push('confirm-dialog');
-          const home = document.getElementById('home-page');
-          if (home) visible.push(`home-kind:${home.querySelector('[data-home-focus-key]') ? 'ready' : 'no-keys'}`);
-          return visible;
-        };
-        const active = () => {
-          const element = document.activeElement;
-          return element ? `${element.tagName}#${element.id}|${element.getAttribute('data-home-focus-key') ?? ''}` : null;
-        };
-        window.__rcLiveDiag = log;
-        window.__rcLiveDiagSurfaces = surfaces;
-        window.__rcLiveDiagActive = active;
-        document.addEventListener('keydown', (event) => push('key', { key: event.key, surfaces: surfaces(), active: active() }), true);
-        const originalRemove = Element.prototype.remove;
-        Element.prototype.remove = function remove() {
-          if (this.id === 'home-page') {
-            push('home-remove-call', {
-              stack: String(new Error().stack).split('\n').slice(2, 10).map((line) => line.trim().replace(/https?:\/\/[^\s)]+\//g, '').slice(0, 100)),
-            });
-          }
-          return originalRemove.call(this);
-        };
-        new MutationObserver((records) => {
-          for (const record of records) {
-            for (const node of record.addedNodes) {
-              if (node.id === 'home-page') push('home-added', { surfaces: surfaces() });
-            }
-            for (const node of record.removedNodes) {
-              if (node.id === 'home-page') push('home-removed', { surfaces: surfaces(), active: active() });
-            }
-          }
-        }).observe(document, { childList: true, subtree: true });
-        window.addEventListener('error', (event) => push('pageerror', { message: String(event.message).slice(0, 160) }));
-      });
       await context.route(`${RC_ENDPOINTS.xtreamA}/**`, (route) => handleXtreamRoute(route, states[PACK_B_PROVIDER_KEYS.A]));
       await context.route(`${RC_ENDPOINTS.xtreamB}/**`, (route) => handleXtreamRoute(route, states[PACK_B_PROVIDER_KEYS.B]));
     },
