@@ -2,12 +2,12 @@
 
 Date: 2026-09-14
 Owner: REVIEW / Integration Controller
-Status: READY FOR CONTROLLER ACCEPTANCE — `1.0.0-rc.1` build, staging and package gates GREEN on the exact candidate head; physical Samsung/Tizen install and runtime rows remain NOT VERIFIED / DEFERRED
+Status: ACCEPTED — controller accepted RC-PACKAGE on 2026-09-14 for `1.0.0-rc.1` at package candidate `c3c9709`; physical Samsung/Tizen install and runtime rows remain NOT VERIFIED / DEFERRED
 
 Design: `docs/superpowers/specs/2026-09-10-babustv-v1-maximum-parallel-execution-design.md` §9.2
 Readiness board: `docs/verification/v1-rc-readiness.md` (queue row 14)
 
-This board records what the RC-PACKAGE gate proved for the first BabuşTV release candidate, and what it cannot prove. It does not mark RC-PACKAGE `ACCEPTED`; that transition belongs to the controller.
+This board records what the RC-PACKAGE gate proved for the first BabuşTV release candidate, and what it cannot prove. The controller's `ACCEPTED` decision is recorded under "Controller acceptance record" below; `CLOSED / GREEN` follows once this branch is merged to `main` with a SUCCESS post-merge verify.
 
 ## Exact identities
 
@@ -143,6 +143,22 @@ Nothing on this board converts a physical-device row to PASS. Building, staging,
 | Zero `player/src/**` changes in the RC-PACKAGE diff | confirmed |
 | Clean working tree after gates | `git status` clean; `tizen/build/`, `player/dist/` ignored |
 | Physical-device rows untouched | confirmed |
+
+## Controller acceptance record
+
+| Item | Value |
+| --- | --- |
+| Decision | `RC-PACKAGE — IN PROGRESS → ACCEPTED` |
+| Date | 2026-09-14 |
+| Decided by | Controller (repository owner) |
+| Accepted candidate | `1.0.0-rc.1`, package candidate commit `c3c9709`; Tizen widget version `1.0.0` |
+| Accepted evidence head | `9a96fcf` (board), `verify` run `34850733251` SUCCESS; candidate head `c3c9709` `verify` run `34849865998` SUCCESS |
+| Accepted local WGT | `babustv_beta_v1.0.0-rc.1_c3c9709.wgt`, SHA-256 `7601527bde3cdee9639c7c5224d96811826e0d13d0dc81fb482a1985ed99173e` (not distributed) |
+| Merge method | merge commit, so `c3c9709` (the WGT's source commit) stays reachable from `main` |
+| Next transition | `ACCEPTED → CLOSED / GREEN` when PR #137 merges and post-merge verify is SUCCESS |
+| Release tag | `v1.0.0-rc.1` requires a separate explicit controller decision; not created by acceptance |
+
+Acceptance does not change any `NOT VERIFIED / DEFERRED` physical-device row, and the open observations above stay open.
 
 ## Browser matrix at the candidate version
 
