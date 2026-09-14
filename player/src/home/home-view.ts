@@ -217,14 +217,24 @@ export class HomeView {
     this.addFocusRow(favoriteKeys);
 
     const frequentSection = appendSection(this.document, root, 'Sık İzlenenler');
-    const frequentRow = this.appendRow(frequentSection);
-    const frequentKeys: HomeFocusKey[] = [];
-    for (const card of model.frequentlyWatched.items) {
-      const key: HomeFocusKey = `home-frequent:${card.providerId}:${card.channelId}`;
-      this.appendChannelAction(frequentRow, key, card, card.intent);
-      frequentKeys.push(key);
+    if (model.frequentlyWatched.items.length === 0) {
+      appendText(
+        this.document,
+        frequentSection,
+        'p',
+        'Sık izlediğiniz kanallar burada görünür.',
+        'home-empty',
+      );
+    } else {
+      const frequentRow = this.appendRow(frequentSection);
+      const frequentKeys: HomeFocusKey[] = [];
+      for (const card of model.frequentlyWatched.items) {
+        const key: HomeFocusKey = `home-frequent:${card.providerId}:${card.channelId}`;
+        this.appendChannelAction(frequentRow, key, card, card.intent);
+        frequentKeys.push(key);
+      }
+      this.addFocusRow(frequentKeys);
     }
-    this.addFocusRow(frequentKeys);
 
     const settingsSection = appendSection(this.document, root, 'Ayarlar');
     const settingsRow = this.appendRow(settingsSection);

@@ -87,6 +87,13 @@
   font-weight: var(--babu-font-weight-regular);
 }
 
+.home-empty {
+  margin: 0;
+  padding: var(--babu-space-sm) var(--babu-space-sm) var(--babu-space-lg);
+  color: var(--babu-text-secondary);
+  font-size: var(--babu-font-size-lg);
+}
+
 .home-status {
   box-sizing: border-box;
   min-height: 96px;
