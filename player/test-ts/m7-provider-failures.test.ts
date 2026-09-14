@@ -451,6 +451,7 @@ function createReentryHarness(options: {
       async getProvider() {
         return existingProvider;
       },
+      async saveProvider() {},
     },
     credentials: {
       isAvailable() {

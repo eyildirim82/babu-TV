@@ -302,6 +302,26 @@ test('HOME-UI renders ready Home sections in domain order using text nodes', asy
   assert.match(text, /Sık Kanal/);
 });
 
+test('HOME-UI empty Frequently Watched row shows a non-actionable empty-state message', async () => {
+  const home = await loadHomeView();
+  assert.ok(home);
+  const document = new FakeDocument();
+  const view = new home.HomeView(asDocument(document), { onIntent: () => {}, onBack: () => {} });
+  const model = readyModel();
+  const isEmptyState = (element: FakeElement) => element.className === 'home-empty';
+
+  view.show({ kind: 'ready', model: { ...model, frequentlyWatched: { items: [] } } });
+
+  const empty = findElement(document.body, isEmptyState);
+  assert.ok(empty, 'an empty Sık İzlenenler row must explain itself instead of showing only its heading');
+  assert.equal(empty.textContent, 'Sık izlediğiniz kanallar burada görünür.');
+  assert.equal(empty.parentElement?.children[0]?.textContent, 'Sık İzlenenler');
+  assert.equal(findElement(empty, (element) => element.getAttribute('data-home-focus-key') !== null), null);
+
+  view.setState({ kind: 'ready', model });
+  assert.equal(findElement(document.body, isEmptyState), null);
+});
+
 test('HOME-UI loading and error states stay non-actionable and render safe supplied copy', async () => {
   const home = await loadHomeView();
   assert.ok(home, 'HOME-UI presentation module should exist');

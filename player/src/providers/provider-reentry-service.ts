@@ -10,6 +10,7 @@ import type { ProviderAdapterFactory } from './contracts.js';
 import { ProviderError, type ProviderErrorCode } from './errors.js';
 import { validateM3uEntry } from './m3u/m3u-entry-validation.js';
 import type { ProviderSyncReport, ProviderSyncService } from './provider-sync-service.js';
+import { xtreamServerLabel } from './xtream/xtream-server-label.js';
 
 export type ProviderReentryInput =
   | {
@@ -34,7 +35,7 @@ export interface ProviderReentryResult {
 }
 
 export interface ProviderReentryDependencies {
-  providers: Pick<ProviderRepository, 'getProvider'>;
+  providers: Pick<ProviderRepository, 'getProvider' | 'saveProvider'>;
   credentials: Pick<CredentialStore, 'isAvailable' | 'load' | 'save' | 'remove'>;
   adapters: ProviderAdapterFactory;
   sync: Pick<ProviderSyncService, 'refresh'>;
@@ -128,6 +129,8 @@ export class ProviderReentryService {
       throw updateUnavailable();
     }
 
+    await this.relabelXtream(provider.id, candidate);
+
     let refresh: ProviderReentryRefreshStatus = 'completed';
     try {
       const report = await this.deps.sync.refresh(provider.id);
@@ -189,6 +192,26 @@ export class ProviderReentryService {
       return credential;
     } catch (error) {
       throw sanitizePreflightError(error);
+    }
+  }
+
+  // An Xtream provider is labelled with its server host at onboarding, so a new
+  // server needs the new host as its label. The record is re-read so a sync
+  // that finished during preflight is not overwritten. The credential is already
+  // committed: a failed label write leaves the previous label and does not fail
+  // re-entry.
+  private async relabelXtream(
+    providerId: ProviderId,
+    credential: ProviderCredential,
+  ): Promise<void> {
+    if (credential.kind !== 'xtream') return;
+    const name = xtreamServerLabel(credential.serverUrl);
+    try {
+      const current = await this.deps.providers.getProvider(providerId);
+      if (current === null || current.name === name) return;
+      await this.deps.providers.saveProvider({ ...current, name });
+    } catch {
+      // Display metadata only; see above.
     }
   }
 

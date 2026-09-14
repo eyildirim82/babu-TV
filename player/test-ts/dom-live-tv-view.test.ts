@@ -35,6 +35,11 @@ class FakeElement {
   readonly dataset: Record<string, string> = {};
   readonly classList = new FakeClassList();
   children: FakeElement[] = [];
+  readonly scrollCalls: unknown[] = [];
+
+  scrollIntoView(options?: unknown): void {
+    this.scrollCalls.push(options);
+  }
 
   append(...children: FakeElement[]): void {
     this.children.push(...children);
@@ -179,6 +184,42 @@ void test('renders categories and channels together while the active interaction
   assert.equal(groups.children.find((item) => item.dataset.scopeKey === 'category:news')!.classList.contains('focused'), true);
   assert.equal(channelList.children.find((item) => item.dataset.channelId === 'b')!.classList.contains('highlighted'), true);
   assert.equal(channelList.children.find((item) => item.dataset.channelId === 'b')!.classList.contains('focused'), false);
+});
+
+// A long channel or category list scrolls inside its own column. Without this
+// the remote moves the highlight below the visible rows and the viewer can no
+// longer see which channel is selected.
+void test('keeps the highlighted channel and active category scrolled into view while the overlay is open', () => {
+  const { document, view } = fixture();
+
+  view.render(state({
+    highlightedChannelId: 'b',
+    activeScope: { kind: 'category', categoryId: 'news' },
+  }), model());
+
+  const channelList = document.getElementById('channel-list')!;
+  const groups = document.getElementById('group-list')!;
+  const highlighted = channelList.children.find((item) => item.dataset.channelId === 'b')!;
+  const other = channelList.children.find((item) => item.dataset.channelId === 'a')!;
+  const activeGroup = groups.children.find((item) => item.dataset.scopeKey === 'category:news')!;
+  const allGroup = groups.children.find((item) => item.dataset.scopeKey === 'all')!;
+  assert.deepEqual(highlighted.scrollCalls, [{ block: 'nearest' }]);
+  assert.deepEqual(other.scrollCalls, []);
+  assert.deepEqual(activeGroup.scrollCalls, [{ block: 'nearest' }]);
+  assert.deepEqual(allGroup.scrollCalls, []);
+});
+
+void test('does not scroll channel or category rows while the overlay is closed', () => {
+  const { document, view } = fixture();
+
+  view.render(state({ overlayOpen: false, highlightedChannelId: 'b' }), model());
+
+  const rows = [
+    ...document.getElementById('channel-list')!.children,
+    ...document.getElementById('group-list')!.children,
+  ];
+  assert.ok(rows.length > 0);
+  for (const row of rows) assert.deepEqual(row.scrollCalls, []);
 });
 
 void test('renders shared playback status copy and numeric overlay presentation without inventing timers', () => {

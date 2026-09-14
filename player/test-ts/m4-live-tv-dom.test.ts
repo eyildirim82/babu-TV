@@ -35,6 +35,7 @@ class FakeElement {
   replaceChildren(...children: FakeElement[]): void { this.children = [...children]; }
   focus(): void {}
   blur(): void {}
+  scrollIntoView(): void {}
   addEventListener(_type: string, _listener: () => void): void {}
 }
 

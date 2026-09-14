@@ -87,6 +87,7 @@ function createHarness(options: {
   refreshError?: unknown;
   failCandidateSave?: boolean;
   failCompensation?: boolean;
+  failProviderSave?: boolean;
   holdChannels?: { entered: () => void; wait: Promise<void> };
 } = {}) {
   const existingProvider = options.provider === undefined ? provider() : options.provider;
@@ -95,6 +96,7 @@ function createHarness(options: {
     : options.previousCredential;
   const events: string[] = [];
   const saveCalls: ProviderCredential[] = [];
+  const providerSaves: ProviderRecord[] = [];
   let removeCalls = 0;
   let adapterCreates = 0;
   let profileCalls = 0;
@@ -106,6 +108,11 @@ function createHarness(options: {
       async getProvider(providerId: ProviderId) {
         events.push(`provider:get:${providerId}`);
         return existingProvider;
+      },
+      async saveProvider(record: ProviderRecord) {
+        events.push(`provider:save:${record.id}`);
+        providerSaves.push(record);
+        if (options.failProviderSave) throw new Error('provider save leaked https://new.example.invalid');
       },
     },
     credentials: {
@@ -188,6 +195,7 @@ function createHarness(options: {
     service: new ProviderReentryService(deps),
     events,
     saveCalls,
+    providerSaves,
     get storedCredential() {
       return storedCredential;
     },
@@ -288,9 +296,67 @@ test('provider re-entry preserves provider identity and commits Xtream only afte
     'adapter:profile',
     'adapter:channels',
     'credential:save:provider-a:xtream',
+    'provider:get:provider-a',
+    'provider:save:provider-a',
     'sync:provider-a',
   ]);
   assert.equal(fixture.events.some((event) => /delete|removeProvider|register|addProvider/i.test(event)), false);
+});
+
+// Xtream providers are labelled with their server host at onboarding. Editing
+// the server must move that label too, or Home and Provider Management keep
+// showing the old host for a provider that now talks to a different server.
+test('provider re-entry relabels an Xtream provider with the new server host before refresh', async () => {
+  const fixture = createHarness({
+    provider: { ...provider('xtream'), name: 'old.example.invalid' },
+  });
+
+  const result = await fixture.service.reenter({ ...xtreamInput, serverUrl: ' https://new.example.invalid:8080/ ' });
+
+  assert.equal(result.refresh, 'completed');
+  assert.deepEqual(fixture.providerSaves, [{
+    id: 'provider-a',
+    kind: 'xtream',
+    name: 'new.example.invalid:8080',
+    createdAtMs: 10,
+    lastSuccessfulSyncAtMs: 20,
+  }]);
+  const saveAt = fixture.events.indexOf('provider:save:provider-a');
+  assert.ok(saveAt > fixture.events.indexOf('credential:save:provider-a:xtream'));
+  assert.ok(saveAt < fixture.events.indexOf('sync:provider-a'));
+});
+
+test('provider re-entry keeps an unchanged Xtream label without rewriting the provider', async () => {
+  const fixture = createHarness({
+    provider: { ...provider('xtream'), name: 'new.example.invalid' },
+  });
+
+  await fixture.service.reenter(xtreamInput);
+
+  assert.deepEqual(fixture.providerSaves, []);
+});
+
+test('provider re-entry never writes M3U playlist details into provider metadata', async () => {
+  const fixture = createHarness({ provider: provider('m3u'), previousCredential: null });
+
+  await fixture.service.reenter(m3uInput);
+
+  assert.deepEqual(fixture.providerSaves, []);
+});
+
+test('provider re-entry label write failure keeps the committed credential and still refreshes', async () => {
+  const fixture = createHarness({
+    provider: { ...provider('xtream'), name: 'old.example.invalid' },
+    failProviderSave: true,
+  });
+
+  const result = await fixture.service.reenter(xtreamInput);
+
+  assert.equal(result.refresh, 'completed');
+  assert.equal(fixture.storedCredential?.kind, 'xtream');
+  assert.equal(fixture.removeCalls, 0);
+  assert.equal(fixture.saveCalls.length, 1);
+  assert.equal(fixture.refreshCalls, 1);
 });
 
 test('provider re-entry rejects provider kind conversion before network or credential writes', async () => {

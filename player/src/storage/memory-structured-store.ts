@@ -32,6 +32,16 @@ function keyOf(store: StructuredStoreName, value: unknown): IDBValidKey {
   return key;
 }
 
+// IndexedDB orders number keys before string keys and compares strings by UTF-16
+// code unit; keyOf admits only those two key types.
+function compareKeys(a: IDBValidKey, b: IDBValidKey): number {
+  if (typeof a === 'number' && typeof b !== 'number') return -1;
+  if (typeof a !== 'number' && typeof b === 'number') return 1;
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+// Like IndexedDB getAll and index cursors, lists return rows in ascending
+// primary-key order rather than insertion order.
 export class MemoryStructuredStore implements StructuredStore {
   private readonly stores: Record<StructuredStoreName, Map<IDBValidKey, unknown>> = {
     providers: new Map(),
@@ -47,7 +57,7 @@ export class MemoryStructuredStore implements StructuredStore {
   }
 
   async getAll<T>(store: StructuredStoreName): Promise<readonly T[]> {
-    return Array.from(this.stores[store].values(), (value) => copyValue(value as T));
+    return this.orderedValues(store).map((value) => copyValue(value as T));
   }
 
   async getAllByIndex<T>(
@@ -56,11 +66,17 @@ export class MemoryStructuredStore implements StructuredStore {
     indexValue: IDBValidKey,
   ): Promise<readonly T[]> {
     const values: T[] = [];
-    for (const value of this.stores[store].values()) {
+    for (const value of this.orderedValues(store)) {
       const record = recordOf(value);
       if (record[indexName] === indexValue) values.push(copyValue(value as T));
     }
     return values;
+  }
+
+  private orderedValues(store: StructuredStoreName): unknown[] {
+    return Array.from(this.stores[store])
+      .sort(([a], [b]) => compareKeys(a, b))
+      .map(([, value]) => value);
   }
 
   async put<T>(store: StructuredStoreName, value: T): Promise<void> {
