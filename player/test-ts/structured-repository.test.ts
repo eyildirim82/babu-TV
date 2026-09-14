@@ -7,23 +7,7 @@ import {
   IndexedDbStructuredStore,
   StorageUnavailableError,
 } from '../src/storage/indexeddb-structured-store.js';
-import type { StructuredStoreName } from '../src/storage/contracts.js';
 import { MemoryStructuredStore } from '../src/storage/memory-structured-store.js';
-
-// IndexedDB index cursors return rows with an equal index value in ascending
-// primary-key order, not insertion order. The memory store keeps insertion
-// order, so this double reproduces the real browser/Tizen contract.
-class PrimaryKeyOrderedStore extends MemoryStructuredStore {
-  override async getAllByIndex<T>(
-    store: StructuredStoreName,
-    indexName: string,
-    indexValue: IDBValidKey,
-  ): Promise<readonly T[]> {
-    const rows = await super.getAllByIndex<T>(store, indexName, indexValue);
-    const keyOf = (row: T) => String((row as Record<string, unknown>).key);
-    return [...rows].sort((a, b) => (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0));
-  }
-}
 
 function provider(
   id: string,
@@ -100,8 +84,34 @@ void test('structured catalog scopes duplicate channel IDs and replaces only the
   assert.deepEqual((await catalog.listChannels('provider-b')).map((item) => item.name), ['B']);
 });
 
+// IndexedDB getAll and index cursors return rows in ascending primary-key order,
+// not insertion order. The memory store used across the test suite must follow
+// the same contract, or order-dependent reads pass in tests and fail on a TV.
+void test('memory structured store lists rows in IndexedDB primary-key order', async () => {
+  const store = new MemoryStructuredStore();
+  for (const key of ['p:b', 'p:10', 'q:a', 'p:9', 'p:a']) {
+    await store.put('channels', { key, providerId: key.slice(0, 1) });
+  }
+  for (const id of ['provider-c', 'provider-a', 'provider-b']) {
+    await store.put('providers', { id });
+  }
+
+  assert.deepEqual(
+    (await store.getAllByIndex<{ key: string }>('channels', 'providerId', 'p')).map((row) => row.key),
+    ['p:10', 'p:9', 'p:a', 'p:b'],
+  );
+  assert.deepEqual(
+    (await store.getAll<{ key: string }>('channels')).map((row) => row.key),
+    ['p:10', 'p:9', 'p:a', 'p:b', 'q:a'],
+  );
+  assert.deepEqual(
+    (await store.getAll<{ id: string }>('providers')).map((row) => row.id),
+    ['provider-a', 'provider-b', 'provider-c'],
+  );
+});
+
 void test('structured catalog lists M3U channels and categories in provider order under IndexedDB key ordering', async () => {
-  const catalog = new StructuredCatalogRepository(new PrimaryKeyOrderedStore());
+  const catalog = new StructuredCatalogRepository(new MemoryStructuredStore());
   await catalog.replaceCategories('m3u-demo', [
     category('m3u-demo', 'group:b2ea63db', 'Film'),
     category('m3u-demo', 'group:afd071e5', 'Test'),
@@ -120,7 +130,7 @@ void test('structured catalog lists M3U channels and categories in provider orde
 });
 
 void test('structured catalog keeps Xtream numeric stream ids in provider order, not string key order', async () => {
-  const catalog = new StructuredCatalogRepository(new PrimaryKeyOrderedStore());
+  const catalog = new StructuredCatalogRepository(new MemoryStructuredStore());
   await catalog.replaceChannels('xtream-a', [
     channel('xtream-a', '9', 'Nine'),
     channel('xtream-a', '10', 'Ten'),
