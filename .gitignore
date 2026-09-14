@@ -4,6 +4,9 @@ node_modules/
 # Build outputs
 player/dist/
 relay/dist/
+relay-cloudflare/dist/
+relay-cloudflare/public/
+relay-cloudflare/.wrangler/
 
 # Tizen build artifacts
 tizen/temp-wgt/

@@ -1,0 +1,66 @@
+name: relay-cloudflare
+
+on:
+  pull_request:
+    paths:
+      - 'relay/**'
+      - 'relay-cloudflare/**'
+      - 'player/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/relay-cloudflare.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'relay/**'
+      - 'relay-cloudflare/**'
+      - 'player/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/relay-cloudflare.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  workers-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            relay-cloudflare/package-lock.json
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Build production player (phone pairing page)
+        run: npm run build
+
+      - name: Install Cloudflare relay dependencies
+        run: npm ci --prefix relay-cloudflare
+
+      - name: Typecheck Cloudflare relay
+        run: npm run typecheck --prefix relay-cloudflare
+
+      - name: Run Workers-runtime tests (local workerd, no account)
+        run: npm test --prefix relay-cloudflare
+
+      - name: Bundle Worker with a Wrangler dry run (no credentials)
+        run: npm run build --prefix relay-cloudflare
+
+      - name: Ensure verification did not modify tracked files
+        run: git diff --exit-code
