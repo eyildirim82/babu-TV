@@ -50,10 +50,77 @@ export const PAIRING_STATE_CASES = Object.freeze([
   }),
 ]);
 
-export const PHONE_ROUTE_RESULT = Object.freeze({
-  status: 'NOT-AVAILABLE',
-  reason: 'no production browser route',
+export const PHONE_PAIRING_SESSION_ID = 'rc-phone-session-1';
+
+export const PHONE_COPY = Object.freeze({
+  chooseProvider: 'TV’ye göndermek istediğiniz sağlayıcı türünü seçin.',
+  success: 'Bilgiler TV’ye güvenli şekilde gönderildi.',
+  expired: "Eşleştirme süresi doldu. TV'den yeniden başlatın.",
+  invalidBootstrap: "Eşleştirme bağlantısı geçersiz. TV'den yeniden başlatın.",
+  network: 'Ağ bağlantısı kurulamadı. Lütfen yeniden deneyin.',
+  relayUnavailable: 'Eşleştirme servisine şu anda ulaşılamıyor.',
 });
+
+export const PHONE_RELAY_FAILURE_CASES = Object.freeze([
+  Object.freeze({ id: 'relay-http-500', mode: 'http-500', expected: PHONE_COPY.network }),
+  Object.freeze({ id: 'relay-transport', mode: 'transport-failure', expected: PHONE_COPY.network }),
+  Object.freeze({ id: 'relay-malformed', mode: 'malformed', expected: PHONE_COPY.relayUnavailable }),
+]);
+
+export const PHONE_ENVELOPE_KEYS = Object.freeze(['algorithm', 'ciphertext', 'iv', 'senderPublicKey', 'version']);
+
+// The test holds the TV private key so it can prove the relay body is real
+// ciphertext for this TV. Decrypted values are compared in memory only.
+export async function createPhonePairingBootstrap({ expiresAtMs = Date.now() + 5 * 60_000 } = {}) {
+  const tv = await webcrypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' },
+    true,
+    ['deriveKey'],
+  );
+  const { d, ...tvPublicKey } = await webcrypto.subtle.exportKey('jwk', tv.publicKey);
+  void d;
+  return {
+    bootstrap: {
+      version: 1,
+      sessionId: PHONE_PAIRING_SESSION_ID,
+      expiresAtMs,
+      tvPublicKey,
+      relayBaseUrl: RC_ENDPOINTS.relay,
+    },
+    tvPrivateKey: tv.privateKey,
+  };
+}
+
+export function encodePhonePairingFragment(value) {
+  return `#pairing=${Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')}`;
+}
+
+export async function decryptPhoneEnvelopeForTv(tvPrivateKey, envelope) {
+  const senderPublicKey = await webcrypto.subtle.importKey(
+    'jwk',
+    envelope.senderPublicKey,
+    { name: 'ECDH', namedCurve: 'P-256' },
+    false,
+    [],
+  );
+  const aesKey = await webcrypto.subtle.deriveKey(
+    { name: 'ECDH', public: senderPublicKey },
+    tvPrivateKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['decrypt'],
+  );
+  const plaintext = await webcrypto.subtle.decrypt(
+    {
+      name: 'AES-GCM',
+      iv: Buffer.from(envelope.iv, 'base64url'),
+      additionalData: new TextEncoder().encode('babustv-pairing-v1'),
+    },
+    aesKey,
+    Buffer.from(envelope.ciphertext, 'base64url'),
+  );
+  return JSON.parse(new TextDecoder().decode(plaintext));
+}
 
 export function assertNoCanaryText(value, category = 'value') {
   let serialized;

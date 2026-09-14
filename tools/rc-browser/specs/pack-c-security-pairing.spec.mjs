@@ -18,10 +18,16 @@ import {
   RC_SECRETS,
 } from '../fixtures/common.mjs';
 import {
-  PHONE_ROUTE_RESULT,
   PAIRING_STATE_CASES,
+  PHONE_COPY,
+  PHONE_ENVELOPE_KEYS,
+  PHONE_PAIRING_SESSION_ID,
+  PHONE_RELAY_FAILURE_CASES,
   XTREAM_ERROR_CASES,
   assertNoCanaryText,
+  createPhonePairingBootstrap,
+  decryptPhoneEnvelopeForTv,
+  encodePhonePairingFragment,
   encryptXtreamPayloadForTv,
   installPairingBrowserConfig,
   installPairingPublicKeyProbe,
@@ -360,25 +366,248 @@ test('S09 decrypted pairing payload is never exposed to diagnostics, DOM, ordina
   expect(leaks).toEqual([]);
 });
 
-test('S10 S11 S12 phone pairing browser qualification is NOT-AVAILABLE without a production route', async ({ context, page }) => {
-  const harness = await installBrowserHarness(context, { widgetData: { initialValue: null } });
-  await openFreshApp(page);
-  await waitForFirstRun(page);
+const phoneStatus = (page) => page.locator('#pairing-phone-status');
+const relayCalls = (harness, method) => harness.providerMocks.calls.filter((call) => (
+  call.category === 'pairing-relay' && (method === undefined || call.method === method)
+));
 
-  expect(PHONE_ROUTE_RESULT).toEqual({ status: 'NOT-AVAILABLE', reason: 'no production browser route' });
-  await expect(page.locator('#pairing-phone-root')).toHaveCount(0);
+async function openPhoneRoute(page, fragment) {
+  // A hash-only change is a same-document navigation; start from a blank page so
+  // the production entry decides the route on a real load.
+  await page.goto('about:blank');
+  await page.goto(`./${fragment}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#pairing-phone-page')).toBeVisible({ timeout: 10_000 });
+}
+
+function captureRelayPuts(page) {
+  const puts = [];
+  page.on('request', (request) => {
+    if (request.method() !== 'POST' || !request.url().startsWith(RC_ENDPOINTS.relay)) return;
+    if (!/\/v1\/pairing\/sessions\/[^/]+\/ciphertext$/.test(new URL(request.url()).pathname)) return;
+    puts.push({ url: request.url(), body: request.postData() ?? '' });
+  });
+  return puts;
+}
+
+async function fillPhoneProvider(page, kind) {
+  await page.locator(`#pairing-phone-${kind}`).click();
+  if (kind === 'xtream') {
+    await page.locator('#pairing-phone-server-url').fill(RC_ENDPOINTS.xtreamA);
+    await page.locator('#pairing-phone-username').fill(RC_SECRETS.xtreamUsername);
+    await page.locator('#pairing-phone-password').fill(RC_SECRETS.xtreamPassword);
+  } else {
+    await page.locator('#pairing-phone-playlist-url').fill(RC_ENDPOINTS.m3uA);
+  }
+}
+
+async function scrubPhoneInputs(page) {
+  await page.evaluate(() => {
+    for (const input of document.querySelectorAll('#pairing-phone-page input')) {
+      input.value = '';
+      input.removeAttribute('value');
+    }
+  });
+}
+
+test('S08 phone pairing route boots from the public fragment and rejects missing or extra bootstrap keys before relay use', async ({ context, page }) => {
+  const harness = await installBrowserHarness(context, { widgetData: { initialValue: null } });
+  const { bootstrap } = await createPhonePairingBootstrap();
+  const { relayBaseUrl, ...missingRelay } = bootstrap;
+  void relayBaseUrl;
+  const invalidCases = [
+    { id: 'extra-key', fragment: encodePhonePairingFragment({ ...bootstrap, extra: 'forbidden' }) },
+    { id: 'missing-key', fragment: encodePhonePairingFragment(missingRelay) },
+    { id: 'not-base64url', fragment: '#pairing=%%%' },
+  ];
+
+  const observed = [];
+  for (const invalid of invalidCases) {
+    await openPhoneRoute(page, invalid.fragment);
+    await expect(phoneStatus(page)).toHaveText(PHONE_COPY.invalidBootstrap);
+    await expect(page.locator('#pairing-phone-xtream')).toHaveCount(0);
+    await expect(page.locator('#first-run-page')).toHaveCount(0);
+    observed.push(`${invalid.id}=INVALID_BOOTSTRAP`);
+  }
+  expect(relayCalls(harness)).toEqual([]);
+
+  await openPhoneRoute(page, encodePhonePairingFragment(bootstrap));
+  await expect(phoneStatus(page)).toHaveText(PHONE_COPY.chooseProvider);
+  await expect(page.locator('#pairing-phone-xtream')).toBeVisible();
+  await expect(page.locator('#pairing-phone-m3u')).toBeVisible();
+  await expect(page.locator('#first-run-page')).toHaveCount(0);
+  expect(relayCalls(harness)).toEqual([]);
+  assertNoCanaryText(page.url(), 'phone pairing route URL');
+
   const leaks = await findSecretLeaks(page, RC_SECRET_CANARIES);
   await writeSafeEvidence({
-    scenarioId: 'BROW-SECPAIR-S10-S12',
+    scenarioId: 'BROW-SECPAIR-S08-PHONE-ROUTE',
     harness,
-    startingState: 'production TV application route',
-    actions: ['inspect production-accessible application surface only'],
-    expectedState: 'phone pairing tests run only when an integrated production browser route exists',
-    observedState: 'NOT-AVAILABLE — no production browser route',
+    startingState: 'fresh browser page opened on the production phone pairing fragment route',
+    actions: invalidCases.map((invalid) => `open #pairing fragment: ${invalid.id}`).concat('open valid public bootstrap fragment'),
+    expectedState: 'invalid bootstrap shows fixed copy with no provider form and no relay request; valid bootstrap shows provider choice without TV boot',
+    observedState: `${observed.join('; ')}; valid=choose-provider; relayCalls=0`,
     leakage: leaks,
-    status: 'NOT-AVAILABLE',
+    status: statusFromLeaks(leaks),
   });
 
+  expect(harness.events.pageErrors).toEqual([]);
+  assertNoUnexplainedConsoleErrors(harness.events);
+  expect(leaks).toEqual([]);
+});
+
+for (const kind of ['xtream', 'm3u']) {
+  test(`S09 S10 phone ${kind} submit sends only a TV-decryptable ciphertext envelope to the relay`, async ({ context, page }) => {
+    const harness = await installBrowserHarness(context, { widgetData: { initialValue: null } });
+    const { bootstrap, tvPrivateKey } = await createPhonePairingBootstrap();
+    const puts = captureRelayPuts(page);
+
+    await openPhoneRoute(page, encodePhonePairingFragment(bootstrap));
+    await fillPhoneProvider(page, kind);
+    await page.locator('#pairing-phone-submit').click();
+    await expect(phoneStatus(page)).toHaveText(PHONE_COPY.success, { timeout: 10_000 });
+    await expect(page.locator('#pairing-phone-page input')).toHaveCount(0);
+
+    expect(puts).toHaveLength(1);
+    const [put] = puts;
+    expect(new URL(put.url).pathname).toBe(`/v1/pairing/sessions/${PHONE_PAIRING_SESSION_ID}/ciphertext`);
+    assertNoCanaryText(put.url, 'phone relay URL');
+    assertNoCanaryText(put.body, 'phone relay body');
+    for (const plaintext of [RC_ENDPOINTS.xtreamA, RC_ENDPOINTS.m3uA]) {
+      expect(put.body.includes(plaintext)).toBe(false);
+    }
+
+    const body = JSON.parse(put.body);
+    expect(Object.keys(body)).toEqual(['ciphertext']);
+    const envelope = JSON.parse(body.ciphertext);
+    expect(Object.keys(envelope).sort()).toEqual([...PHONE_ENVELOPE_KEYS]);
+    expect(envelope.version).toBe(1);
+    expect(envelope.algorithm).toBe('ECDH-P256+A256GCM');
+    expect(envelope.senderPublicKey.d).toBeUndefined();
+
+    const decrypted = await decryptPhoneEnvelopeForTv(tvPrivateKey, envelope);
+    const expectedCredential = kind === 'xtream'
+      ? { kind: 'xtream', serverUrl: RC_ENDPOINTS.xtreamA, username: RC_SECRETS.xtreamUsername, password: RC_SECRETS.xtreamPassword }
+      : { kind: 'm3u', playlistUrl: RC_ENDPOINTS.m3uA };
+    expect(decrypted).toEqual({ version: 1, credential: expectedCredential });
+
+    const leaks = await findSecretLeaks(page, RC_SECRET_CANARIES);
+    assertNoCanaryText(harness.events, 'phone pairing diagnostics');
+    assertNoCanaryText(harness.providerMocks.calls, 'phone relay diagnostics');
+    await writeSafeEvidence({
+      scenarioId: `BROW-SECPAIR-S09-S10-PHONE-${kind.toUpperCase()}`,
+      harness,
+      startingState: 'phone pairing route with a valid public bootstrap and a test-held TV private key',
+      actions: [`choose ${kind}`, 'enter synthetic provider data', 'submit to TV'],
+      expectedState: 'relay receives one POST whose body is only a ciphertext envelope; envelope decrypts for the TV to the submitted provider data; no plaintext in relay URL/body, DOM, storage or diagnostics',
+      observedState: `relayPosts=1; bodyKeys=${Object.keys(body).join(',')}; envelopeKeys=${Object.keys(envelope).sort().join(',')}; ciphertextLength=${envelope.ciphertext.length}; tvDecrypt=matches submitted ${kind} payload; phoneStatus=success`,
+      leakage: leaks,
+      status: statusFromLeaks(leaks),
+    });
+
+    expect(harness.events.pageErrors).toEqual([]);
+    assertNoUnexplainedConsoleErrors(harness.events);
+    expect(leaks).toEqual([]);
+  });
+}
+
+for (const scenario of PHONE_RELAY_FAILURE_CASES) {
+  test(`S11 phone relay failure UI is fixed and sanitized: ${scenario.id}`, async ({ context, page }) => {
+    const harness = await installBrowserHarness(context, { widgetData: { initialValue: null } });
+    harness.providerMocks.setRelayMode('put', scenario.mode);
+    const { bootstrap } = await createPhonePairingBootstrap();
+
+    await openPhoneRoute(page, encodePhonePairingFragment(bootstrap));
+    await fillPhoneProvider(page, 'xtream');
+    await page.locator('#pairing-phone-submit').click();
+    await expect(phoneStatus(page)).toHaveText(scenario.expected, { timeout: 10_000 });
+    await expect(page.locator('#pairing-phone-submit')).toBeEnabled();
+    const observed = await phoneStatus(page).textContent();
+    expect(relayCalls(harness, 'POST')).toHaveLength(1);
+
+    await scrubPhoneInputs(page);
+    const leaks = await findSecretLeaks(page, RC_SECRET_CANARIES);
+    assertNoCanaryText(harness.events, 'phone relay failure diagnostics');
+    assertNoCanaryText(harness.providerMocks.calls, 'phone relay failure calls');
+    await writeSafeEvidence({
+      scenarioId: `BROW-SECPAIR-S11-PHONE-${scenario.id}`,
+      harness,
+      startingState: 'phone pairing Xtream form with deterministic relay failure',
+      actions: ['submit synthetic Xtream provider data', `relay put mode=${scenario.id}`],
+      expectedState: 'fixed sanitized retry copy with the form still usable; no raw relay error, URL or credential exposure',
+      observedState: observed ?? '',
+      leakage: leaks,
+      status: statusFromLeaks(leaks),
+    });
+
+    expect(observed).toBe(scenario.expected);
+    expect(harness.events.pageErrors).toEqual([]);
+    assertNoUnexplainedConsoleErrors(harness.events, {
+      allow: [/Failed to load resource: (the server responded with a status of 500\b|net::ERR_FAILED)/],
+    });
+    expect(leaks).toEqual([]);
+  });
+}
+
+test('S11 expired phone bootstrap shows fixed copy without relay use', async ({ context, page }) => {
+  const harness = await installBrowserHarness(context, { widgetData: { initialValue: null } });
+  const { bootstrap } = await createPhonePairingBootstrap({ expiresAtMs: Date.now() - 1_000 });
+
+  await openPhoneRoute(page, encodePhonePairingFragment(bootstrap));
+  await fillPhoneProvider(page, 'xtream');
+  await page.locator('#pairing-phone-submit').click();
+  await expect(phoneStatus(page)).toHaveText(PHONE_COPY.expired, { timeout: 10_000 });
+  await expect(page.locator('#pairing-phone-page input')).toHaveCount(0);
+  expect(relayCalls(harness)).toEqual([]);
+
+  const leaks = await findSecretLeaks(page, RC_SECRET_CANARIES);
+  await writeSafeEvidence({
+    scenarioId: 'BROW-SECPAIR-S11-PHONE-expired',
+    harness,
+    startingState: 'phone pairing route with an already expired public bootstrap',
+    actions: ['enter synthetic Xtream provider data', 'submit to TV'],
+    expectedState: 'fixed expired copy; no encryption result sent to the relay; no provider data left in the DOM',
+    observedState: `phoneStatus=expired; relayCalls=0`,
+    leakage: leaks,
+    status: statusFromLeaks(leaks),
+  });
+
+  expect(harness.events.pageErrors).toEqual([]);
+  assertNoUnexplainedConsoleErrors(harness.events);
+  expect(leaks).toEqual([]);
+});
+
+test('S12 TV Back hides pairing and stops subsequent relay polling', async ({ context, page }) => {
+  await installPairingBrowserConfig(context);
+  const harness = await installBrowserHarness(context, { widgetData: { initialValue: null } });
+
+  await openFreshApp(page);
+  await openPairing(page);
+  await expect(page.locator('#pairing-tv-status')).toHaveText('QR kodunu telefonunuzla tarayın.', { timeout: 10_000 });
+  await expect.poll(() => relayCalls(harness, 'GET').length, { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
+
+  await pressRemote(page, 'BACK');
+  await expect(page.locator('#pairing-tv-root')).toHaveCount(0);
+  await expect(page.locator('#first-run-page')).toBeVisible();
+  const pollsAtBack = relayCalls(harness, 'GET').length;
+  // Absence cannot be awaited as a condition: observe well over ten 40 ms poll intervals.
+  await page.waitForTimeout(600);
+  const pollsAfterBack = relayCalls(harness, 'GET').length;
+
+  const leaks = await findSecretLeaks(page, RC_SECRET_CANARIES);
+  await writeSafeEvidence({
+    scenarioId: 'BROW-SECPAIR-S12-TV-BACK',
+    harness,
+    startingState: 'TV pairing open and polling a pending relay session every 40 ms',
+    actions: ['wait for at least two polls', 'press remote Back', 'observe relay traffic for 600 ms'],
+    expectedState: 'pairing surface removed, First Run restored, and no relay poll starts after Back',
+    observedState: `pollsAtBack=${pollsAtBack}; pollsAfter600ms=${pollsAfterBack}; firstRun=visible`,
+    leakage: leaks,
+    status: statusFromLeaks(leaks),
+  });
+
+  expect(pollsAfterBack).toBe(pollsAtBack);
+  expect(harness.events.pageErrors).toEqual([]);
+  assertNoUnexplainedConsoleErrors(harness.events);
   expect(leaks).toEqual([]);
 });
 
