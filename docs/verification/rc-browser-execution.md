@@ -2,7 +2,7 @@
 
 Date: 2026-09-14
 Owner: REVIEW / Integration Controller
-Status: BLOCKED — integrated suite GREEN on the exact production SHA, but a deterministic Search text-entry defect is open (see below); physical Samsung/Tizen rows remain NOT VERIFIED / DEFERRED
+Status: READY FOR CONTROLLER ACCEPTANCE — integrated browser qualification GREEN on the exact production SHA with no open deterministic production defect; physical Samsung/Tizen rows remain NOT VERIFIED / DEFERRED
 
 Plan: `docs/superpowers/plans/2026-09-12-rc-browser-parallel-execution.md`
 Design: `docs/superpowers/specs/2026-09-12-rc-browser-qualification-design.md`
@@ -13,15 +13,15 @@ This board records what the deterministic 1920×1080 Chromium qualification prov
 
 | Item | Value |
 | --- | --- |
-| Production SHA under qualification | `8b0f3407e5f08c6b8ee8b106a018c2d92cffabe4` (`main`, post-merge verify `34828018060` SUCCESS) |
+| Production SHA under qualification | `eaa928c6b0d9b71b1ae91f9f0424ffd166b7c03f` (`main`, post-merge verify `34837966335` SUCCESS) |
 | H0 harness SHA | `61cb2198fee982ae3b3a61398dc120738d3405b4` |
 | Integrated qualification branch | `verification/v1-rc-browser-h2` |
-| Integrated qualification head | `02dcaaa305091998314921dddfa25a951c12fe8b` |
-| Exact-head integrated CI | `rc-browser` run `34829839575` SUCCESS |
-| Stability evidence | run `34829196455` attempts 1 and 2 at `d51e1f82`, both SUCCESS with no retried scenario |
-| Evidence artifact | `rc-browser-integration-02dcaaa305091998314921dddfa25a951c12fe8b` on run `34829839575` (14-day retention) |
+| Integrated qualification head | `aca5f44e928ceae7568acc28ad11f112d6745f1f` |
+| Exact-head integrated CI | `rc-browser` run `34838069268` attempt 1 SUCCESS |
+| Stability evidence | run `34838069268` attempt 2 at `aca5f44` SUCCESS with no retried scenario (earlier production `8b0f340`: `34829196455` ×2 and `34829839575`) |
+| Evidence artifact | `rc-browser-integration-aca5f44e928ceae7568acc28ad11f112d6745f1f` on run `34838069268` (14-day retention) |
 
-This board is committed on top of the qualified head `02dcaaa`; that commit adds only this file, which the canonical qualification scope explicitly allows.
+This board is committed on top of the qualified head `aca5f44`; that commit changes only this file, which the canonical qualification scope explicitly allows.
 
 Worker lanes. Every worker branch has H0 as its exact merge base, and its diff against H0 is exactly its own spec and fixture file. The last standalone qualify run is listed for completeness; the failures it shows were routed to product fixes and corrections integrated at H1/H2, and the integrated suite above supersedes them.
 
@@ -44,10 +44,12 @@ H1  5276c42  five packs integrated (#122–#127), production 49c9e3e (#119 produ
 H2  03c3201  H1 + main ac8a346 (#129)
      bd78aaa  + main 69b4d72 (#130)
      d26041b  + main 8b0f340 (#131)
-     02dcaaa  final qualification head
+     02dcaaa  8b0f340 qualification head (board then BLOCKED on Search text entry)
+     63c2b6f  + main eaa928c (#133, #134)
+     aca5f44  final qualification head (Search typed with real keys)
 ```
 
-Every H2 production step merged the exact post-merge `main` into the qualification branch and retargeted `RC_PRODUCTION_SHA` in `.github/workflows/rc-browser.yml`. All browser evidence below was produced against `8b0f340`.
+Every H2 production step merged the exact post-merge `main` into the qualification branch and retargeted `RC_PRODUCTION_SHA` in `.github/workflows/rc-browser.yml`. All browser evidence below was produced against `eaa928c`.
 
 ## Result summary
 
@@ -65,16 +67,6 @@ Scenario IDs follow the implemented packs rather than the plan's draft numbering
 
 ## Deterministic defects and resolution
 
-### Open production defect — Search text entry is not remote/keyboard reachable
-
-Found after the GREEN run by code review of the B06 flake. The Search layer is reachable, but the query input is not:
-
-- `.live-tv-search-input` is never DOM-focused (no `.focus()` in `player/src/live-tv` or `player/src/search`), so a Tizen IME cannot open and hardware keystrokes do not reach it.
-- `player/src/remote.js` calls `preventDefault()` globally for `Backspace`, space and `r`/`R`, so those characters cannot be typed even with focus.
-- `renderFeatures()` creates a new input element on every render, and every `input` event re-renders, so focus would be lost after each character.
-
-B06, B07 and P10 set the value with Playwright `fill` / `dispatchEvent`, which bypasses focus and key handling. They prove Search layer reachability, Turkish matching and focus restoration on the logical model, not text entry. This must be fixed and requalified with real key input before RC-BROWSER can be accepted.
-
 ### Production defects (fixed on `main`, then requalified)
 
 | PR | Found by | Root cause | Requalification |
@@ -82,6 +74,9 @@ B06, B07 and P10 set the value with Playwright `fill` / `dispatchEvent`, which b
 | #129 | H1 P03/P04, P06/P13 | Shaka teardown was fire-and-forget; a detached `destroyPlayer()` resumed after the next player attached and emptied its media source, leaving playback in `PREPARING`. | P03/P04 and P06/P13 PASS from H2 onwards. |
 | #130 | H2 STATE (C03, C05, C07, C08, C14, C15) | After #129 kept the shared video element, teardown's `src = ''` + `load()` raised `MEDIA_ELEMENT_ERROR: Empty src attribute`, which `onVideoError` logged and counted as a real playback error. | STATE pack back to clean console; no ERROR-level player log in C03/C05 real playback sessions. |
 | #131 | H2 SECPAIR phone scenarios | The phone pairing route only worked from source: the built classic script ran before `<body>` existed, and the IIFE build inlined `main.js`, whose auto-init booted the TV app on top of the phone page. | S08–S11 phone rows PASS in the built bundle. |
+| #134 | Code review of the B06 flake after the `02dcaaa` GREEN run | The Search input was never DOM-focused and was rebuilt on every render (every `input` event re-renders), and `remote.js` swallowed Backspace, space, `r` and digits as app actions, so a query could not be typed with a remote or keyboard. B06/B07/P10 had written the value with `fill`, which hid it. | B06/B07/P10 now require DOM focus and type with `page.keyboard` (`şeker` includes `r`; P10 types `4` without a zap). Local counterfactual: all three FAIL at `toBeFocused()` without the fix. |
+
+Hardening merged in the same generation: #133 serializes WidgetData credential `save`/`remove` per native object (lost-update race proven RED in unit tests; not observed in the browser suite).
 
 ### Qualification corrections (H2, `tools/rc-browser/**` only)
 
@@ -97,6 +92,7 @@ B06, B07 and P10 set the value with Playwright `fill` / `dispatchEvent`, which b
 | `2ebdc4c` | B07, B06 | A diagnostic timeline showed B07 sending DOWN 68 ms after Search opened, before results existed. Wait for Search input focus before typing and for results before navigating. B06 still needed one retry afterwards (see open observations). |
 | `d51e1f8` | B11 (all Live re-entry) | A CI diagnostic timeline showed `openLiveTv()` returning while Home was still on screen: provider entry is awaited before Home is swapped out, and a previous session's channel list stays in the closed sidebar, which Playwright treats as visible. ~26 ms later the pending swap removed the Home that `backToHome()` had matched. Wait for Home to leave and the sidebar to open. |
 | `583390c` → `2cdde2b` | — | Temporary B11 timeline recorder, reverted after the root cause was fixed. |
+| `aca5f44` | B06, B07, P10 | Type Search queries with real key input and require the input to hold DOM focus (requalifies #134). |
 | `02dcaaa` | gate | Ignore `tools/rc-browser/test-results/` (Playwright resolves `outputDir` relative to the config directory), so `git status --porcelain` stays clean after `npm run rc:browser`. |
 
 The B11 route-swap window (~26 ms) could not be forced locally without patching application internals, so that correction rests on the CI timeline plus three consecutive clean integrated runs (`34829196455` ×2, `34829839575`).
@@ -148,27 +144,25 @@ Reload/persistence rows are GREEN: provider and active-provider identity (C01, C
 
 | Command | Where | Head | Result |
 | --- | --- | --- | --- |
-| `npm ci` | CI `34829839575` | `02dcaaa` | PASS |
-| `npx playwright install chromium` (+ deps) | CI `34829839575` | `02dcaaa` | PASS |
-| `npm run build` | CI `34829839575` | `02dcaaa` | PASS |
-| `npm test` | CI `34829839575` | `02dcaaa` | PASS |
-| `npm run typecheck` | CI `34829839575` | `02dcaaa` | PASS |
-| `npm run rc:browser` (H0 smoke + all packs) | CI `34829839575` | `02dcaaa` | PASS, 76/76 evidence rows |
-| `node tools/check-m7-security-privacy.mjs` | CI `34829839575` and local | `02dcaaa` | PASS |
-| canonical scope (`git diff 8b0f340...HEAD`, no `player/src/**`, allowed paths only) | CI `34829839575` and local | `02dcaaa` | PASS |
-| `git diff --exit-code` after verification | CI `34829839575` | `02dcaaa` | PASS |
-| `npm run brand:check` | local | `02dcaaa` | PASS, 149 active product surfaces clean |
-| `npm run tizen:build` | local | `02dcaaa` | PASS (staged to ignored `tizen/build/`) |
-| `git diff --check 8b0f340...HEAD` | local | `02dcaaa` | PASS |
+| `npm ci` | CI `34838069268` | `aca5f44` | PASS |
+| `npx playwright install chromium` (+ deps) | CI `34838069268` | `aca5f44` | PASS |
+| `npm run build` | CI `34838069268` | `aca5f44` | PASS |
+| `npm test` | CI `34838069268` | `aca5f44` | PASS |
+| `npm run typecheck` | CI `34838069268` | `aca5f44` | PASS |
+| `npm run rc:browser` (H0 smoke + all packs) | CI `34838069268` (attempts 1 and 2) | `aca5f44` | PASS, 76/76 evidence rows |
+| `node tools/check-m7-security-privacy.mjs` | CI `34838069268` and local | `aca5f44` | PASS |
+| canonical scope (`git diff eaa928c...HEAD`, no `player/src/**`, allowed paths only) | CI `34838069268` and local | `aca5f44` | PASS |
+| `git diff --exit-code` after verification | CI `34838069268` | `aca5f44` | PASS |
+| `npm run brand:check` | local | `aca5f44` | PASS, 149 active product surfaces clean |
+| `npm run tizen:build` | local | `aca5f44` | PASS (staged to ignored `tizen/build/`) |
+| `git diff --check eaa928c...HEAD` | local | `aca5f44` | PASS |
 | `npm run tizen:package` | — | — | NOT-AVAILABLE — signing material is intentionally absent; belongs to RC-PACKAGE |
 
-Qualification diff against `8b0f340` touches only `.github/workflows/rc-browser.yml`, `.gitignore`, `package.json`, `package-lock.json` and `tools/rc-browser/**`, plus this document.
+Qualification diff against `eaa928c` touches only `.github/workflows/rc-browser.yml`, `.gitignore`, `package.json`, `package-lock.json` and `tools/rc-browser/**`, plus this document.
 
 ## Open observations (not RC-BROWSER blockers)
 
-- **B06 intermittent first query.** In run `34830458201` (board commit `3ffdacf`) B06 passed only on retry: after Search owned input focus, the first query `İ` showed no result within 5 s. The feature composition keeps the search query across background refreshes, so a refresh-reset defect is not indicated, but the cause is not yet proven. It did not recur in runs `34829196455` (×2) or `34829839575`. Track it before RC-PACKAGE; do not paper over it with blind retries.
-
-- **Credential store concurrency.** `SamsungWidgetDataCredentialStore` performs an unserialized read-modify-write of one WidgetData document for `save` and `remove`. Concurrent operations could lose an update (resurrect a removed credential or drop a new one). No scenario reproduced it; the C08 flake traced to test synchronization. Needs a separate bounded review.
+- **B06 intermittent first query (superseded).** Before #134, B06 once needed a retry (`34830458201`) while `fill` raced the input re-render. B06 now types with real keys into a persistent focused input and passed without retry in both attempts of `34838069268`. Keep watching it in RC-PACKAGE runs.
 - **Interrupted onboarding.** With post-registration sync artificially delayed, reloading between registration and compensation left a registered provider and booted to Home. This is outside the approved failure matrix (it needs a mid-transaction reload) and was not investigated further.
 - **Phone relay HTTP 500 copy.** The phone maps relay HTTP errors to the network copy ("Ağ bağlantısı kurulamadı…"). It is sanitized; wording may deserve a product decision.
 
@@ -192,21 +186,21 @@ Nothing on this board converts a physical-device row to PASS. The following rema
 | Condition | State |
 | --- | --- |
 | Every browser-testable critical row PASS or honestly NOT-AVAILABLE | 76/76 PASS, none NOT-AVAILABLE |
-| No unresolved deterministic production defect | **NOT MET** — Search text entry (above); #129, #130, #131 merged and requalified |
+| No unresolved deterministic production defect | met — #129, #130, #131, #134 merged and requalified |
 | No unexplained console/page error | none (classification above) |
 | No credential/source/stream/pairing plaintext leak | none observed |
 | Reload/persistence checks GREEN | GREEN |
 | Five worker scopes clean | each worker diff is exactly its spec + fixture from H0; three lanes last standalone qualify runs failed and were superseded by integrated corrections |
-| Integrated browser suite GREEN | run `34829839575` |
+| Integrated browser suite GREEN | run `34838069268` (attempts 1 and 2) |
 | Repository command gate GREEN | GREEN; `tizen:package` NOT-AVAILABLE by design |
 | Static M7 security audit GREEN | PASS |
 | Zero `player/src/**` changes in the qualification diff | confirmed |
 | Clean working tree | CI `git diff --exit-code` PASS; `tools/rc-browser/test-results/` now ignored |
-| Exact-head CI GREEN | `02dcaaa` SUCCESS |
+| Exact-head CI GREEN | `aca5f44` SUCCESS |
 
 ## Scenario matrix
 
-Generated from the evidence artifact of run `34829839575`. Long cells are truncated; the artifact holds the full records.
+Generated from the evidence artifact of run `34838069268`. Long cells are truncated; the artifact holds the full records.
 
 ### H0 (1)
 
@@ -239,7 +233,7 @@ Generated from the evidence artifact of run `34829839575`. Long cells are trunca
 | `B02` | PASS | categories/channels render with stable highlight and no playback | Provider A/all visible; stable shared highlight; playback IDLE | not-applicable | 0 / 0 | clean |
 | `B03` | PASS | scope changes without playback | category:news; one channel; playback IDLE | not-applicable | 0 / 0 | clean |
 | `B04` | PASS | provider-scoped favorite persists; empty Favorites safe | add persisted across reload; remove produced safe empty scope | favorite survives page reload | 0 / 0 | clean |
-| `B05` | PASS | favorite membership never crosses provider boundary | A=xtream-mu129qsu-7c0c74881b5f356c; B=xtream-mu129qzi-63fe4404a0cabb5f; same channelId isolated | not-applicable | 0 / 0 | clean |
+| `B05` | PASS | favorite membership never crosses provider boundary | A=xtream-mu15qe6l-046761cb44e46f1f; B=xtream-mu15qee6-36ee85860b0dbef0; same channelId isolated | not-applicable | 0 / 0 | clean |
 | `B06` | PASS | remote-reachable Search with deterministic Turkish/provider-scoped results | Channel Actions -> Search remote path; Turkish variants deterministic; result keys provider A scoped | not-applicable | 0 / 0 | clean |
 | `B07` | PASS | highlight and result activation do not implicitly play | Channel Actions -> Search remote path; Search highlight and activation kept playback IDLE | not-applicable | 0 / 0 | clean |
 | `B08` | PASS | current/next and program detail present without playback | current+next+Program Info visible; playback IDLE | not-applicable | 0 / 0 | clean |
