@@ -1,10 +1,12 @@
-// Signs tizen/build/ into a .wgt using the official Tizen CLI and the "dev"
-// security profile. Requires `npm run tizen:build` to have staged the app.
+// Signs tizen/build/ into a .wgt using the official Tizen CLI and the security
+// profile named by TIZEN_PROFILE (default "dev"). Requires `npm run tizen:build`
+// to have staged the app.
 import { execFileSync } from 'child_process';
 import { existsSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { artifactName } from './product-identity.mjs';
+import { parseSecurityProfileNames } from './security-profiles.mjs';
 import { BUILD_DIR, tizen } from './tizen-env.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -14,6 +16,18 @@ const PROFILE = process.env.TIZEN_PROFILE || 'dev';
 if (!existsSync(join(BUILD_DIR, 'index.html'))) {
   console.error('[wgt] tizen/build is not staged; run: npm run tizen:build');
   process.exit(1);
+}
+
+// The CLI's own failure for a missing profile does not name the problem. Check
+// first; if the list itself cannot be read, let `tizen package` report.
+const listed = tizen(['security-profiles', 'list'], { inherit: false });
+if (listed.status === 0) {
+  const profiles = parseSecurityProfileNames(listed.stdout);
+  if (!profiles.includes(PROFILE)) {
+    console.error(`[wgt] Tizen security profile "${PROFILE}" does not exist`);
+    console.error(`[wgt] available: ${profiles.join(', ') || '(none)'}; set TIZEN_PROFILE=<name>`);
+    process.exit(1);
+  }
 }
 
 for (const f of readdirSync(BUILD_DIR)) {
