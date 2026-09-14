@@ -6,6 +6,7 @@ import type {
   ProviderKind,
   ProviderRecord,
 } from '../domain/models.js';
+import { orderProvidersForDisplay } from '../domain/provider-display.js';
 import type { FavoriteRecord } from '../favorites/contracts.js';
 import type { LastWatchedRecord, WatchAggregate } from '../watch/contracts.js';
 import {
@@ -146,9 +147,7 @@ function providerSelector(
   providers: readonly ProviderRecord[],
   activeProviderId: ProviderId | null,
 ): HomeProviderSelectorState {
-  const sorted = [...providers].sort((a, b) =>
-    a.createdAtMs - b.createdAtMs || compareStableId(a.id, b.id),
-  );
+  const sorted = orderProvidersForDisplay(providers);
   const effectiveActiveProviderId = activeProviderId !== null
     && sorted.some((provider) => provider.id === activeProviderId)
     ? activeProviderId

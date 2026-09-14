@@ -1,4 +1,5 @@
 import type { Platform } from '../platform/contracts.js';
+import { orderProvidersForDisplay } from '../domain/provider-display.js';
 import { createBrowserProviderRuntime } from '../providers/create-browser-provider-runtime.js';
 import { ProviderReentryService } from '../providers/provider-reentry-service.js';
 import { XtreamOnboardingService } from '../providers/xtream-onboarding-service.js';
@@ -124,7 +125,7 @@ export function createBrowserAppDependencies(
       providerManagement: (callbacks) => {
         const presenter = new ProviderManagementPresenter({
           load: async () => ({
-            providers: await runtime.providers.listProviders(),
+            providers: orderProvidersForDisplay(await runtime.providers.listProviders()),
             activeProviderId: await runtime.providers.getActiveProviderId(),
           }),
           switchProvider: (providerId) => runtime.core.switchActiveProvider(providerId),
