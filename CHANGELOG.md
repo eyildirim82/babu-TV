@@ -2,6 +2,24 @@
 
 All notable changes to EN TV Player will be documented in this file.
 
+## [1.0.0-rc.2] - 2026-09-14
+
+Second BabuşTV V1 release candidate. It fixes defects found by running 1.0.0-rc.1 in a desktop browser at 1920×1080 (#139).
+
+### Fixed
+- The First Run brand logo loads again; it used a root-absolute path that broke under the web base path and in the TV package.
+- Live TV lists channels and categories in playlist/provider order, so CH+ and CH- step through channels in order.
+- Home and Provider Management fit the 1920×1080 screen; "Ayarları Aç" is no longer cut off.
+- First Run and TV pairing regain their padding, borders and focus outline (they referenced undefined design tokens).
+- Full-screen pages no longer rely on the `inset` shorthand, which older Samsung TV web engines ignore.
+- The Live TV favorites, EPG, actions and search panel is styled as a compact strip, and the focused action is clearly visible.
+- Two M3U providers are distinguishable ("M3U", "M3U 2") in Home, Provider Management and the delete prompt.
+
+### Known limitations
+- Physical Samsung/Tizen acceptance is still pending. The Tizen widget version stays `1.0.0`, as in rc.1.
+
+---
+
 ## [1.0.0-rc.1] - 2026-09-14
 
 First BabuşTV V1 release candidate. BabuşTV starts its own version line here; `1.10.1` below is the last inherited release.
