@@ -5,7 +5,7 @@
   max-width: 62vw;
   display: grid;
   grid-template-columns: minmax(calc(250px * var(--tv-scale)), 34%) minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   background: var(--babu-surface);
   color: var(--babu-text-primary);
   border-right: 1px solid var(--babu-surface-focus);
@@ -134,6 +134,180 @@
   box-shadow: inset 0 0 0 1px var(--babu-surface-focus);
 }
 
+/* M4 feature panel (Favorites summary, selected EPG, Channel Actions, Search,
+   Program Info). The DOM view appends it into #sidebar; it owns the overlay's
+   third row so it spans both columns instead of falling into an implicit row.
+   Text sections (at most three) stack in min-content rows of the left track so
+   a capped, scrolling panel never shrinks one under the next; Channel Actions
+   form a vertical menu in the right track, matching their UP/DOWN remote
+   movement, and the trailing flexible row absorbs their extra height.
+   Flex/grid `gap` is avoided for older Tizen Chromium; spacing uses margins. */
+.babu-live-tv-overlay .live-tv-feature-root {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  min-width: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: min-content min-content min-content 1fr;
+  align-items: start;
+  padding: calc(var(--babu-space-md) * var(--tv-scale)) calc(var(--babu-space-xl) * var(--tv-scale));
+  border-top: 1px solid var(--babu-surface-focus);
+  background: var(--babu-surface-raised);
+  color: var(--babu-text-secondary);
+  font-size: calc(var(--babu-font-size-sm) * var(--tv-scale));
+  line-height: var(--babu-line-height-base);
+}
+
+.babu-live-tv-overlay .live-tv-feature-root::-webkit-scrollbar {
+  display: none;
+}
+
+.babu-live-tv-overlay .live-tv-selected-epg,
+.babu-live-tv-overlay .live-tv-favorites,
+.babu-live-tv-overlay .live-tv-search,
+.babu-live-tv-overlay .live-tv-program-info {
+  grid-column: 1;
+  min-width: 0;
+}
+
+.babu-live-tv-overlay .live-tv-selected-epg,
+.babu-live-tv-overlay .live-tv-favorites {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.babu-live-tv-overlay .live-tv-selected-epg {
+  color: var(--babu-text-primary);
+  font-weight: var(--babu-font-weight-medium);
+}
+
+/* Missing EPG leaves the section without text; it must not reserve a line. */
+.babu-live-tv-overlay .live-tv-selected-epg:empty {
+  display: none;
+}
+
+.babu-live-tv-overlay .live-tv-selected-epg:not(:empty) + .live-tv-favorites,
+.babu-live-tv-overlay .live-tv-favorites + .live-tv-search,
+.babu-live-tv-overlay .live-tv-actions + .live-tv-program-info {
+  margin-top: calc(var(--babu-space-sm) * var(--tv-scale));
+}
+
+.babu-live-tv-overlay .live-tv-program-info {
+  color: var(--babu-text-primary);
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.babu-live-tv-overlay .live-tv-actions {
+  grid-column: 2;
+  grid-row: 1 / span 4;
+  display: flex;
+  flex-direction: column;
+  min-width: calc(260px * var(--tv-scale));
+  margin-left: calc(var(--babu-space-xl) * var(--tv-scale));
+}
+
+.babu-live-tv-overlay .live-tv-action {
+  display: block;
+  width: 100%;
+  min-height: calc(44px * var(--tv-scale));
+  padding: calc(var(--babu-space-sm) * var(--tv-scale)) calc(var(--babu-space-xl) * var(--tv-scale));
+  overflow: hidden;
+  border: 1px solid var(--babu-surface-focus);
+  border-radius: var(--babu-radius-md);
+  background: var(--babu-surface);
+  color: var(--babu-text-secondary);
+  font-family: inherit;
+  font-size: calc(var(--babu-font-size-base) * var(--tv-scale));
+  font-weight: var(--babu-font-weight-medium);
+  line-height: var(--babu-line-height-tight);
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition:
+    background-color var(--babu-motion-fast) ease,
+    border-color var(--babu-motion-fast) ease,
+    color var(--babu-motion-fast) ease,
+    box-shadow var(--babu-motion-fast) ease,
+    outline-color var(--babu-motion-fast) ease;
+}
+
+.babu-live-tv-overlay .live-tv-action + .live-tv-action {
+  margin-top: calc(var(--babu-space-sm) * var(--tv-scale));
+}
+
+.babu-live-tv-overlay .live-tv-action[data-presentation-state="focused"] {
+  background: var(--babu-surface-focus);
+  border-color: var(--babu-accent-strong);
+  color: var(--babu-text-primary);
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: var(--babu-focus-offset);
+  box-shadow: inset 5px 0 0 var(--babu-accent-strong), var(--babu-focus-shadow);
+  font-weight: var(--babu-font-weight-semibold);
+}
+
+.babu-live-tv-overlay .live-tv-search-input {
+  display: block;
+  width: 100%;
+  min-height: calc(44px * var(--tv-scale));
+  padding: calc(var(--babu-space-sm) * var(--tv-scale)) calc(var(--babu-space-lg) * var(--tv-scale));
+  border: 1px solid var(--babu-surface-focus);
+  border-radius: var(--babu-radius-md);
+  background: var(--babu-surface);
+  color: var(--babu-text-primary);
+  caret-color: var(--babu-accent-strong);
+  font-family: inherit;
+  font-size: calc(var(--babu-font-size-base) * var(--tv-scale));
+  line-height: var(--babu-line-height-tight);
+  -webkit-appearance: none;
+  transition:
+    border-color var(--babu-motion-fast) ease,
+    box-shadow var(--babu-motion-fast) ease,
+    outline-color var(--babu-motion-fast) ease;
+}
+
+.babu-live-tv-overlay .live-tv-search-input[data-presentation-state="focused"] {
+  border-color: var(--babu-accent-strong);
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: var(--babu-focus-offset);
+  box-shadow: var(--babu-focus-shadow);
+}
+
+.babu-live-tv-overlay .live-tv-search-result {
+  margin-top: calc(var(--babu-space-xs) * var(--tv-scale));
+  padding: calc(var(--babu-space-xs) * var(--tv-scale)) calc(var(--babu-space-lg) * var(--tv-scale));
+  overflow: hidden;
+  border-radius: var(--babu-radius-sm);
+  color: var(--babu-text-secondary);
+  font-size: calc(var(--babu-font-size-base) * var(--tv-scale));
+  line-height: var(--babu-line-height-tight);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition:
+    background-color var(--babu-motion-fast) ease,
+    color var(--babu-motion-fast) ease,
+    box-shadow var(--babu-motion-fast) ease,
+    outline-color var(--babu-motion-fast) ease;
+}
+
+.babu-live-tv-overlay .live-tv-search-input + .live-tv-search-result {
+  margin-top: calc(var(--babu-space-sm) * var(--tv-scale));
+}
+
+.babu-live-tv-overlay .live-tv-search-result[data-presentation-state="focused"] {
+  background: var(--babu-surface-focus);
+  color: var(--babu-text-primary);
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: calc(-1 * var(--babu-focus-width));
+  box-shadow: inset 5px 0 0 var(--babu-accent-strong);
+  font-weight: var(--babu-font-weight-semibold);
+}
+
 .live-tv-status,
 .numeric-zap {
   position: absolute;
@@ -177,6 +351,9 @@
 @media (prefers-reduced-motion: reduce) {
   .babu-live-tv-overlay .channel-item,
   .babu-live-tv-overlay .group-item,
+  .babu-live-tv-overlay .live-tv-action,
+  .babu-live-tv-overlay .live-tv-search-input,
+  .babu-live-tv-overlay .live-tv-search-result,
   .live-tv-status,
   .numeric-zap {
     transition: none;
