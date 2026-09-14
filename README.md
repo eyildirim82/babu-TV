@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tizen](https://img.shields.io/badge/Tizen-5.0+-red?logo=samsung)]()
 
-> **Current version: v1.10.1** — [CHANGELOG](CHANGELOG.md)
+> **Current version: v1.0.0-rc.1** — [CHANGELOG](CHANGELOG.md)
 
 ---
 
