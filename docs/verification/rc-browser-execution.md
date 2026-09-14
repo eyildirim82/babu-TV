@@ -2,7 +2,7 @@
 
 Date: 2026-09-14
 Owner: REVIEW / Integration Controller
-Status: READY FOR CONTROLLER ACCEPTANCE — integrated browser qualification GREEN on the exact production SHA; physical Samsung/Tizen rows remain NOT VERIFIED / DEFERRED
+Status: BLOCKED — integrated suite GREEN on the exact production SHA, but a deterministic Search text-entry defect is open (see below); physical Samsung/Tizen rows remain NOT VERIFIED / DEFERRED
 
 Plan: `docs/superpowers/plans/2026-09-12-rc-browser-parallel-execution.md`
 Design: `docs/superpowers/specs/2026-09-12-rc-browser-qualification-design.md`
@@ -64,6 +64,16 @@ Every H2 production step merged the exact post-merge `main` into the qualificati
 Scenario IDs follow the implemented packs rather than the plan's draft numbering: the plan's `N01–N11` rows are implemented as `P01–P15`, `C01–C11` as `C01–C15`, and `S01–S13` as the `BROW-SECPAIR-S01…S16` rows, several of which cover more than one plan row.
 
 ## Deterministic defects and resolution
+
+### Open production defect — Search text entry is not remote/keyboard reachable
+
+Found after the GREEN run by code review of the B06 flake. The Search layer is reachable, but the query input is not:
+
+- `.live-tv-search-input` is never DOM-focused (no `.focus()` in `player/src/live-tv` or `player/src/search`), so a Tizen IME cannot open and hardware keystrokes do not reach it.
+- `player/src/remote.js` calls `preventDefault()` globally for `Backspace`, space and `r`/`R`, so those characters cannot be typed even with focus.
+- `renderFeatures()` creates a new input element on every render, and every `input` event re-renders, so focus would be lost after each character.
+
+B06, B07 and P10 set the value with Playwright `fill` / `dispatchEvent`, which bypasses focus and key handling. They prove Search layer reachability, Turkish matching and focus restoration on the logical model, not text entry. This must be fixed and requalified with real key input before RC-BROWSER can be accepted.
 
 ### Production defects (fixed on `main`, then requalified)
 
@@ -182,7 +192,7 @@ Nothing on this board converts a physical-device row to PASS. The following rema
 | Condition | State |
 | --- | --- |
 | Every browser-testable critical row PASS or honestly NOT-AVAILABLE | 76/76 PASS, none NOT-AVAILABLE |
-| No unresolved deterministic production defect | #129, #130, #131 merged and requalified |
+| No unresolved deterministic production defect | **NOT MET** — Search text entry (above); #129, #130, #131 merged and requalified |
 | No unexplained console/page error | none (classification above) |
 | No credential/source/stream/pairing plaintext leak | none observed |
 | Reload/persistence checks GREEN | GREEN |
