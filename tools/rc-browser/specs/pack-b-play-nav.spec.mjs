@@ -502,6 +502,11 @@ test('P10 Search opened from Channel Actions closes with Back and restores the s
   await expect(featureRoot(page)).toHaveAttribute('data-active-layer', 'search');
   await expect(page.locator('.live-tv-search-input')).toHaveAttribute('data-presentation-state', 'focused');
   await expect(page.locator('.channel-item[data-presentation-state="focused"]')).toHaveCount(0);
+  // A digit typed into Search must edit the query, not trigger a numeric zap.
+  await expect(page.locator('.live-tv-search-input')).toBeFocused();
+  await page.keyboard.type('4');
+  await expect(page.locator('.live-tv-search-input')).toHaveValue('4');
+  expect(await status(page).getAttribute('data-playback-status')).toBe(playbackBefore);
 
   await pressRemote(page, 'BACK');
   await expect(featureRoot(page)).toHaveAttribute('data-active-layer', 'none');

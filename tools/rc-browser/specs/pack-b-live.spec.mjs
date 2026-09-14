@@ -181,8 +181,9 @@ async function openSearch(page) {
   await expect(searchAction).toHaveAttribute('data-presentation-state', 'focused');
   await pressRemote(page, 'SELECT');
   await expect(page.locator(SEARCH)).toBeVisible();
-  // Typing before the search layer owns input focus can be dropped by the render.
   await expect(page.locator('.live-tv-search-input')).toHaveAttribute('data-presentation-state', 'focused');
+  // Real key input only reaches the query when the input holds DOM focus.
+  await expect(page.locator('.live-tv-search-input')).toBeFocused();
 }
 
 async function favoriteHighlighted(page) {
@@ -346,13 +347,17 @@ test('B06 Turkish Search matching/order/provider isolation', async ({ context, p
     await openLiveTv(page);
     await openSearch(page);
     const cases = [['İ', 'İstanbul'], ['i', 'İstanbul'], ['I', 'Ihlamur'], ['ı', 'Ihlamur'], ['Ş', 'Şeker'], ['ş', 'Şeker'], ['Ğ', 'Ğölge'], ['ğ', 'Ğölge'], ['Ü', 'Üsküdar'], ['ü', 'Üsküdar'], ['Ö', 'Öykü'], ['ö', 'Öykü'], ['Ç', 'Çınar'], ['ç', 'Çınar']];
+    let previous = '';
     for (const [query, expected] of cases) {
       const input = page.locator('.live-tv-search-input');
-      await input.fill(query);
-      await input.dispatchEvent('input');
+      await expect(input).toBeFocused();
+      for (let index = 0; index < previous.length; index += 1) await page.keyboard.press('Backspace');
+      await page.keyboard.type(query);
+      await expect(input).toHaveValue(query);
       await expect(page.locator(SEARCH_RESULT).first()).toContainText(expected);
       const keys = await page.locator(SEARCH_RESULT).evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-result-key')));
       expect(keys.every((key) => key?.startsWith(`${providerA}:`))).toBe(true);
+      previous = query;
     }
     return 'Channel Actions -> Search remote path; Turkish variants deterministic; result keys provider A scoped';
   } });
@@ -364,8 +369,10 @@ test('B07 Search highlight/activation does not implicitly play', async ({ contex
     await openLiveTv(page);
     await openSearch(page);
     const input = page.locator('.live-tv-search-input');
-    await input.fill('şeker');
-    await input.dispatchEvent('input');
+    await expect(input).toBeFocused();
+    // 'şeker' includes 'r', which remote routing used to swallow as reload.
+    await page.keyboard.type('şeker');
+    await expect(input).toHaveValue('şeker');
     // DOWN only moves into results that are already rendered.
     await expect(page.locator(SEARCH_RESULT).first()).toContainText('Şeker');
     await pressRemote(page, 'DOWN');
