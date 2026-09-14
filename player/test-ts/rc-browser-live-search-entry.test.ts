@@ -95,6 +95,8 @@ class FakeElement {
 
   append(...children: FakeElement[]): void { this.children.push(...children); }
   replaceChildren(...children: FakeElement[]): void { this.children = [...children]; }
+  focus(): void {}
+  blur(): void {}
   addEventListener(type: string, listener: () => void): void {
     const current = this.listeners.get(type) ?? [];
     current.push(listener);
