@@ -107,8 +107,22 @@ function serializeDocument(document: CredentialDocument): string {
   return serialized;
 }
 
+// save/remove rewrite the whole WidgetData document. Several provider runtimes
+// build their own store over the same native object, so mutations are queued
+// per WidgetData object rather than per store instance. load stays unqueued:
+// it reads one whole document and must not wait behind a stalled write.
+const mutationQueues = new WeakMap<WidgetDataLike, Promise<void>>();
+
 export class SamsungWidgetDataCredentialStore implements CredentialStore {
   constructor(private readonly widgetData: WidgetDataLike | null) {}
+
+  private mutate(operation: () => Promise<void>): Promise<void> {
+    const widgetData = this.requireWidgetData();
+    const previous = mutationQueues.get(widgetData) ?? Promise.resolve();
+    const result = previous.then(operation);
+    mutationQueues.set(widgetData, result.catch(() => undefined));
+    return result;
+  }
 
   isAvailable(): boolean {
     return this.widgetData !== null;
@@ -157,9 +171,11 @@ export class SamsungWidgetDataCredentialStore implements CredentialStore {
   }
 
   async save(providerId: ProviderId, credential: ProviderCredential): Promise<void> {
-    const document = await this.readDocument('save');
-    document[providerId] = credential;
-    await this.writeDocument(document, 'save');
+    await this.mutate(async () => {
+      const document = await this.readDocument('save');
+      document[providerId] = credential;
+      await this.writeDocument(document, 'save');
+    });
   }
 
   async load(providerId: ProviderId): Promise<ProviderCredential | null> {
@@ -169,27 +185,29 @@ export class SamsungWidgetDataCredentialStore implements CredentialStore {
 
   async remove(providerId: ProviderId): Promise<void> {
     const widgetData = this.requireWidgetData();
-    const document = await this.readDocument('remove');
-    if (!Object.prototype.hasOwnProperty.call(document, providerId)) return;
+    await this.mutate(async () => {
+      const document = await this.readDocument('remove');
+      if (!Object.prototype.hasOwnProperty.call(document, providerId)) return;
 
-    delete document[providerId];
-    if (Object.keys(document).length > 0) {
-      await this.writeDocument(document, 'remove');
-      return;
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      try {
-        widgetData.remove(
-          resolve,
-          (error) => {
-            if (isNotFoundError(error)) resolve();
-            else reject(new CredentialStoreOperationError('remove'));
-          },
-        );
-      } catch {
-        reject(new CredentialStoreOperationError('remove'));
+      delete document[providerId];
+      if (Object.keys(document).length > 0) {
+        await this.writeDocument(document, 'remove');
+        return;
       }
+
+      await new Promise<void>((resolve, reject) => {
+        try {
+          widgetData.remove(
+            resolve,
+            (error) => {
+              if (isNotFoundError(error)) resolve();
+              else reject(new CredentialStoreOperationError('remove'));
+            },
+          );
+        } catch {
+          reject(new CredentialStoreOperationError('remove'));
+        }
+      });
     });
   }
 }

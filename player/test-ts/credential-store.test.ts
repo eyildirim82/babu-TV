@@ -250,3 +250,91 @@ void test('WidgetData credential document enforces the documented 20000 characte
   );
   assert.equal(widgetData.data, null);
 });
+
+// Tizen WidgetData answers through callbacks on a later task. Deferring every
+// callback exposes read-modify-write interleaving between overlapping calls.
+class AsyncFakeWidgetData extends FakeWidgetData {
+  override read(
+    successCallback: (data: string) => void,
+    errorCallback?: (error: unknown) => void,
+  ): void {
+    setImmediate(() => super.read(successCallback, errorCallback));
+  }
+
+  override write(
+    data: string,
+    successCallback?: () => void,
+    errorCallback?: (error: unknown) => void,
+  ): void {
+    setImmediate(() => super.write(data, successCallback, errorCallback));
+  }
+
+  override remove(
+    successCallback?: () => void,
+    errorCallback?: (error: unknown) => void,
+  ): void {
+    setImmediate(() => super.remove(successCallback, errorCallback));
+  }
+}
+
+void test('WidgetData secure store does not resurrect a removed credential when a save overlaps', async () => {
+  const widgetData = new AsyncFakeWidgetData();
+  // The app builds more than one provider runtime over the same WidgetData.
+  const registration = new SamsungWidgetDataCredentialStore(widgetData);
+  const deletion = new SamsungWidgetDataCredentialStore(widgetData);
+  await registration.save('provider-a', { kind: 'm3u', playlistUrl: 'https://example.com/a.m3u' });
+  await registration.save('provider-c', { kind: 'm3u', playlistUrl: 'https://example.com/c.m3u' });
+
+  await Promise.all([
+    deletion.remove('provider-a'),
+    registration.save('provider-b', { kind: 'm3u', playlistUrl: 'https://example.com/b.m3u' }),
+  ]);
+
+  assert.deepEqual(Object.keys(JSON.parse(widgetData.data ?? '{}')).sort(), ['provider-b', 'provider-c']);
+});
+
+void test('WidgetData secure store does not drop a new credential when the last-provider remove overlaps', async () => {
+  const widgetData = new AsyncFakeWidgetData();
+  const registration = new SamsungWidgetDataCredentialStore(widgetData);
+  const deletion = new SamsungWidgetDataCredentialStore(widgetData);
+  await registration.save('provider-a', { kind: 'm3u', playlistUrl: 'https://example.com/a.m3u' });
+
+  await Promise.all([
+    deletion.remove('provider-a'),
+    registration.save('provider-b', { kind: 'm3u', playlistUrl: 'https://example.com/b.m3u' }),
+  ]);
+
+  assert.equal(await registration.load('provider-a'), null);
+  assert.equal((await registration.load('provider-b'))?.kind, 'm3u');
+});
+
+void test('WidgetData secure store keeps serving calls after an overlapping operation fails', async () => {
+  const widgetData = new AsyncFakeWidgetData();
+  const store = new SamsungWidgetDataCredentialStore(widgetData);
+  await store.save('provider-a', { kind: 'm3u', playlistUrl: 'https://example.com/a.m3u' });
+
+  const failing = store.save('provider-b', { kind: 'm3u', playlistUrl: `https://example.com/${'x'.repeat(20000)}` });
+  const following = store.save('provider-c', { kind: 'm3u', playlistUrl: 'https://example.com/c.m3u' });
+
+  await assert.rejects(failing, CredentialStoreCapacityError);
+  await following;
+  assert.deepEqual(Object.keys(JSON.parse(widgetData.data ?? '{}')).sort(), ['provider-a', 'provider-c']);
+});
+
+void test('WidgetData secure store load does not wait behind a stalled native write', async () => {
+  const widgetData = new AsyncFakeWidgetData();
+  const store = new SamsungWidgetDataCredentialStore(widgetData);
+  await store.save('provider-a', { kind: 'm3u', playlistUrl: 'https://example.com/a.m3u' });
+  widgetData.write = () => {
+    // Native callback never arrives.
+  };
+
+  void store.save('provider-b', { kind: 'm3u', playlistUrl: 'https://example.com/b.m3u' });
+  const loaded = await Promise.race([
+    store.load('provider-a'),
+    new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 200)),
+  ]);
+
+  assert.notEqual(loaded, 'timeout');
+  assert.equal((loaded as { kind: string } | null)?.kind, 'm3u');
+});
