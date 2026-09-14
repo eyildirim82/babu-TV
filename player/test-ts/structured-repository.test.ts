@@ -7,7 +7,23 @@ import {
   IndexedDbStructuredStore,
   StorageUnavailableError,
 } from '../src/storage/indexeddb-structured-store.js';
+import type { StructuredStoreName } from '../src/storage/contracts.js';
 import { MemoryStructuredStore } from '../src/storage/memory-structured-store.js';
+
+// IndexedDB index cursors return rows with an equal index value in ascending
+// primary-key order, not insertion order. The memory store keeps insertion
+// order, so this double reproduces the real browser/Tizen contract.
+class PrimaryKeyOrderedStore extends MemoryStructuredStore {
+  override async getAllByIndex<T>(
+    store: StructuredStoreName,
+    indexName: string,
+    indexValue: IDBValidKey,
+  ): Promise<readonly T[]> {
+    const rows = await super.getAllByIndex<T>(store, indexName, indexValue);
+    const keyOf = (row: T) => String((row as Record<string, unknown>).key);
+    return [...rows].sort((a, b) => (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0));
+  }
+}
 
 function provider(
   id: string,
@@ -82,6 +98,36 @@ void test('structured catalog scopes duplicate channel IDs and replaces only the
 
   assert.deepEqual((await catalog.listChannels('provider-a')).map((item) => item.name), ['A new', 'A only']);
   assert.deepEqual((await catalog.listChannels('provider-b')).map((item) => item.name), ['B']);
+});
+
+void test('structured catalog lists M3U channels and categories in provider order under IndexedDB key ordering', async () => {
+  const catalog = new StructuredCatalogRepository(new PrimaryKeyOrderedStore());
+  await catalog.replaceCategories('m3u-demo', [
+    category('m3u-demo', 'group:b2ea63db', 'Film'),
+    category('m3u-demo', 'group:afd071e5', 'Test'),
+    category('m3u-demo', 'group:b9ea00ee', 'Canlı'),
+  ]);
+  await catalog.replaceChannels('m3u-demo', [
+    { ...channel('m3u-demo', 'tvg:demo-bbb'), number: 1 },
+    { ...channel('m3u-demo', 'tvg:demo-tos'), number: 2 },
+    { ...channel('m3u-demo', 'tvg:demo-bipbop'), number: 3 },
+    { ...channel('m3u-demo', 'tvg:demo-live'), number: 4 },
+    { ...channel('m3u-demo', 'tvg:demo-sintel'), number: 5 },
+  ]);
+
+  assert.deepEqual((await catalog.listChannels('m3u-demo')).map((item) => item.number), [1, 2, 3, 4, 5]);
+  assert.deepEqual((await catalog.listCategories('m3u-demo')).map((item) => item.name), ['Film', 'Test', 'Canlı']);
+});
+
+void test('structured catalog keeps Xtream numeric stream ids in provider order, not string key order', async () => {
+  const catalog = new StructuredCatalogRepository(new PrimaryKeyOrderedStore());
+  await catalog.replaceChannels('xtream-a', [
+    channel('xtream-a', '9', 'Nine'),
+    channel('xtream-a', '10', 'Ten'),
+    channel('xtream-a', '11', 'Eleven'),
+  ]);
+
+  assert.deepEqual((await catalog.listChannels('xtream-a')).map((item) => item.name), ['Nine', 'Ten', 'Eleven']);
 });
 
 void test('structured catalog replaces categories and removes only one provider catalog', async () => {

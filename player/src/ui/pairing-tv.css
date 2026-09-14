@@ -1,23 +1,26 @@
 .pairing-tv-page {
   position: fixed;
-  inset: 0;
-  z-index: var(--babu-z-modal);
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 90;
   display: grid;
   place-items: center;
   box-sizing: border-box;
-  padding: var(--babu-space-7);
+  padding: var(--babu-space-2xl);
   background: var(--babu-bg);
-  color: var(--babu-text);
+  color: var(--babu-text-primary);
 }
 
 .pairing-tv-panel {
   display: grid;
   justify-items: center;
-  gap: var(--babu-space-4);
+  gap: var(--babu-space-lg);
   width: min(760px, 100%);
   box-sizing: border-box;
-  padding: var(--babu-space-7);
-  border: 1px solid var(--babu-border);
+  padding: var(--babu-space-2xl);
+  border: 1px solid var(--babu-surface-focus);
   border-radius: var(--babu-radius-lg);
   background: var(--babu-surface);
   text-align: center;
@@ -45,7 +48,7 @@
   width: 360px;
   max-width: 70vw;
   height: auto;
-  padding: var(--babu-space-3);
+  padding: var(--babu-space-md);
   border-radius: var(--babu-radius-md);
   background: #fff;
 }
@@ -59,24 +62,24 @@
   appearance: none;
   min-width: 160px;
   min-height: 58px;
-  padding: var(--babu-space-3) var(--babu-space-5);
-  border: 1px solid var(--babu-border-strong);
+  padding: var(--babu-space-md) var(--babu-space-xl);
+  border: 1px solid var(--babu-surface-focus);
   border-radius: var(--babu-radius-sm);
-  background: var(--babu-surface-soft);
-  color: var(--babu-text);
+  background: var(--babu-surface-raised);
+  color: var(--babu-text-primary);
   font: inherit;
   font-weight: 700;
   transition:
-    border-color var(--babu-motion-fast) var(--babu-ease),
-    box-shadow var(--babu-motion-fast) var(--babu-ease),
-    background-color var(--babu-motion-fast) var(--babu-ease);
+    border-color var(--babu-motion-fast) ease,
+    box-shadow var(--babu-motion-fast) ease,
+    background-color var(--babu-motion-fast) ease;
 }
 
 .pairing-tv-back:focus,
 .pairing-tv-back:focus-visible {
   border-color: var(--babu-accent);
-  outline: var(--babu-focus-outline);
-  outline-offset: 3px;
+  outline: var(--babu-focus-width) solid var(--babu-accent-strong);
+  outline-offset: var(--babu-focus-offset);
   box-shadow: var(--babu-focus-shadow);
 }
 

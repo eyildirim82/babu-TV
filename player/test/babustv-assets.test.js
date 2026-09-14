@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const assets = [
@@ -42,6 +43,18 @@ test('BabuşTV SVG assets identify the owned brand and exclude inherited product
     assert.equal(legacyVisualTerms.test(svg), false, `${path} must not describe the inherited TV/play mark`);
     assert.equal(svg.toUpperCase().includes(inheritedAccent), false, `${path} must not carry the inherited red/orange accent`);
   }
+});
+
+test('script code never references public assets by a root-absolute path', () => {
+  // Vite rewrites public asset paths in index.html but not string literals in scripts.
+  // A root-absolute path escapes the /babustv/ web base and the Tizen WGT root.
+  const srcRoot = fileURLToPath(new URL('../src/', import.meta.url));
+  const rootAbsoluteAsset = /['"`]\/(?:brand\/|favicon\.png)/;
+  const offenders = readdirSync(srcRoot, { recursive: true })
+    .filter((file) => /\.(?:[cm]?[jt]s)$/.test(String(file)))
+    .filter((file) => rootAbsoluteAsset.test(readFileSync(path.join(srcRoot, String(file)), 'utf8')));
+
+  assert.deepEqual(offenders, []);
 });
 
 test('BabuşTV raster assets are valid PNG files', () => {

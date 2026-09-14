@@ -66,6 +66,24 @@ test('HOME-D projects providers deterministically and exposes switch intents wit
   assert.equal(model.providerSelector.activeProviderId, 'p3');
 });
 
+test('HOME-D numbers same-named providers so two M3U playlists stay distinguishable', () => {
+  const m3u = (id: string, createdAtMs: number): ProviderRecord => ({
+    ...provider(id, createdAtMs),
+    kind: 'm3u',
+    name: 'M3U',
+  });
+  const model = createHomeViewModel(input({
+    providers: [m3u('m3u-second', 20), m3u('m3u-first', 10)],
+    activeProviderId: 'm3u-first',
+    channels: [],
+  }));
+
+  assert.deepEqual(model.providerSelector.options.map((item) => [item.providerId, item.name]), [
+    ['m3u-first', 'M3U'],
+    ['m3u-second', 'M3U 2'],
+  ]);
+});
+
 test('HOME-D selects a valid provider-scoped Last Watched card and focuses it by stable channel ID', () => {
   const model = createHomeViewModel(input({
     channels: [channel('p2', 'foreign'), channel('p1', 'c1', 'One'), channel('p1', 'c2', 'Two')],
