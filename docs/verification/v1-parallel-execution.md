@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-14\
 **Owner:** REVIEW / Integration Controller\
-**Status:** WAVES 0–6 CLOSED GREEN — RC CANDIDATE `1.0.0-rc.1` PRODUCED; RELEASE TAG AWAITING CONTROLLER DECISION\
+**Status:** WAVES 0–6 CLOSED GREEN — RC CANDIDATE `1.0.0-rc.2` PRODUCED AND TAGGED; PHYSICAL-TIZEN STAGE NEXT\
 **Parent roadmap:** `docs/superpowers/plans/2026-09-10-babustv-v1-rc-roadmap.md`\
 **Execution design:** `docs/superpowers/specs/2026-09-10-babustv-v1-maximum-parallel-execution-design.md`
 
@@ -135,7 +135,7 @@ Hardening does not become a general refactor wave. Every production fix follows 
 | ROLE | Branch | Status | Evidence | Output |
 | --- | --- | --- | --- | --- |
 | `RC-BROWSER` | `verification/v1-rc-browser-h2` (planned as `verification/v1-rc-browser`) | `CLOSED GREEN` | #132 `450f681`; verify `34846072550` | deterministic 1920×1080 release matrix + screenshots/focus evidence |
-| `RC-PACKAGE` | `verification/v1-rc-package` | `CLOSED GREEN` | #137 `4afeef4`; verify `34851391827`; prerequisite RC FIX #135 `29c2e0f`; verify `34849186407` | exact-head test/typecheck/build/Tizen staging/package evidence |
+| `RC-PACKAGE` | `verification/v1-rc-package` | `CLOSED GREEN` | rc.1: #137 `4afeef4`; verify `34851391827` (prerequisite RC FIX #135 `29c2e0f`); rc.2: #140 `e4a6bca`; verify `34861410744` (prerequisite RC FIX #139 `a7fe8f9`) | exact-head test/typecheck/build/Tizen staging/package evidence |
 | `CONTROLLER` | no production branch | `ACTIVE` | — | gate/merge/evidence authority |
 
 RC-BROWSER was accepted by the controller under Task 13 on 2026-09-14 against production `eaa928c` (qualification head `aca5f44`; integrated suite 76/76 PASS in `rc-browser` run `34838069268` attempts 1 and 2). Its actual integration branch was `verification/v1-rc-browser-h2`; PR #132 merged with a merge commit, so the qualification SHAs stay reachable from `main`. Production defects found during qualification were routed to bounded fix PRs #105, #119, #129, #130, #131 and #134; #133 is credential-store hardening. Evidence: `docs/verification/rc-browser-execution.md`.
@@ -194,10 +194,10 @@ Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=CONTROLLER.
 
 ## Current action
 
-Waves 0–6 are integrated on `main` (`main@4afeef4`, post-merge verify `34851391827` SUCCESS). RC candidate `1.0.0-rc.1` is produced per the RC completion rule in `v1-rc-readiness.md`.
+Waves 0–6 are integrated on `main` (`main@e4a6bca`, post-merge verify `34861410744` SUCCESS). RC candidate `1.0.0-rc.2` is produced and tagged `v1.0.0-rc.2` at `77b0a5b`; it supersedes `v1.0.0-rc.1` (`c3c9709`), whose desktop-browser run led to the #139 fixes.
 
-1. Release tag: `v1.0.0-rc.1` is not created. Creating and pushing it is a controller decision, including its target: package candidate `c3c9709` (the WGT's source) or merge `4afeef4`.
-2. Physical-Tizen stage: the evidence debt in `v1-rc-readiness.md` (WidgetData probe, M3 runtime matrix, remote keys, AVPlay fallback, lifecycle, long playback, network loss, TV + phone pairing, install smoke) blocks final `1.0.0` and needs an applicable Samsung/Tizen runtime.
-3. Open non-blocking observations stay open: interrupted onboarding reload, phone relay HTTP 500 copy, legacy What's New list, `tizen/wgt.mjs` `dev` profile default.
+1. Physical-Tizen stage: the evidence debt in `v1-rc-readiness.md` (WidgetData probe, M3 runtime matrix, remote keys, AVPlay fallback, lifecycle, long playback, network loss, TV + phone pairing, install smoke, same-version install over rc.1) blocks final `1.0.0` and needs an applicable Samsung/Tizen runtime. Use the rc.2 WGT.
+2. Open non-blocking follow-ups from #139: Search result scroll-into-view, Home "Sık İzlenenler" empty state, legacy root-absolute backend routes, other IndexedDB key-order reads, Xtream edit host label.
+3. Carried observations: interrupted onboarding reload, phone relay HTTP 500 copy, legacy What's New list, `tizen/wgt.mjs` `dev` profile default.
 
 Merge and tag authority remains Controller / explicit user instruction.

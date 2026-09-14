@@ -156,7 +156,7 @@ Nothing on this board converts a physical-device row to PASS. Building, staging,
 | Accepted local WGT | `babustv_beta_v1.0.0-rc.1_c3c9709.wgt`, SHA-256 `7601527bde3cdee9639c7c5224d96811826e0d13d0dc81fb482a1985ed99173e` (not distributed) |
 | Merge method | merge commit, so `c3c9709` (the WGT's source commit) stays reachable from `main` |
 | Next transition | `ACCEPTED → CLOSED / GREEN` when PR #137 merges and post-merge verify is SUCCESS |
-| Release tag | `v1.0.0-rc.1` requires a separate explicit controller decision; not created by acceptance |
+| Release tag | annotated `v1.0.0-rc.1` at `c3c9709` created by later controller decision (tag object `6475244`), no GitHub Release; superseded by `1.0.0-rc.2` (`docs/verification/rc-package-rc2-execution.md`) |
 
 Acceptance does not change any `NOT VERIFIED / DEFERRED` physical-device row, and the open observations above stay open.
 
