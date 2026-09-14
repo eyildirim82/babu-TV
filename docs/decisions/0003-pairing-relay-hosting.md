@@ -63,3 +63,7 @@ Sources:
 - Cloudflare changes `workers.dev` or Durable Object Free-plan terms.
 
 The fallback is running `relay/` unchanged on a small VPS behind Caddy.
+
+## Implementation note (2026-09-14)
+
+`relay-cloudflare/` implements this decision with one refinement recorded in `docs/superpowers/specs/2026-09-14-pairing-relay-cloudflare-design.md`: the relay core and its existing in-memory store and limiter run inside a single Durable Object instance, and Durable Object storage holds only the expiry alarm. Sessions, ciphertext and client addresses are therefore never written to Cloudflare storage, matching the relay's "ciphertext only in process memory" invariant; eviction drops open pairings. The Workers Rate Limiting binding is not used (Free-plan availability still unverified; no peek or long windows).
