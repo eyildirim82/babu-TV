@@ -139,6 +139,11 @@ async function selectProvider(page, providerId) {
 async function openLiveTv(page) {
   await goHomeKey(page, 'home-live-tv');
   await pressRemote(page, 'SELECT');
+  // The app awaits provider entry before it swaps Home for Live TV, and a
+  // previous session's channel list stays in the closed sidebar, so channel
+  // visibility alone can pass while Home is still on screen.
+  await expect(page.locator('#home-page')).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.locator('#sidebar')).not.toHaveClass(/closed/);
   await expect(page.locator(CHANNEL).first()).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(FAVORITES)).toBeVisible({ timeout: 10_000 });
 }
