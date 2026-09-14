@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-14\
 **Owner:** REVIEW / Integration Controller\
-**Status:** WAVES 0–5 CLOSED GREEN; RC-BROWSER CLOSED GREEN; RC-PACKAGE IN PROGRESS (PREREQUISITE RC FIX VERSION-PRERELEASE PR PENDING)\
+**Status:** WAVES 0–5 CLOSED GREEN; RC-BROWSER CLOSED GREEN; RC-PACKAGE IN PROGRESS (PREREQUISITE RC FIX VERSION-PRERELEASE PR #135)\
 **Parent roadmap:** `docs/superpowers/plans/2026-09-10-babustv-v1-rc-roadmap.md`\
 **Execution design:** `docs/superpowers/specs/2026-09-10-babustv-v1-maximum-parallel-execution-design.md`
 
@@ -37,7 +37,7 @@ HARDENING
 RC-BROWSER + RC-PACKAGE
 ```
 
-Recommended active concurrency: **8–12 workers**. Thirteen core roles are OPEN so workers can be scheduled flexibly, but controller/CI capacity remains the practical simultaneous-work limit.
+Recommended active concurrency: **8–12 workers**. This concurrency guidance applied to Waves 1–5, which are now integrated; controller/CI capacity remains the practical simultaneous-work limit for any future lanes.
 
 ## Wave 0 — serial foundation
 
@@ -135,7 +135,7 @@ Hardening does not become a general refactor wave. Every production fix follows 
 | ROLE | Branch | Status | Evidence | Output |
 | --- | --- | --- | --- | --- |
 | `RC-BROWSER` | `verification/v1-rc-browser-h2` (planned as `verification/v1-rc-browser`) | `CLOSED GREEN` | #132 `450f681`; verify `34846072550` | deterministic 1920×1080 release matrix + screenshots/focus evidence |
-| `RC-PACKAGE` | `verification/v1-rc-package` | `IN PROGRESS` | prerequisite RC FIX `fix/rc-version-prerelease` (RC FIX PR pending); verification branch starts after it merges GREEN | exact-head test/typecheck/build/Tizen staging/package evidence |
+| `RC-PACKAGE` | `verification/v1-rc-package` | `IN PROGRESS` | prerequisite RC FIX `fix/rc-version-prerelease` (PR #135); verification branch starts after it merges GREEN | exact-head test/typecheck/build/Tizen staging/package evidence |
 | `CONTROLLER` | no production branch | `ACTIVE` | — | gate/merge/evidence authority |
 
 RC-BROWSER was accepted by the controller under Task 13 on 2026-09-14 against production `eaa928c` (qualification head `aca5f44`; integrated suite 76/76 PASS in `rc-browser` run `34838069268` attempts 1 and 2). Its actual integration branch was `verification/v1-rc-browser-h2`; PR #132 merged with a merge commit, so the qualification SHAs stay reachable from `main`. Production defects found during qualification were routed to bounded fix PRs #105, #119, #129, #130, #131 and #134; #133 is credential-store hardening. Evidence: `docs/verification/rc-browser-execution.md`.
@@ -200,7 +200,7 @@ Repo eyildirim82/babu-TV. Kontrol boardunu oku. ROLE=RC-PACKAGE.
 
 Waves 0–5 and RC-BROWSER are integrated on `main` (`main@450f681`, post-merge verify `34846072550` SUCCESS). The remaining repository gate before the first RC candidate is RC-PACKAGE, which waits on one RC FIX.
 
-1. RC FIX `fix/rc-version-prerelease` (RC FIX PR pending) from current `main`: derive a numeric `x.y.z` Tizen widget version for the staged `config.xml` and make `player/src/update.js` version comparison prerelease-aware; bounded TDD fix, Draft PR, controller review.
+1. RC FIX `fix/rc-version-prerelease` (PR #135) from current `main`: derive a numeric `x.y.z` Tizen widget version for the staged `config.xml` and make `player/src/update.js` version comparison prerelease-aware; bounded TDD fix; exact-head verify GREEN and review clean; awaiting controller merge.
 2. Merge the RC FIX PR; post-merge `main` verify must be SUCCESS.
 3. RC-PACKAGE starts on `verification/v1-rc-package` from that exact post-fix `main`:
    - bump the version to `1.0.0-rc.1` (controller decision 2026-09-14, recorded in `v1-rc-readiness.md`);

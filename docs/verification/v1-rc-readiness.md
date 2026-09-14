@@ -62,7 +62,7 @@ Approved product spec: `docs/superpowers/specs/2026-09-07-babustv-v1-product-and
 | RC-BROWSER production fixes | `CLOSED GREEN` | #105 `3ed999f`, #119 `49c9e3e`, #129 `ac8a346`, #130 `69b4d72`, #131 `8b0f340`, #134 `eaa928c`; hardening #133 `0eb86cf`; each post-merge verify SUCCESS |
 | RC-BROWSER qualification | `CLOSED GREEN` | accepted 2026-09-14 against production `eaa928c` (head `aca5f44`, 76/76 PASS, `rc-browser` run `34838069268` attempts 1 and 2); PR #132 merged to `main@450f681`; post-merge verify `34846072550` SUCCESS |
 | V1 RC versioning decision | `CLOSED GREEN` | independent `1.0.0-rc.1` line; see "V1 RC versioning decision" below |
-| Open implementation blocker | RC FIX PR pending | `fix/rc-version-prerelease` must merge GREEN before RC-PACKAGE applies the version bump |
+| Open implementation blocker | RC FIX PR #135 | `fix/rc-version-prerelease` must merge GREEN before RC-PACKAGE applies the version bump |
 
 Every PR listed on this board merged to `main` with a SUCCESS post-merge `verify` run. Per-role merge SHAs and run IDs are recorded in `v1-parallel-execution.md`.
 
@@ -86,7 +86,7 @@ This table remains product-level. Evidence lists the merged PRs that implement e
 | 11 | M6 Secure Pairing | `CLOSED GREEN` | No for protocol/browser development | ephemeral encrypted single-use pairing + public/self-host-compatible relay contract | #72 #73 #74 #79 #84 #87; RC fix #131 |
 | 12 | M7 Hardening | `CLOSED GREEN` | No for deterministic matrix | large/malformed/offline/migration/focus/security cases GREEN | #88 #90 #92 #93 #94 #95 #96 |
 | 13 | Browser Release Matrix | `CLOSED GREEN` | No | deterministic 1920×1080 release smoke GREEN | #132 → `main@450f681`; `docs/verification/rc-browser-execution.md` |
-| 14 | Tizen build/package RC gate | `IN PROGRESS` | No for build; environment-dependent for package signing | available package/staging gates GREEN, unavailable paths honestly classified | RC-PACKAGE on `verification/v1-rc-package`; prerequisite RC FIX `fix/rc-version-prerelease` (RC FIX PR pending) |
+| 14 | Tizen build/package RC gate | `IN PROGRESS` | No for build; environment-dependent for package signing | available package/staging gates GREEN, unavailable paths honestly classified | RC-PACKAGE on `verification/v1-rc-package`; prerequisite RC FIX `fix/rc-version-prerelease` (PR #135) |
 | 15 | V1 RC versioning decision | `CLOSED GREEN` | No | explicit choice: independent `1.0.0-rc.1` line or inherited version continuation | controller decision 2026-09-14: independent `1.0.0-rc.1`; constraints below |
 
 Product defects found by RC-BROWSER qualification were fixed on `main` through #105, #119, #129, #130, #131 and #134; #119 integrated a set of product fixes across several packages. #133 is WidgetData credential-store hardening.
@@ -103,7 +103,7 @@ Verified constraints on `main@450f681`:
 
 Sequence:
 
-1. prerequisite RC FIX `fix/rc-version-prerelease` (RC FIX PR pending) derives a numeric Tizen widget version and makes update comparison prerelease-aware;
+1. prerequisite RC FIX `fix/rc-version-prerelease` (PR #135) derives a numeric Tizen widget version and makes update comparison prerelease-aware;
 2. RC-PACKAGE then applies the `1.0.0-rc.1` bump from the post-fix `main`.
 
 Upgrade note: legacy EN TV Player installs used Tizen package `IPTVPlayer`. Since B0A (#18, 2026-09-09) the package is `BabusTVApp`, so those installs are a separate Tizen application, not an in-place upgrade target. Only `BabusTVApp` developer/emulator installs built at `1.10.1` will see a lower widget version and need one uninstall/reinstall.
@@ -236,7 +236,7 @@ Current controller state (2026-09-14):
 - qualification found deterministic production defects, fixed on `main` by #105, #119, #129, #130, #131 and #134; #133 is credential-store hardening;
 - GitGuardian incident `37220448` on #132 is the synthetic `RC_SECRETS.xtreamPassword` leak canary in `tools/rc-browser/fixtures/common.mjs`; classified as a false positive and merged by controller decision;
 - V1 RC versioning decision taken: independent `1.0.0-rc.1` → `1.0.0` line (queue row 15);
-- prerequisite RC FIX `fix/rc-version-prerelease` (RC FIX PR pending) derives a numeric Tizen widget version and makes update comparison prerelease-aware before any version bump;
+- prerequisite RC FIX `fix/rc-version-prerelease` (PR #135) derives a numeric Tizen widget version and makes update comparison prerelease-aware before any version bump;
 - RC-PACKAGE is next: `verification/v1-rc-package` from the post-fix `main`, applying the `1.0.0-rc.1` bump and the RC command gate;
 - open non-blocking RC-BROWSER observations: interrupted onboarding (a mid-transaction reload under artificial sync delay can leave a registered provider; not investigated), phone relay HTTP 500 shown with the network copy (product wording decision), B06 Search to keep watching in RC-PACKAGE runs;
 - physical-Tizen debt rows are unchanged and remain `PENDING`/`DEFERRED`;
