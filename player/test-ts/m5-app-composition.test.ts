@@ -61,6 +61,9 @@ function makeDeps(events: string[], providerCount = 1): AppCompositionDependenci
         events.push(`switch:${providerId}`);
         activeProviderId = providerId;
       },
+      async discardIncompleteRegistrations() {
+        events.push('core:discard-incomplete');
+      },
     },
     homeData: { async load() { events.push('home:load'); return HOME_MODEL; } },
     views: {
@@ -146,6 +149,7 @@ test('M5 application boot selects first-run for zero providers and Home otherwis
   const configured = createAppComposition(makeDeps(configuredEvents));
   await configured.boot();
   assert.deepEqual(configured.route(), { kind: 'home' });
+  assert.equal(configuredEvents[0], 'core:discard-incomplete');
   assert.equal(configuredEvents.includes('live:start'), false);
   assert.equal(configuredEvents.includes('play:c1'), false);
 });

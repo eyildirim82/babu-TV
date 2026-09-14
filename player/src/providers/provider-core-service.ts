@@ -125,6 +125,25 @@ export class ProviderCoreService {
     await this.providers.setActiveProviderId(providerId);
   }
 
+  // Onboarding saves the credential and provider record before the first sync,
+  // and deletes them when that sync fails. An app closed or reloaded in between
+  // skips that compensation. Onboarding is the only writer of new provider
+  // records and a successful first sync is required to finish it, so a record
+  // that never completed a sync is an interrupted registration. Run once at boot,
+  // before any onboarding can start. A provider that cannot be removed now is
+  // retried on the next boot.
+  async discardIncompleteRegistrations(): Promise<void> {
+    const providers = await this.providers.listProviders();
+    for (const provider of providers) {
+      if (provider.lastSuccessfulSyncAtMs !== null) continue;
+      try {
+        await this.deleteProvider(provider.id);
+      } catch {
+        // Idempotent delete; the next boot converges.
+      }
+    }
+  }
+
   async deleteProvider(providerId: ProviderId): Promise<void> {
     if (await this.providers.getProvider(providerId) === null) throw missingProvider();
     if (this.userStateCleanup === null) throw providerDataUnavailable();
