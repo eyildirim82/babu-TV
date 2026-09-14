@@ -2,6 +2,28 @@
 
 All notable changes to EN TV Player will be documented in this file.
 
+## [1.0.0-rc.1] - 2026-09-14
+
+First BabuşTV V1 release candidate. BabuşTV starts its own version line here; `1.10.1` below is the last inherited release.
+
+### Added
+- Provider Core onboarding for Xtream and M3U, with provider management (switch, add, edit, delete) and a branded first-run flow.
+- Remote-first Home: provider, Last Watched, Live TV, Favorites, Frequently Watched and Settings.
+- Live TV EPG (current/next/detail), provider-scoped Favorites, Turkish-safe local Search and channel actions.
+- Secure phone pairing: ephemeral encrypted, single-use sessions over a ciphertext-only relay.
+
+### Changed
+- Hardening for large catalogs and EPG, provider failures, storage migrations, focus navigation, Live TV playback and security/privacy.
+- The Tizen widget version is derived as numeric `x.y.z` (`1.0.0` for this candidate), and the update check follows semver prerelease precedence.
+
+### Fixed
+- Defects found during browser release qualification: provider focus on re-entry, Shaka teardown before channel handoff, media error when clearing the video element, phone pairing route in the built bundle, and Search text entry by remote and keyboard.
+
+### Known limitations
+- Physical Samsung/Tizen acceptance (device credential store, real remote keys, AVPlay fallback, lifecycle, long playback, install smoke) is still pending.
+
+---
+
 ## [1.10.1] - 2026-09-07
 
 ### Fixed
