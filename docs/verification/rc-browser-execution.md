@@ -209,7 +209,7 @@ Nothing on this board converts a physical-device row to PASS. The following rema
 | Accepted qualification head | `aca5f44e928ceae7568acc28ad11f112d6745f1f` (integrated suite 76/76, run `34838069268` attempts 1 and 2) |
 | Final production SHA rule | not `409e416`: qualification found deterministic production defects, fixed on `main` by #129, #130, #131 and #134 and requalified |
 | Next transition | `ACCEPTED → CLOSED / GREEN` when PR #132 merges to `main`; only then RC-PACKAGE starts |
-| RC-PACKAGE handoff | versioning decision taken: independent `1.0.0-rc.1` line (Tizen `config.xml` stays numeric `1.0.0`); implementation belongs to RC-PACKAGE |
+| RC-PACKAGE handoff | versioning decision taken: independent `1.0.0-rc.1` line; staged Tizen widget version must be derived as numeric `x.y.z` (prerequisite RC FIX); implementation belongs to RC-PACKAGE |
 
 GitGuardian on PR #132 reports one "Generic Password" (incident `37220448`) at `tools/rc-browser/fixtures/common.mjs:7`, first introduced by `2fc9964`. The value is the synthetic `RC_SECRETS.xtreamPassword` leak canary, used only against `.invalid` endpoints so that the leakage checks can prove it never reaches evidence or logs. It is not a real credential and needs no rotation. The controller resolves the incident as a test credential in the GitGuardian dashboard before merge.
 

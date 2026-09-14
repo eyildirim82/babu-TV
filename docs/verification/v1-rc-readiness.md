@@ -1,10 +1,11 @@
 # BabuşTV V1 RC Readiness Board
 
-**Date:** 2026-09-10  
-**Owner:** REVIEW / Integration Controller  
-**Status:** RC ROADMAP ACTIVE — RC-F0 CLOSED GREEN; 13 WAVE 1 CORE ROLES PLAN-BACKED AND OPEN  
-**Starting baseline:** `main@f3061cbad574b507b1f80cf23e19b8af179e90b0`  
-**Baseline verify:** `34414698392` SUCCESS
+**Date:** 2026-09-14\
+**Owner:** REVIEW / Integration Controller\
+**Status:** RC ROADMAP ACTIVE — WAVES 0–5 CLOSED GREEN; RC-BROWSER CLOSED GREEN; RC-PACKAGE IN PROGRESS (BLOCKED ON RC FIX VERSION-PRERELEASE PR); PHYSICAL-TIZEN DEBT PENDING/DEFERRED\
+**Starting baseline:** `main@f3061cbad574b507b1f80cf23e19b8af179e90b0`\
+**Baseline verify:** `34414698392` SUCCESS\
+**Latest evidence head:** `main@450f6816712623b422faffd1354c94757686e182` (RC-BROWSER merge, PR #132); post-merge verify `34846072550` SUCCESS
 
 ## Purpose
 
@@ -21,6 +22,8 @@ Detailed roadmap: `docs/superpowers/plans/2026-09-10-babustv-v1-rc-roadmap.md`.
 Maximum-parallel execution design: `docs/superpowers/specs/2026-09-10-babustv-v1-maximum-parallel-execution-design.md`.
 
 Live role/dependency board: `docs/verification/v1-parallel-execution.md`.
+
+RC-BROWSER evidence board: `docs/verification/rc-browser-execution.md`.
 
 Approved product spec: `docs/superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md`.
 
@@ -48,54 +51,73 @@ Approved product spec: `docs/superpowers/specs/2026-09-07-babustv-v1-product-and
 | Docs closeout baseline | `CLOSED GREEN` | `main@f3061cb...`; verify `34414698392` SUCCESS |
 | Maximum-parallel execution design | `CLOSED GREEN` | design and RC-F0 bounded plan integrated before production start |
 | RC-F0 shared contracts | `CLOSED GREEN` | PR #37 squash-merged; resulting `main@aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`; post-merge verify `34487321835` SUCCESS |
-| Wave 1 implementation base | `CLOSED GREEN` | common exact base frozen at `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` |
-| Wave 1 bounded plan pack | `CLOSED GREEN` | 13 independent core roles have controller-authored bounded plans; live status is `OPEN` in `v1-parallel-execution.md` |
-| Open implementation blocker | none for the 13 core lanes | `PAIR-WEB` remains separately `BLOCKED-CONTRACT` until pairing interfaces are frozen |
+| Wave 1 implementation base | `CLOSED GREEN` | common exact base frozen at `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` (historical) |
+| Wave 1 bounded plan pack | `CLOSED GREEN` | 13 independent core roles had controller-authored bounded plans (PR #40) |
+| Wave 1 core lanes | `CLOSED GREEN` | 13 core roles #41–#49, #51, #72–#74, plus `PAIR-WEB` #79; last post-merge verify `34610551534` (`8d6a94a`) SUCCESS |
+| Wave 2 persistence/provider integration | `CLOSED GREEN` | #52, #53, #54, #56, #57; last post-merge verify `34521303374` (`7b9b61c`) SUCCESS |
+| Wave 3 UI lanes | `CLOSED GREEN` | #58–#65, #71; last post-merge verify `34568048330` (`3a4d60d`) SUCCESS |
+| Wave throughput policy | `CLOSED GREEN` | `docs/verification/wave-throughput-policy.md` (`8c1c14a`, `92af4f5`); verify `34612781820`, `34612837592` SUCCESS |
+| Wave 4 composition | `CLOSED GREEN` | #70, #78, #84, #87, plus provider integration #83, #86; last post-merge verify `34685628558` (`0cdc1ed`) SUCCESS |
+| Wave 5 hardening | `CLOSED GREEN` | #88, #90, #92, #93, #94, #95, #96; last post-merge verify `34707993412` (`409e416`) SUCCESS |
+| RC-BROWSER production fixes | `CLOSED GREEN` | #105 `3ed999f`, #119 `49c9e3e`, #129 `ac8a346`, #130 `69b4d72`, #131 `8b0f340`, #134 `eaa928c`; hardening #133 `0eb86cf`; each post-merge verify SUCCESS |
+| RC-BROWSER qualification | `CLOSED GREEN` | accepted 2026-09-14 against production `eaa928c` (head `aca5f44`, 76/76 PASS, `rc-browser` run `34838069268` attempts 1 and 2); PR #132 merged to `main@450f681`; post-merge verify `34846072550` SUCCESS |
+| V1 RC versioning decision | `CLOSED GREEN` | independent `1.0.0-rc.1` line; see "V1 RC versioning decision" below |
+| Open implementation blocker | RC FIX PR #135 | `fix/rc-version-prerelease` must merge GREEN before RC-PACKAGE applies the version bump |
+
+Every PR listed on this board merged to `main` with a SUCCESS post-merge `verify` run. Per-role merge SHAs and run IDs are recorded in `v1-parallel-execution.md`.
 
 ## RC product implementation queue
 
-This table remains product-level. A role becoming `OPEN` means it may start; package status stays `PLANNED` until a scoped worker branch/PR actually begins implementation. The actual worker decomposition is tracked separately in `docs/verification/v1-parallel-execution.md`.
+This table remains product-level. Evidence lists the merged PRs that implement each package; the worker decomposition, merge SHAs and verify runs are tracked in `docs/verification/v1-parallel-execution.md`.
 
-| Order | Work package | Status | TV required to implement? | Exit condition |
-| ---: | --- | --- | --- | --- |
-| 0 | RC-F0 shared contracts | `CLOSED GREEN` | No | common EPG/user-state/capability seams frozen without feature behavior |
-| 1 | M4 EPG core/integration | `PLANNED` | No | normalized current/next/detail + bounded cache/query + malformed/large-data tests |
-| 2 | M4 Live TV EPG presentation | `PLANNED` | No | remote-first EPG UI + missing-EPG degradation + 1920×1080 evidence |
-| 3 | M4 Favorites | `PLANNED` | No | provider-scoped stable-ID durable favorites + virtual Favorites scope |
-| 4 | M4 Local Search | `PLANNED` | No | Turkish-safe local search + large-list benchmark + highlight≠playback preserved |
-| 5 | M4 Channel Options | `PLANNED` | No | core actions reachable with six basic remote actions |
-| 6 | M3U Provider-Core onboarding parity | `PLANNED` | No | modern M3U add/validate/register/sync/activate flow; no credential leakage |
-| 7 | M5 Watch State | `PLANNED` | No | last watched + meaningful watch stats + provider-scoped frequently-watched state |
-| 8 | M5 Home | `PLANNED` | No | Provider / Last Watched / Live TV / Favorites / Frequently Watched / Settings flow |
-| 9 | M5 Provider Management | `PLANNED` | No | switch/add/edit/delete with provider-scoped cleanup |
-| 10 | M5 First Run | `PLANNED` | No | short branded Provider Ekle flow; later boots remain restrained |
-| 11 | M6 Secure Pairing | `PLANNED` | No for protocol/browser development | ephemeral encrypted single-use pairing + public/self-host-compatible relay contract |
-| 12 | M7 Hardening | `PLANNED` | No for deterministic matrix | large/malformed/offline/migration/focus/security cases GREEN |
-| 13 | Browser Release Matrix | `PLANNED` | No | deterministic 1920×1080 release smoke GREEN |
-| 14 | Tizen build/package RC gate | `PLANNED` | No for build; environment-dependent for package signing | available package/staging gates GREEN, unavailable paths honestly classified |
-| 15 | V1 RC versioning decision | `PLANNED` | No | explicit choice: independent `1.0.0-rc.1` line or inherited version continuation |
+| Order | Work package | Status | TV required to implement? | Exit condition | Evidence |
+| ---: | --- | --- | --- | --- | --- |
+| 0 | RC-F0 shared contracts | `CLOSED GREEN` | No | common EPG/user-state/capability seams frozen without feature behavior | #37 |
+| 1 | M4 EPG core/integration | `CLOSED GREEN` | No | normalized current/next/detail + bounded cache/query + malformed/large-data tests | #41 #42 #45 #47 #49 #53 #56 |
+| 2 | M4 Live TV EPG presentation | `CLOSED GREEN` | No | remote-first EPG UI + missing-EPG degradation + 1920×1080 evidence | #59 #70 |
+| 3 | M4 Favorites | `CLOSED GREEN` | No | provider-scoped stable-ID durable favorites + virtual Favorites scope | #48 #52 #58 #70 |
+| 4 | M4 Local Search | `CLOSED GREEN` | No | Turkish-safe local search + large-list benchmark + highlight≠playback preserved | #51 #62 #70; RC fix #134 |
+| 5 | M4 Channel Options | `CLOSED GREEN` | No | core actions reachable with six basic remote actions | #60 #70 |
+| 6 | M3U Provider-Core onboarding parity | `CLOSED GREEN` | No | modern M3U add/validate/register/sync/activate flow; no credential leakage | #43 #54 #61 |
+| 7 | M5 Watch State | `CLOSED GREEN` | No | last watched + meaningful watch stats + provider-scoped frequently-watched state | #44 #46 #57 |
+| 8 | M5 Home | `CLOSED GREEN` | No | Provider / Last Watched / Live TV / Favorites / Frequently Watched / Settings flow | #64 #71 #78 |
+| 9 | M5 Provider Management | `CLOSED GREEN` | No | switch/add/edit/delete with provider-scoped cleanup | #63 #78 #83 #86; RC fix #105 |
+| 10 | M5 First Run | `CLOSED GREEN` | No | short branded Provider Ekle flow; later boots remain restrained | #65 #78 |
+| 11 | M6 Secure Pairing | `CLOSED GREEN` | No for protocol/browser development | ephemeral encrypted single-use pairing + public/self-host-compatible relay contract | #72 #73 #74 #79 #84 #87; RC fix #131 |
+| 12 | M7 Hardening | `CLOSED GREEN` | No for deterministic matrix | large/malformed/offline/migration/focus/security cases GREEN | #88 #90 #92 #93 #94 #95 #96 |
+| 13 | Browser Release Matrix | `CLOSED GREEN` | No | deterministic 1920×1080 release smoke GREEN | #132 → `main@450f681`; `docs/verification/rc-browser-execution.md` |
+| 14 | Tizen build/package RC gate | `IN PROGRESS` | No for build; environment-dependent for package signing | available package/staging gates GREEN, unavailable paths honestly classified | RC-PACKAGE on `verification/v1-rc-package`; prerequisite RC FIX `fix/rc-version-prerelease` (PR #135) |
+| 15 | V1 RC versioning decision | `CLOSED GREEN` | No | explicit choice: independent `1.0.0-rc.1` line or inherited version continuation | controller decision 2026-09-14: independent `1.0.0-rc.1`; constraints below |
+
+Product defects found by RC-BROWSER qualification were fixed on `main` through #105, #119, #129, #130, #131 and #134; #119 integrated a set of product fixes across several packages. #133 is WidgetData credential-store hardening.
+
+### V1 RC versioning decision
+
+Controller decision 2026-09-14: BabuşTV takes an independent `1.0.0-rc.1` → `1.0.0` version line instead of continuing the inherited `1.10.1`.
+
+Verified constraints on `main@450f681`:
+
+- `tizen/stage.mjs` (`npm run tizen:build`) and `tizen/package.mjs` copy the `package.json` version into the staged `config.xml` widget version. Every staged build so far therefore carried `1.10.1`, although source `tizen/config.xml` says `1.0.0`.
+- Tizen widget versions must be numeric `x.y.z`; a prerelease suffix must not reach the staged `config.xml`.
+- `player/src/update.js` `compareVersions` splits on `.` and compares numbers only; it does not understand prerelease tags.
+
+Sequence:
+
+1. prerequisite RC FIX `fix/rc-version-prerelease` (PR #135) derives a numeric Tizen widget version and makes update comparison prerelease-aware;
+2. RC-PACKAGE then applies the `1.0.0-rc.1` bump from the post-fix `main`.
+
+Upgrade note: legacy EN TV Player installs used Tizen package `IPTVPlayer`. Since B0A (#18, 2026-09-09) the package is `BabusTVApp`, so those installs are a separate Tizen application, not an in-place upgrade target. Only `BabusTVApp` developer/emulator installs built at `1.10.1` will see a lower widget version and need one uninstall/reinstall.
 
 ## Parallel execution overlay
 
-RC-F0 is merged and its post-merge `main` is GREEN. The common Wave 1 implementation base is frozen at:
+All role waves in `v1-parallel-execution.md` up to hardening are integrated: Wave 0 (RC-F0), Wave 1 core lanes, Wave 2 persistence/provider integration, Wave 3 UI lanes, Wave 4 composition and Wave 5 hardening are `CLOSED GREEN`, each role through a merged PR with a SUCCESS post-merge `verify` run.
 
-```text
-aac531b15bad85f6e7ae42c6ff1a6b71eed289d1
-```
+Wave 6 state:
 
-Post-merge verification: `34487321835` SUCCESS.
+- `RC-BROWSER` is `CLOSED GREEN`: PR #132 (`verification/v1-rc-browser-h2`) merged to `main@450f681` with a merge commit that preserves the qualification SHAs; post-merge verify `34846072550` SUCCESS;
+- `RC-PACKAGE` is `IN PROGRESS`: it runs on `verification/v1-rc-package` from the exact post-fix `main` once the RC FIX `fix/rc-version-prerelease` PR merges GREEN.
 
-The following 13 core roles have bounded plans and are `OPEN`:
-
-```text
-EPG-N EPG-X EPG-XML EPG-MAP EPG-Q
-FAV-D SRCH-C M3U-V WATCH-R WATCH-S
-PAIR-C PAIR-S PAIR-R
-```
-
-`PAIR-WEB` remains `BLOCKED-CONTRACT` until the pairing crypto/session/relay interfaces are merged and frozen. Recommended active concurrency is 8–12 workers so controller review and CI remain effective even though all 13 independent core roles are eligible to start.
-
-All 13 production branches must start from exact `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`, not from later documentation-only `main` commits unless the controller explicitly records a new production base. Shared runtime/storage hot-zone changes remain deferred to named persistence/integration/composition roles.
+History: Wave 1 production branches started from the frozen base `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` (post-RC-F0 verify `34487321835`); it is not a base for new work.
 
 ## Required per-package workflow
 
@@ -121,31 +143,31 @@ Parallel work is allowed only when file ownership and semantic dependencies do n
 
 ## RC deterministic release matrix
 
-Before an RC is declared ready, record evidence for these scenarios where applicable:
+Before an RC is declared ready, record evidence for these scenarios where applicable. Scenario IDs refer to the RC-BROWSER scenario matrix in `docs/verification/rc-browser-execution.md` (production `eaa928c`, run `34838069268`).
 
 | Scenario | Required before RC | Physical TV required? | Current status |
 | --- | --- | --- | --- |
-| Cold boot / branded shell | Yes | No | `PLANNED` for final matrix; earlier B0 evidence exists |
-| Xtream add / fail / success | Yes | No | existing implementation GREEN; rerun in final matrix |
-| M3U add / fail / success | Yes | No | `PLANNED` |
-| Home and default focus | Yes | No | `PLANNED` |
-| Provider switching | Yes | No | `PLANNED` |
-| Live TV overlay/navigation | Yes | No | existing deterministic tests; rerun after M4/M5 changes |
-| Explicit channel play vs highlight | Yes | No | existing M3 invariant; must remain GREEN |
-| CH± logical behavior | Yes | No | deterministic simulation possible |
-| Numeric zap logical behavior | Yes | No | deterministic simulation possible |
-| EPG present/missing/broken | Yes | No | `PLANNED` |
-| Favorites | Yes | No | `PLANNED` |
-| Search | Yes | No | `PLANNED` |
-| Last Watched | Yes | No | `PLANNED` |
-| Frequently Watched | Yes | No | `PLANNED` |
-| Settings/provider management | Yes | No | `PLANNED` |
-| Offline/provider failure | Yes | No | extend deterministic matrix |
-| Cache fallback | Yes | No | extend deterministic matrix |
-| Back/layer ownership | Yes | No | existing M3 behavior; rerun after new surfaces |
-| Focus restoration | Yes | No | stable-ID regression required |
-| Reduced motion | Yes | No | B0 baseline exists; rerun on final surfaces |
-| Secret/log/artifact audit | Yes | No | `PLANNED` final gate |
+| Cold boot / branded shell | Yes | No | `CLOSED GREEN` (RC-BROWSER H0-SMOKE, A01, BROW-SECPAIR-S01) for cold boot to First Run with default focus and clean console; branding rests on `brand:check` PASS at `aca5f44`, not on a visual browser assertion |
+| Xtream add / fail / success | Yes | No | `CLOSED GREEN` (RC-BROWSER A02, A03, A04, BROW-SECPAIR-S05-*) |
+| M3U add / fail / success | Yes | No | `CLOSED GREEN` (RC-BROWSER A05, A06) |
+| Home and default focus | Yes | No | `CLOSED GREEN` (RC-BROWSER B01, A04) |
+| Provider switching | Yes | No | `CLOSED GREEN` (RC-BROWSER A07, A08, C06) |
+| Live TV overlay/navigation | Yes | No | `CLOSED GREEN` (RC-BROWSER B02, B03, B10, P08-P10-layer-focus-back) |
+| Explicit channel play vs highlight | Yes | No | `CLOSED GREEN` (RC-BROWSER P01-P02-explicit-play, B02, B07, P12-single-item) |
+| CH± logical behavior | Yes | No | `CLOSED GREEN` (RC-BROWSER P03-P04-last-intent-wins: logical `ChannelUp`/`ChannelDown` simulation); physical CH± keys stay `DEFERRED` |
+| Numeric zap logical behavior | Yes | No | unit/deterministic coverage (`player/test-ts/live-tv-controller.test.ts` numeric commit); browser matrix only proves a digit typed into Search does not zap (P10-search-focus); positive numeric zap not in browser matrix; physical numeric keys stay `DEFERRED` |
+| EPG present/missing/broken | Yes | No | `CLOSED GREEN` (RC-BROWSER B08, B09, C09) |
+| Favorites | Yes | No | `CLOSED GREEN` (RC-BROWSER B04, B05, C02, C04) |
+| Search | Yes | No | `CLOSED GREEN` (RC-BROWSER B06, B07, P10-search-focus; requalified after #134) |
+| Last Watched | Yes | No | `CLOSED GREEN` (RC-BROWSER C03, C05) for browser-established Last Watched persistence and provider isolation; B01 covers the no-entry Home fallback |
+| Frequently Watched | Yes | No | unit/deterministic coverage (`watch-score`, `home-domain`, `m5-app-composition`, `m7-perf-hardening` tests); not in browser matrix |
+| Settings/provider management | Yes | No | `CLOSED GREEN` (RC-BROWSER A07–A10, A12, C08) via the Home Settings entry to Provider Management; no separate app-settings assertion |
+| Offline/provider failure | Yes | No | `CLOSED GREEN` (RC-BROWSER A03, A11, BROW-SECPAIR-S05-*, B09, C09, P05, P07, P15-failure-sanitization) |
+| Cache fallback | Yes | No | `CLOSED GREEN` (RC-BROWSER A11, C09) |
+| Back/layer ownership | Yes | No | `CLOSED GREEN` (RC-BROWSER A10, B10, P08-P10-layer-focus-back, P10-search-focus, BROW-SECPAIR-S12-TV-BACK) |
+| Focus restoration | Yes | No | `CLOSED GREEN` (RC-BROWSER A07, B11, P08-P10-layer-focus-back, P11-deleted-reordered-focus) |
+| Reduced motion | Yes | No | `CLOSED GREEN` for Live TV (RC-BROWSER P14-reduced-motion); other final surfaces are not asserted under reduced motion in the browser matrix |
+| Secret/log/artifact audit | Yes | No | `CLOSED GREEN` (RC-BROWSER BROW-SECPAIR-S02, S03-S04-S13, S09, S14-S15, S16, C12, C13; static `tools/check-m7-security-privacy.mjs` PASS; SEC #96) |
 
 ## Physical-Tizen evidence debt
 
@@ -206,18 +228,19 @@ Synthetic/fake provider data only in public CI and screenshots.
 
 ## Controller state
 
-Current controller state:
+Current controller state (2026-09-14):
 
-- RC roadmap documentation and maximum-parallel design are integrated;
-- RC-F0 plan was implemented on `foundation/v1-rc-contracts`, final worker head `8a216600b8244c58e7fabb8069f2320b906b21b4`;
-- RC-F0 plan-required exact-head gates are GREEN, including `brand:check` and `tizen:build` evidence from verification run `34486768193`;
-- PR #37 was squash-merged to `main@aac531b15bad85f6e7ae42c6ff1a6b71eed289d1`;
-- post-merge `main` verify `34487321835` is SUCCESS;
-- `aac531b15bad85f6e7ae42c6ff1a6b71eed289d1` is the common exact Wave 1 implementation base;
-- 13 independent core roles have approved bounded plans and are `OPEN`; the live plan paths/ownership are recorded in `v1-parallel-execution.md`;
-- `PAIR-WEB` remains `BLOCKED-CONTRACT` until the pairing core interfaces are merged/frozen;
-- dependent Wave 2/UI roles remain blocked until their required core predecessors merge and post-merge verification is GREEN;
-- old B0/M3G/Xtream worker branches are historical evidence, not implementation bases;
+- Waves 0–5 are integrated on `main`; every role PR merged with a SUCCESS post-merge `verify` run (per-role evidence in `v1-parallel-execution.md`);
+- RC-BROWSER was accepted under Task 13 on 2026-09-14 against production `eaa928c`, qualification head `aca5f44`, integrated suite 76/76 PASS in `rc-browser` run `34838069268` attempts 1 and 2 with no retried scenario;
+- PR #132 merged to `main@450f681` with a merge commit (qualification SHAs preserved); post-merge verify `34846072550` SUCCESS; RC-BROWSER is `CLOSED GREEN`;
+- qualification found deterministic production defects, fixed on `main` by #105, #119, #129, #130, #131 and #134; #133 is credential-store hardening;
+- GitGuardian incident `37220448` on #132 is the synthetic `RC_SECRETS.xtreamPassword` leak canary in `tools/rc-browser/fixtures/common.mjs`; classified as a false positive and merged by controller decision;
+- V1 RC versioning decision taken: independent `1.0.0-rc.1` → `1.0.0` line (queue row 15);
+- prerequisite RC FIX `fix/rc-version-prerelease` (PR #135) derives a numeric Tizen widget version and makes update comparison prerelease-aware before any version bump;
+- RC-PACKAGE is next: `verification/v1-rc-package` from the post-fix `main`, applying the `1.0.0-rc.1` bump and the RC command gate;
+- open non-blocking RC-BROWSER observations: interrupted onboarding (a mid-transaction reload under artificial sync delay can leave a registered provider; not investigated), phone relay HTTP 500 shown with the network copy (product wording decision), B06 Search to keep watching in RC-PACKAGE runs;
+- physical-Tizen debt rows are unchanged and remain `PENDING`/`DEFERRED`;
+- old B0/M3G/Xtream worker branches and the Wave 1 base are historical evidence, not implementation bases;
 - merge authority remains Controller / explicit user instruction.
 
 ## RC completion rule
