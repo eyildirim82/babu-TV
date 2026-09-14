@@ -96,6 +96,10 @@ export class DomLiveTvView implements LiveTvView {
     this.channelList.replaceChildren(...items);
     this.channelList.classList.toggle('hidden', false);
     this.channelList.classList.toggle('zone-active', state.overlayZone === 'CHANNEL');
+    if (state.overlayOpen) {
+      items.find((item) => item.dataset.channelId === state.highlightedChannelId)
+        ?.scrollIntoView({ block: 'nearest' });
+    }
   }
 
   private renderCategories(state: LiveTvState, model: LiveTvViewModel): void {
@@ -131,6 +135,10 @@ export class DomLiveTvView implements LiveTvView {
     this.groupList.replaceChildren(...items);
     this.groupList.classList.toggle('hidden', false);
     this.groupList.classList.toggle('zone-active', state.overlayZone === 'CATEGORY');
+    if (state.overlayOpen) {
+      items.find((item) => item.dataset.scopeKey === activeKey)
+        ?.scrollIntoView({ block: 'nearest' });
+    }
   }
 
   private renderFeatures(model: LiveTvViewModel): void {
@@ -218,6 +226,10 @@ export class DomLiveTvView implements LiveTvView {
     this.featureRoot.classList.remove('hidden');
     this.featureRoot.dataset.activeLayer = features.layer;
     this.syncSearchFocus(features.layer === 'search' && features.search.focusZone === 'input');
+    // Results are only attached (and the panel visible) at this point.
+    this.searchResults
+      .find((result) => result.dataset.presentationState === 'focused')
+      ?.scrollIntoView({ block: 'nearest' });
   }
 
   // The Search layer keeps one section and input while it stays open. Every

@@ -32,6 +32,7 @@ class FakeElement {
   children: FakeElement[] = [];
   readonly dataset: Record<string, string> = {};
   readonly classList = new FakeClassList();
+  readonly scrollCalls: unknown[] = [];
   private readonly listeners = new Map<string, Array<() => void>>();
 
   constructor(private readonly owner: FakeDocument) {}
@@ -58,6 +59,7 @@ class FakeElement {
     return false;
   }
   focus(): void { this.owner.activeElement = this; }
+  scrollIntoView(options?: unknown): void { this.scrollCalls.push(options); }
   blur(): void { if (this.owner.activeElement === this) this.owner.activeElement = this.owner.body; }
   addEventListener(type: string, listener: () => void): void {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
@@ -144,10 +146,10 @@ async function fixture() {
     .find((element) => element.dataset.featureSection === 'search') ?? null;
   const searchInput = () => searchSection()?.children
     .find((element) => element.className === 'live-tv-search-input') ?? null;
-  const resultKeys = () => searchSection()?.children
-    .filter((element) => element.dataset.resultKey !== undefined)
-    .map((element) => element.dataset.resultKey) ?? [];
-  return { composition, document, queries, render, searchInput, resultKeys };
+  const results = () => searchSection()?.children
+    .filter((element) => element.dataset.resultKey !== undefined) ?? [];
+  const resultKeys = () => results().map((element) => element.dataset.resultKey);
+  return { composition, document, queries, render, searchInput, results, resultKeys };
 }
 
 void test('Search input takes DOM focus when Search opens on the input zone', async () => {
@@ -212,4 +214,22 @@ void test('closing Search drops the input and a reopened Search starts focused w
   assert.notEqual(reopened, first);
   assert.equal(reopened.value, 'h');
   assert.equal(document.activeElement, reopened);
+});
+
+// The Search panel is height-capped and scrolls; a focused result below its
+// visible rows must be brought into view as the remote moves through results.
+void test('the focused Search result is scrolled into view and the input zone scrolls no result', async () => {
+  const { composition, render, results } = await fixture();
+  render(composition.openSearch(refreshInput, 's'));
+  assert.ok(results().length > 0);
+  for (const result of results()) assert.deepEqual(result.scrollCalls, []);
+
+  render(composition.handleSearchKeyboard({ key: 'ArrowDown', keyCode: 40 }).state);
+
+  const focused = results().filter((result) => result.dataset.presentationState === 'focused');
+  assert.equal(focused.length, 1);
+  assert.deepEqual(focused[0]!.scrollCalls, [{ block: 'nearest' }]);
+  for (const result of results()) {
+    if (result !== focused[0]) assert.deepEqual(result.scrollCalls, []);
+  }
 });
