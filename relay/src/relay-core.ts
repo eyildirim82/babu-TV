@@ -60,6 +60,15 @@ export function normalizeRelayBasePath(raw: string | undefined): string {
   return value.replace(/\/+$/, '');
 }
 
+/** CORS preflight answer for relay paths; adapters may return it without reaching the store. */
+export function relayPreflightResponse(): RelayHttpResponse {
+  return emptyResponse(204, {
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    'access-control-allow-headers': 'Content-Type',
+    'access-control-max-age': '600',
+  });
+}
+
 export function relayErrorResponse(
   status: number,
   code: RelayErrorCode,
@@ -173,6 +182,7 @@ export function createRelayCore(deps: RelayCoreDependencies): RelayCore {
     if (outcome === 'stored') return emptyResponse(204);
     if (outcome === 'missing') return miss(clientKey, nowMs);
     if (outcome === 'expired') return relayErrorResponse(410, 'expired');
+    if (outcome === 'full') return relayErrorResponse(503, 'unavailable');
     return relayErrorResponse(409, 'conflict');
   }
 
@@ -187,13 +197,7 @@ export function createRelayCore(deps: RelayCoreDependencies): RelayCore {
     const matched = matchRoute(request.path, basePath);
     if (matched === null) return relayErrorResponse(404, 'not_found');
 
-    if (request.method === 'OPTIONS') {
-      return emptyResponse(204, {
-        'access-control-allow-methods': 'GET, POST, OPTIONS',
-        'access-control-allow-headers': 'Content-Type',
-        'access-control-max-age': '600',
-      });
-    }
+    if (request.method === 'OPTIONS') return relayPreflightResponse();
 
     const methods = matched.kind === 'sessions' ? ['POST'] : ['GET', 'POST'];
     if (!methods.includes(request.method)) {

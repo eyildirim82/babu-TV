@@ -17,6 +17,7 @@ test('RELAY-STORE defaults match the V1 five-minute pairing TTL and bound memory
   assert.equal(DEFAULT_RELAY_LIMITS.maxSessions, 50_000);
   assert.equal(DEFAULT_RELAY_LIMITS.maxLiveSessionsPerClient, 10);
   assert.equal(DEFAULT_RELAY_LIMITS.maxTombstones, 20_000);
+  assert.equal(DEFAULT_RELAY_LIMITS.maxRetainedCiphertextChars, 32_000_000);
 });
 
 test('RELAY-STORE create, put and take deliver the ciphertext exactly once', async () => {
@@ -178,4 +179,37 @@ test('RELAY-STORE keeps counting a client whose old sessions were swept by a sto
   assert.deepEqual(await s.create('session-client-x02', 'client-x', TTL), { outcome: 'created' });
   assert.deepEqual(await s.create('session-client-x03', 'client-x', TTL + 1), { outcome: 'created' });
   assert.deepEqual(await s.create('session-client-x04', 'client-x', TTL + 2), { outcome: 'client_limit', retryAfterMs: TTL - 2 });
+});
+
+test('RELAY-STORE reports the earliest live expiry for timer-less hosts', async () => {
+  const s = store();
+  assert.equal(s.nextLiveExpiryMs(), null);
+  await s.create('session-next-one00', 'client-a', 100);
+  await s.create('session-next-two00', 'client-b', 200);
+  assert.equal(s.nextLiveExpiryMs(), 100 + TTL);
+  await s.put('session-next-one00', 'x', 150);
+  await s.take('session-next-one00', 160);
+  assert.equal(s.nextLiveExpiryMs(), 200 + TTL);
+  s.purge(200 + TTL);
+  assert.equal(s.nextLiveExpiryMs(), null);
+});
+
+test('RELAY-STORE bounds retained ciphertext memory and frees budget on consumption or expiry', async () => {
+  const s = store({ maxRetainedCiphertextChars: 10 });
+  await s.create('session-budget-one', 'client-a', 0);
+  await s.create('session-budget-two', 'client-b', 0);
+  await s.create('session-budget-thr', 'client-c', 0);
+  assert.equal(await s.put('session-budget-one', '123456', 1), 'stored');
+  assert.equal(s.retainedCiphertextChars(), 6);
+  assert.equal(await s.put('session-budget-two', '12345', 2), 'full');
+  assert.deepEqual(await s.take('session-budget-two', 3), { kind: 'pending' });
+  assert.equal(await s.put('session-budget-two', '1234', 4), 'stored');
+  assert.equal(s.retainedCiphertextChars(), 10);
+  assert.equal(await s.put('session-budget-one', '123456', 5), 'stored');
+
+  await s.take('session-budget-one', 6);
+  assert.equal(s.retainedCiphertextChars(), 4);
+  assert.equal(await s.put('session-budget-thr', '123456', 7), 'stored');
+  s.purge(TTL);
+  assert.equal(s.retainedCiphertextChars(), 0);
 });

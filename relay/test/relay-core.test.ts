@@ -112,6 +112,15 @@ test('RELAY-CORE accepts a phone retry that repeats the same ciphertext', async 
   assert.equal(ready.body, json({ status: 'ready', ciphertext: 'same-envelope' }));
 });
 
+test('RELAY-CORE answers 503 when the ciphertext memory budget is exhausted', async () => {
+  const h = harness({ limits: { maxRetainedCiphertextChars: 5 } });
+  await createSession(h);
+  const response = await h.handle({ method: 'POST', path: CIPHERTEXT_PATH, body: json({ ciphertext: '123456' }) });
+  assert.equal(response.status, 503);
+  assert.equal(response.body, json({ error: 'unavailable' }));
+  assert.equal((await h.handle({ method: 'GET', path: CIPHERTEXT_PATH })).body, json({ status: 'pending' }));
+});
+
 test('RELAY-CORE returns 404 for unknown sessions and 503 when the store is full', async () => {
   const h = harness({ limits: { maxSessions: 1 } });
   assert.equal((await h.handle({ method: 'GET', path: CIPHERTEXT_PATH })).status, 404);

@@ -14,6 +14,8 @@ export interface RelayLimits {
   maxSessions: number;
   maxLiveSessionsPerClient: number;
   maxTombstones: number;
+  /** Total ciphertext characters held by ready sessions; bounds memory on small hosts. */
+  maxRetainedCiphertextChars: number;
   maxCiphertextLength: number;
   maxBodyBytes: number;
   rateLimits: RelayRateLimitRules;
@@ -25,6 +27,7 @@ export const DEFAULT_RELAY_LIMITS: RelayLimits = Object.freeze({
   maxSessions: 50_000,
   maxLiveSessionsPerClient: 10,
   maxTombstones: 20_000,
+  maxRetainedCiphertextChars: 32_000_000,
   maxCiphertextLength: 16_384,
   maxBodyBytes: 32 * 1024,
   rateLimits: Object.freeze({
