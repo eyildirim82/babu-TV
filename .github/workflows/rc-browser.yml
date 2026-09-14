@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 35
     env:
       RC_BROWSER_H0_SHA: 61cb2198fee982ae3b3a61398dc120738d3405b4
-      RC_PRODUCTION_SHA: 69b4d72ad34e61798e1bb04fecaa4177cd600d6b
+      RC_PRODUCTION_SHA: 8b0f3407e5f08c6b8ee8b106a018c2d92cffabe4
     steps:
       - name: Checkout trusted trigger revision
         uses: actions/checkout@v4
