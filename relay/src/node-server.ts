@@ -1,6 +1,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { isIP } from 'node:net';
+import { normalizeClientAddress } from './client-address.js';
 import { normalizeRelayBasePath, relayErrorResponse, type RelayCore, type RelayHttpResponse } from './relay-core.js';
+
+export { normalizeClientAddress };
 
 export interface RelayNodeServerOptions {
   core: RelayCore;
@@ -55,46 +57,6 @@ export function readRelayServerConfig(env: Record<string, string | undefined>): 
   }
 
   return { host: env.RELAY_HOST || '127.0.0.1', port, basePath, trustedProxyHops };
-}
-
-function expandIpv6(address: string): string[] {
-  let value = address;
-  const embeddedV4 = /(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(value);
-  if (embeddedV4 !== null) {
-    const [a, b, c, d] = embeddedV4.slice(1).map(Number) as [number, number, number, number];
-    value = `${value.slice(0, embeddedV4.index)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
-  }
-  const [head = '', tail] = value.split('::');
-  const headParts = head === '' ? [] : head.split(':');
-  const tailParts = tail === undefined || tail === '' ? [] : tail.split(':');
-  const zeros = tail === undefined ? [] : new Array<string>(8 - headParts.length - tailParts.length).fill('0');
-  return [...headParts, ...zeros, ...tailParts].map((part) => Number.parseInt(part, 16).toString(16));
-}
-
-/**
- * Rate-limit identity for an address: IPv4 as-is (including IPv4-mapped IPv6), IPv6 grouped by /64
- * because a single subscriber usually controls a whole /64. Returns null for anything that is not an IP.
- */
-export function normalizeClientAddress(raw: string | undefined): string | null {
-  if (raw === undefined) return null;
-  let value = raw.trim();
-  // Some proxies append a port: "203.0.113.7:4711" or "[2001:db8::1]:443".
-  const bracketed = /^\[([^\]]+)\](?::\d{1,5})?$/.exec(value);
-  const ipv4WithPort = /^(\d{1,3}(?:\.\d{1,3}){3}):\d{1,5}$/.exec(value);
-  if (bracketed !== null) value = bracketed[1] as string;
-  else if (ipv4WithPort !== null) value = ipv4WithPort[1] as string;
-  value = (value.split('%')[0] ?? '').toLowerCase();
-
-  const family = isIP(value);
-  if (family === 4) return value;
-  if (family !== 6) return null;
-  const hextets = expandIpv6(value);
-  if (hextets.slice(0, 5).every((part) => part === '0') && hextets[5] === 'ffff') {
-    const high = Number.parseInt(hextets[6] as string, 16);
-    const low = Number.parseInt(hextets[7] as string, 16);
-    return `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`;
-  }
-  return `${hextets.slice(0, 4).join(':')}::/64`;
 }
 
 function clientKeyOf(request: IncomingMessage, trustedProxyHops: number): string {

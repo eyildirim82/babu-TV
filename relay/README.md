@@ -49,6 +49,7 @@ Start the relay with `RELAY_TRUSTED_PROXY_HOPS=1` in this setup.
 
 - **State is in memory and single-process.** Do not run several instances behind a load balancer; a restart drops open pairings, which users simply retry.
 - **Rate limits** per client address (IPv6 grouped by /64): 10 session creates/min, 10 open sessions at a time, 20 submits/min, 120 polls/min, and 30 unknown-session hits per 10 min. Exceeding them returns `429` with `Retry-After`. Configure clients to poll every 2 seconds; anything faster than once per second risks hitting the poll limit.
+- **Memory:** ready sessions may hold at most 32,000,000 ciphertext characters in total; further submits get `503` until sessions are taken or expire.
 - **Shared addresses:** users behind the same carrier-grade NAT share these limits.
 - **Logging:** the relay prints one startup line and nothing per request. Your reverse proxy, host or CDN may still log IP addresses and paths (paths contain the short-lived session ID, never the payload). Describe the real deployment when you publish a privacy statement.
 - **Not a DDoS shield:** an attacker controlling thousands of addresses can still exhaust the in-memory limits. Put a public relay behind host- or CDN-level protection.

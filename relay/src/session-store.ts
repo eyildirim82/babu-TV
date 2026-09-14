@@ -5,7 +5,7 @@ export type RelayCreateResult =
   /** retryAfterMs: time until the client's oldest live session expires and frees a slot. */
   | { outcome: 'client_limit'; retryAfterMs: number };
 
-export type RelayPutOutcome = 'stored' | 'missing' | 'expired' | 'conflict';
+export type RelayPutOutcome = 'stored' | 'missing' | 'expired' | 'conflict' | 'full';
 
 export type RelayTakeOutcome =
   | { kind: 'missing' }

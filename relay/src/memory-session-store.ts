@@ -17,7 +17,12 @@ interface RelayTombstone {
 
 type RelayStoreLimits = Pick<
   RelayLimits,
-  'sessionTtlMs' | 'tombstoneGraceMs' | 'maxSessions' | 'maxLiveSessionsPerClient' | 'maxTombstones'
+  | 'sessionTtlMs'
+  | 'tombstoneGraceMs'
+  | 'maxSessions'
+  | 'maxLiveSessionsPerClient'
+  | 'maxTombstones'
+  | 'maxRetainedCiphertextChars'
 >;
 
 /**
@@ -33,6 +38,7 @@ export class MemoryRelaySessionStore implements RelaySessionStore {
   private readonly tombstones = new Map<string, RelayTombstone>();
   /** Session IDs per client key, oldest first; at most maxLiveSessionsPerClient entries each. */
   private readonly liveByClient = new Map<string, string[]>();
+  private retainedChars = 0;
 
   constructor(private readonly limits: RelayStoreLimits) {}
 
@@ -66,7 +72,9 @@ export class MemoryRelaySessionStore implements RelaySessionStore {
     if (record === undefined) return 'missing';
     if (!('clientKey' in record)) return record.status === 'expired' ? 'expired' : 'conflict';
     if (record.status === 'ready') return record.ciphertext === ciphertext ? 'stored' : 'conflict';
+    if (this.retainedChars + ciphertext.length > this.limits.maxRetainedCiphertextChars) return 'full';
     this.live.set(sessionId, { ...record, status: 'ready', ciphertext });
+    this.retainedChars += ciphertext.length;
     return 'stored';
   }
 
@@ -89,6 +97,16 @@ export class MemoryRelaySessionStore implements RelaySessionStore {
       }
     }
     return forgotten;
+  }
+
+  /** Expiry of the oldest live session, or null; lets hosts without timers schedule the next purge. */
+  nextLiveExpiryMs(): number | null {
+    const oldest = this.live.values().next();
+    return oldest.done ? null : oldest.value.expiresAtMs;
+  }
+
+  retainedCiphertextChars(): number {
+    return this.retainedChars;
   }
 
   liveCount(): number {
@@ -138,6 +156,7 @@ export class MemoryRelaySessionStore implements RelaySessionStore {
     retainUntilMs: number,
   ): RelayTombstone {
     this.live.delete(sessionId);
+    if (record.status === 'ready') this.retainedChars -= record.ciphertext.length;
     const owned = this.liveByClient.get(record.clientKey);
     if (owned !== undefined) {
       const index = owned.indexOf(sessionId);

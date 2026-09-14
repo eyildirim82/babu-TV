@@ -80,7 +80,7 @@ Decisions:
 - Request bodies: JSON objects with the exact key set; any extra key, wrong type or invalid JSON is `400`.
 - `ciphertext`: non-empty string, at most 16,384 characters.
 - Request body: at most 32 KiB, otherwise `413`.
-- Session store: at most 50,000 live (PENDING/READY) sessions, otherwise create returns `503`; at most 10 live sessions per client key, otherwise `429`; at most 20,000 tombstones (oldest evicted). Live sessions are kept in expiry order, so expiry sweeps stop at the first unexpired session.
+- Session store: at most 50,000 live (PENDING/READY) sessions, otherwise create returns `503`; at most 10 live sessions per client key, otherwise `429`; at most 20,000 tombstones (oldest evicted); at most 32,000,000 characters of retained ciphertext across ready sessions, otherwise a submit returns `503`. Live sessions are kept in expiry order, so expiry sweeps stop at the first unexpired session.
 - Unknown path `404`; known path with wrong method `405`.
 
 ## 6. Abuse controls
