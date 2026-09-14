@@ -28,7 +28,23 @@ function installFakeDocument() {
       };
       keydownHandler(event);
     },
+    pressEvent(event) {
+      keydownHandler(event);
+    },
   };
+}
+
+function focusLiveTvSearchInput() {
+  globalThis.document.activeElement = {
+    tagName: 'INPUT',
+    classList: { contains: (name) => name === 'live-tv-search-input' },
+  };
+}
+
+function pressTracked(fake, key, keyCode = 0) {
+  let prevented = false;
+  fake.pressEvent({ key, keyCode, preventDefault() { prevented = true; }, stopPropagation() {} });
+  return prevented;
 }
 
 test.afterEach(() => {
@@ -120,4 +136,43 @@ test('destroy clears pending legacy numeric state before a later init', async ()
 
   assert.deepEqual(firstActions, []);
   assert.deepEqual(secondActions, [['number', 2]]);
+});
+
+test('a focused Live TV Search input keeps text-editing keys', () => {
+  const fake = installFakeDocument();
+  const actions = [];
+  init((...args) => actions.push(args), { numericMode: 'digits' });
+  focusLiveTvSearchInput();
+
+  const prevented = [
+    pressTracked(fake, 'r', 82),
+    pressTracked(fake, 'R', 82),
+    pressTracked(fake, '5', 53),
+    pressTracked(fake, ' ', 32),
+    pressTracked(fake, 'Backspace', 8),
+    pressTracked(fake, 'ArrowLeft', 37),
+    pressTracked(fake, 'ArrowRight', 39),
+    pressTracked(fake, 'ş', 0),
+  ];
+
+  assert.deepEqual(actions, []);
+  assert.deepEqual(prevented, [false, false, false, false, false, false, false, false]);
+});
+
+test('a focused Live TV Search input still routes Search navigation keys to the app', () => {
+  const fake = installFakeDocument();
+  const actions = [];
+  init((...args) => actions.push(args));
+  focusLiveTvSearchInput();
+
+  const prevented = [
+    pressTracked(fake, 'ArrowUp', 38),
+    pressTracked(fake, 'ArrowDown', 40),
+    pressTracked(fake, 'Enter', 13),
+    pressTracked(fake, 'GoBack', 10009),
+    pressTracked(fake, 'Escape', 27),
+  ];
+
+  assert.deepEqual(actions, [['up'], ['down'], ['select'], ['back'], ['back']]);
+  assert.deepEqual(prevented, [true, true, true, true, true]);
 });

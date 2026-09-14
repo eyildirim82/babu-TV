@@ -26,10 +26,31 @@ export function destroy() {
   resetNumberInput();
 }
 
+function isLiveTvSearchInputFocused() {
+  const active = document.activeElement;
+  return Boolean(active && active.classList && active.classList.contains('live-tv-search-input'));
+}
+
 function handleKeyDown(e) {
   if (!onKeyAction) return;
 
   const key = e.key || e.keyCode;
+
+  // Live TV Search owns text entry while its input has DOM focus. Only Search
+  // navigation reaches the app; letters, digits, space, Backspace and caret
+  // movement stay with the input.
+  if (isLiveTvSearchInputFocused()) {
+    let action = null;
+    if (key === 'ArrowUp' || e.keyCode === 38) action = 'up';
+    else if (key === 'ArrowDown' || e.keyCode === 40) action = 'down';
+    else if (key === 'Enter' || e.keyCode === 13) action = 'select';
+    else if (key === 'Escape' || key === 'GoBack' || e.keyCode === 27 || e.keyCode === 10009) action = 'back';
+    if (action !== null) {
+      e.preventDefault();
+      onKeyAction(action);
+    }
+    return;
+  }
 
   // When settings is visible, handle arrow navigation + back
   const settingsPage = document.getElementById('settings-page');
