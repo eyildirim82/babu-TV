@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "npm run dev -w player",
     "build": "npm run build -w player",
-    "test": "node --test player/test/*.test.js && npm run test:ts -w player",
-    "typecheck": "npm run typecheck -w player",
+    "test": "node --test player/test/*.test.js && npm run test:ts -w player && npm run test -w relay",
+    "typecheck": "npm run typecheck -w player && npm run typecheck -w relay",
     "brand:check": "node tools/check-legacy-brand.mjs",
     "tizen": "cd tizen && node package.mjs",
     "tizen:build": "node tizen/stage.mjs",
@@ -15,11 +15,14 @@
     "tizen:emu": "npm run tizen:build && npm run tizen:package && node tizen/deploy.mjs",
     "tizen:log": "node tizen/dlog.mjs",
     "rc:browser": "playwright test -c tools/rc-browser/playwright.config.mjs",
-    "rc:browser:list": "playwright test -c tools/rc-browser/playwright.config.mjs --list"
+    "rc:browser:list": "playwright test -c tools/rc-browser/playwright.config.mjs --list",
+    "relay:build": "npm run build -w relay",
+    "relay:start": "npm run start -w relay"
   },
   "workspaces": [
     "player",
-    "tizen"
+    "tizen",
+    "relay"
   ],
   "keywords": [
     "tizen",

@@ -3,6 +3,7 @@ node_modules/
 
 # Build outputs
 player/dist/
+relay/dist/
 
 # Tizen build artifacts
 tizen/temp-wgt/
