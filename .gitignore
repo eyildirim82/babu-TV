@@ -36,3 +36,7 @@ Thumbs.db
 
 # Tizen CLI staging output
 tizen/build/
+/test-results/
+/tools/rc-browser/test-results/
+/playwright-report/
+/rc-browser-artifacts/

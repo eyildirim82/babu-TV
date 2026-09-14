@@ -1,0 +1,252 @@
+name: rc-browser
+
+on:
+  push:
+    branches:
+      - verification/v1-rc-browser
+      - verification/v1-rc-browser-h1
+      - verification/v1-rc-browser-h2
+      - 'verification/rc-browser-qualify/**'
+
+permissions:
+  contents: read
+
+jobs:
+  browser-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      RC_BROWSER_H0_SHA: 61cb2198fee982ae3b3a61398dc120738d3405b4
+      RC_PRODUCTION_SHA: eaa928c6b0d9b71b1ae91f9f0424ffd166b7c03f
+    steps:
+      - name: Checkout trusted trigger revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Resolve exact qualification target
+        id: meta
+        shell: bash
+        env:
+          TRIGGER_SHA: ${{ github.sha }}
+          TRIGGER_REF: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mode=''
+          slug=''
+          worker_ref=''
+          spec=''
+          fixture=''
+          sha=''
+
+          case "${TRIGGER_REF}" in
+            verification/v1-rc-browser|verification/v1-rc-browser-h1|verification/v1-rc-browser-h2)
+              mode='integration'
+              slug='integration'
+              sha="${TRIGGER_SHA}"
+              ;;
+            verification/rc-browser-qualify/provider)
+              mode='worker'
+              slug='provider'
+              worker_ref='verification/rc-browser-provider'
+              spec='tools/rc-browser/specs/pack-a-provider.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-a-provider.mjs'
+              ;;
+            verification/rc-browser-qualify/live)
+              mode='worker'
+              slug='live'
+              worker_ref='verification/rc-browser-live'
+              spec='tools/rc-browser/specs/pack-b-live.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-b-live.mjs'
+              ;;
+            verification/rc-browser-qualify/play-nav)
+              mode='worker'
+              slug='play-nav'
+              worker_ref='verification/rc-browser-play-nav'
+              spec='tools/rc-browser/specs/pack-b-play-nav.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-b-play-nav.mjs'
+              ;;
+            verification/rc-browser-qualify/state)
+              mode='worker'
+              slug='state'
+              worker_ref='verification/rc-browser-state'
+              spec='tools/rc-browser/specs/pack-c-state.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-c-state.mjs'
+              ;;
+            verification/rc-browser-qualify/security-pairing)
+              mode='worker'
+              slug='security-pairing'
+              worker_ref='verification/rc-browser-security-pairing'
+              spec='tools/rc-browser/specs/pack-c-security-pairing.spec.mjs'
+              fixture='tools/rc-browser/fixtures/pack-c-security-pairing.mjs'
+              ;;
+            *)
+              echo "Unapproved RC browser trigger branch: ${TRIGGER_REF}"
+              exit 1
+              ;;
+          esac
+
+          if [[ "${mode}" == 'worker' ]]; then
+            git fetch --no-tags origin "+refs/heads/${worker_ref}:refs/remotes/origin/${worker_ref}"
+            sha="$(git rev-parse "refs/remotes/origin/${worker_ref}")"
+          fi
+
+          if [[ ! "${sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid qualification SHA: ${sha}"
+            exit 1
+          fi
+
+          echo "mode=${mode}" >> "${GITHUB_OUTPUT}"
+          echo "slug=${slug}" >> "${GITHUB_OUTPUT}"
+          echo "worker_ref=${worker_ref}" >> "${GITHUB_OUTPUT}"
+          echo "spec=${spec}" >> "${GITHUB_OUTPUT}"
+          echo "fixture=${fixture}" >> "${GITHUB_OUTPUT}"
+          echo "sha=${sha}" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout exact worker head
+        if: steps.meta.outputs.mode == 'worker'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach "${{ steps.meta.outputs.sha }}"
+
+      - name: Assert exact qualification checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.meta.outputs.sha }}"
+
+      - name: Assert immutable H0 worker ancestry and exact scope
+        if: steps.meta.outputs.mode == 'worker'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${RC_BROWSER_H0_SHA}^{commit}"
+          merge_base="$(git merge-base "${RC_BROWSER_H0_SHA}" HEAD)"
+          test "${merge_base}" = "${RC_BROWSER_H0_SHA}"
+          git diff --check "${RC_BROWSER_H0_SHA}...HEAD"
+
+          actual="$(git diff --name-only "${RC_BROWSER_H0_SHA}...HEAD" | LC_ALL=C sort)"
+          expected="$(printf '%s\n%s\n' '${{ steps.meta.outputs.spec }}' '${{ steps.meta.outputs.fixture }}' | LC_ALL=C sort)"
+          if [[ "${actual}" != "${expected}" ]]; then
+            echo 'Unexpected worker diff:'
+            printf '%s\n' "${actual}"
+            echo 'Expected exactly:'
+            printf '%s\n' "${expected}"
+            exit 1
+          fi
+
+          if printf '%s\n' "${actual}" | grep -q '^player/src/'; then
+            echo 'Forbidden player/src change detected.'
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install chromium
+
+      - name: Install Chromium system dependencies
+        run: npx playwright install-deps chromium
+
+      - name: Build production player
+        run: npm run build
+
+      - name: Run repository tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Assert exact Playwright dependency
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          if (pkg.devDependencies?.['@playwright/test'] !== '1.63.0') process.exit(1);
+          if (lock.packages?.['']?.devDependencies?.['@playwright/test'] !== '1.63.0') process.exit(1);
+          if (lock.packages?.['node_modules/@playwright/test']?.version !== '1.63.0') process.exit(1);
+          NODE
+
+      - name: Run focused worker browser qualification
+        if: steps.meta.outputs.mode == 'worker'
+        run: npm run rc:browser -- "${{ steps.meta.outputs.spec }}"
+
+      - name: Run worker security/privacy audit
+        if: steps.meta.outputs.mode == 'worker' && steps.meta.outputs.slug == 'security-pairing'
+        run: node tools/check-m7-security-privacy.mjs
+
+      - name: Run H0 browser smoke
+        if: steps.meta.outputs.mode == 'integration'
+        run: npm run rc:browser -- tools/rc-browser/specs/harness-smoke.spec.mjs
+
+      - name: Run all integrated browser packs present at exact head
+        if: steps.meta.outputs.mode == 'integration'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t packs < <(find tools/rc-browser/specs -maxdepth 1 -type f -name 'pack-*.spec.mjs' | LC_ALL=C sort)
+          for spec in "${packs[@]}"; do
+            echo "Running integrated browser pack: ${spec}"
+            npm run rc:browser -- "${spec}"
+          done
+
+      - name: Run integrated security/privacy audit when security pack is present
+        if: steps.meta.outputs.mode == 'integration'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f tools/rc-browser/specs/pack-c-security-pairing.spec.mjs ]]; then
+            node tools/check-m7-security-privacy.mjs
+          fi
+
+      - name: Assert canonical qualification scope
+        if: steps.meta.outputs.mode == 'integration'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check "${RC_PRODUCTION_SHA}...HEAD"
+          changed="$(git diff --name-only "${RC_PRODUCTION_SHA}...HEAD")"
+          if printf '%s\n' "${changed}" | grep -q '^player/src/'; then
+            echo 'Forbidden player/src change detected.'
+            exit 1
+          fi
+
+          allowed='^(package\.json|package-lock\.json|\.gitignore|\.github/workflows/rc-browser\.yml|tools/rc-browser/playwright\.config\.mjs|tools/rc-browser/lib/harness\.mjs|tools/rc-browser/lib/widgetdata-stub\.mjs|tools/rc-browser/lib/provider-mocks\.mjs|tools/rc-browser/lib/evidence\.mjs|tools/rc-browser/fixtures/common\.mjs|tools/rc-browser/specs/harness-smoke\.spec\.mjs|tools/rc-browser/specs/pack-[^/]+\.spec\.mjs|tools/rc-browser/fixtures/pack-[^/]+\.mjs|docs/verification/rc-browser-execution\.md)$'
+          unexpected="$(printf '%s\n' "${changed}" | grep -Ev "${allowed}" || true)"
+          if [[ -n "${unexpected}" ]]; then
+            echo 'Unexpected canonical qualification paths:'
+            printf '%s\n' "${unexpected}"
+            exit 1
+          fi
+
+      - name: Ensure verification did not modify tracked files
+        run: git diff --exit-code
+
+      - name: Upload exact-head worker evidence
+        if: always() && steps.meta.outputs.mode == 'worker'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc-browser-${{ steps.meta.outputs.slug }}-${{ steps.meta.outputs.sha }}
+          path: rc-browser-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload exact-head integration evidence
+        if: always() && steps.meta.outputs.mode == 'integration'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc-browser-integration-${{ steps.meta.outputs.sha }}
+          path: rc-browser-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
