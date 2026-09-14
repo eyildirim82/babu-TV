@@ -84,7 +84,7 @@ Scenario IDs follow the implemented packs rather than the plan's draft numbering
 | `f2f154c` | C09 | The shared EPG fixture's 1970 timestamps were discarded by the EPG window, so the persisted-EPG sub-check was NOT-AVAILABLE. C09 now seeds a current/next pair and requires it to survive the degraded refresh. |
 | `77f8144` | C08 | The delete confirmation replaces every provider row, so "row absent" was true before Sil was handled. Wait for the confirmation to close with no delete error, then assert the credential document. |
 | `7f4e00c` | S08–S12 | Replaced the single NOT-AVAILABLE phone row with real scenarios (details in the matrix). |
-| `2ebdc4c` | B06, B07 | A diagnostic timeline showed DOWN sent 68 ms after Search opened, before results existed. Wait for Search input focus before typing and for results before navigating. |
+| `2ebdc4c` | B07, B06 | A diagnostic timeline showed B07 sending DOWN 68 ms after Search opened, before results existed. Wait for Search input focus before typing and for results before navigating. B06 still needed one retry afterwards (see open observations). |
 | `d51e1f8` | B11 (all Live re-entry) | A CI diagnostic timeline showed `openLiveTv()` returning while Home was still on screen: provider entry is awaited before Home is swapped out, and a previous session's channel list stays in the closed sidebar, which Playwright treats as visible. ~26 ms later the pending swap removed the Home that `backToHome()` had matched. Wait for Home to leave and the sidebar to open. |
 | `583390c` → `2cdde2b` | — | Temporary B11 timeline recorder, reverted after the root cause was fixed. |
 | `02dcaaa` | gate | Ignore `tools/rc-browser/test-results/` (Playwright resolves `outputDir` relative to the config directory), so `git status --porcelain` stays clean after `npm run rc:browser`. |
@@ -155,6 +155,8 @@ Reload/persistence rows are GREEN: provider and active-provider identity (C01, C
 Qualification diff against `8b0f340` touches only `.github/workflows/rc-browser.yml`, `.gitignore`, `package.json`, `package-lock.json` and `tools/rc-browser/**`, plus this document.
 
 ## Open observations (not RC-BROWSER blockers)
+
+- **B06 intermittent first query.** In run `34830458201` (board commit `3ffdacf`) B06 passed only on retry: after Search owned input focus, the first query `İ` showed no result within 5 s. The feature composition keeps the search query across background refreshes, so a refresh-reset defect is not indicated, but the cause is not yet proven. It did not recur in runs `34829196455` (×2) or `34829839575`. Track it before RC-PACKAGE; do not paper over it with blind retries.
 
 - **Credential store concurrency.** `SamsungWidgetDataCredentialStore` performs an unserialized read-modify-write of one WidgetData document for `save` and `remove`. Concurrent operations could lose an update (resurrect a removed credential or drop a new one). No scenario reproduced it; the C08 flake traced to test synchronization. Needs a separate bounded review.
 - **Interrupted onboarding.** With post-registration sync artificially delayed, reloading between registration and compensation left a registered provider and booted to Home. This is outside the approved failure matrix (it needs a mid-transaction reload) and was not investigated further.
