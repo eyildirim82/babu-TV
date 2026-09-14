@@ -2,9 +2,9 @@
 
 Date: 2026-09-14
 Owner: REVIEW / Integration Controller
-Status: READY FOR CONTROLLER ACCEPTANCE — `1.0.0-rc.2` build, staging, package and browser gates GREEN on the exact candidate head; physical Samsung/Tizen install and runtime rows remain NOT VERIFIED / DEFERRED
+Status: ACCEPTED — controller accepted `1.0.0-rc.2` on 2026-09-14 at package candidate `77b0a5b`; physical Samsung/Tizen install and runtime rows remain NOT VERIFIED / DEFERRED
 
-Method and check definitions: `docs/verification/rc-package-execution.md` (rc.1). This board records only what differs and the rc.2 results. It does not mark the candidate `ACCEPTED`; that transition belongs to the controller.
+Method and check definitions: `docs/verification/rc-package-execution.md` (rc.1). This board records only what differs and the rc.2 results. The controller's `ACCEPTED` decision is recorded under "Controller acceptance record"; `CLOSED / GREEN` follows once this branch is merged to `main` with a SUCCESS post-merge verify.
 
 ## Why rc.2
 
@@ -79,6 +79,22 @@ Carried from rc.1:
 ## Physical Samsung/Tizen — NOT VERIFIED / DEFERRED
 
 Unchanged from rc.1. Building, staging, signing and archive inspection do not prove install, launch, WidgetData persistence, remote keys, AVPlay fallback, lifecycle, long playback, network loss, TV + phone pairing, or final install smoke.
+
+## Controller acceptance record
+
+| Item | Value |
+| --- | --- |
+| Decision | `RC-PACKAGE 1.0.0-rc.2 — IN PROGRESS → ACCEPTED` |
+| Date | 2026-09-14 |
+| Decided by | Controller (repository owner) |
+| Accepted candidate | `1.0.0-rc.2`, package candidate commit `77b0a5b`; Tizen widget version `1.0.0` |
+| Accepted evidence head | `07cb5ce` (board), `verify` run `34861109862` SUCCESS; candidate head `77b0a5b` `verify` run `34860514185` SUCCESS |
+| Accepted local WGT | `babustv_beta_v1.0.0-rc.2_77b0a5b.wgt`, SHA-256 `ea127ca6ac2f8d47728ae603cb99409c7ed5fee96e057a703e6eb3df18acecf1` (not distributed) |
+| Merge method | merge commit, so `77b0a5b` stays reachable from `main` |
+| Release tag | controller approved annotated `v1.0.0-rc.2` at `77b0a5b`, no GitHub Release |
+| Next transition | `ACCEPTED → CLOSED / GREEN` when PR #140 merges and post-merge verify is SUCCESS |
+
+Acceptance does not change any `NOT VERIFIED / DEFERRED` physical-device row, and the open observations stay open.
 
 ## Controller acceptance checklist
 
