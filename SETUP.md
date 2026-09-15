@@ -80,6 +80,10 @@ npm run tizen:emu        # build + package + sdb'den hedef seç + install + run
 npm run tizen:log        # sdb dlog, uygulama ve web çalışma zamanı filtreli
 ```
 
+`tizen:emu` adına rağmen emülatöre özel değildir. `sdb devices` listesindeki ilk
+cihaza kurar, o cihaz gerçek bir TV de olabilir. Paketleme profili
+`TIZEN_PROFILE` ile seçilir; gerçek TV için `TIZEN_PROFILE=samsung` gerekir.
+
 Custom packaging hattı için:
 
 ```
@@ -129,8 +133,71 @@ sertifikası Tizen Developers CA ile imzalı, dağıtıcı sertifikası SDK'nın
 - **Geçerlilik: 27 Aralık 2026.** Tizen Developers CA 1 Ocak 2027'de dolduğu için
   daha uzun süre verilemedi. O tarihten sonra sertifika yeniden üretilmeli.
 
-Bu profil sadece emülatör ve geliştirme içindir. Gerçek Samsung TV'ye mağaza
-dağıtımı için Samsung'un kendi sertifika uzantısıyla üretilmiş sertifika gerekir.
+Bu profil sadece emülatör içindir. Perakende Samsung TV bu zinciri reddeder:
+
+```
+install failed[118, -12], reason: Check certificate error :
+:Invalid certificate chain with certificate in signature.:<-3>
+```
+
+### Samsung sertifikası
+
+Gerçek TV için `samsung` profili kullanılır. Yazar sertifikası Samsung VD Author
+CA, dağıtıcı sertifikası VD DEVELOPER Public CA Class tarafından imzalanır ve
+dağıtıcı sertifikası hedef TV'nin DUID'ine bağlanır.
+
+- Sertifikalar: `C:\Users\erkan\SamsungCertificate\samsung\`
+- Geçerlilik: 9 Eylül 2027
+- Üretim aracı: Certificate Manager GUI, Samsung hesabı girişi gerektirir
+
+Sertifikayı üretmek için iki paket gerekiyor. Paket yöneticisi bu makinede bozuk
+olduğundan ikisi de elle kuruldu, `data/` ağacı SDK köküne açılarak:
+
+| Paket | Kaynak |
+| --- | --- |
+| `certificate-manager-product_1.3.11_windows-64.zip` | `download.tizen.org/sdk/tizenstudio/official/binary/` |
+| `cert-add-on_2.0.75_windows-64.zip` | `download.tizen.org/sdk/extensions/tizen-certificate-extension_2.0.75.zip` içinde |
+
+Samsung Certificate Extension'ın Samsung'un kendi deposundan indirilmesi
+gerekmiyor; `download.tizen.org/sdk/extensions/` altında açık duruyor. Samsung'un
+`developer.samsung.com/sdk-manager/repository/` adresleri 403 döndürüyor.
+
+TV'nin DUID'i:
+
+```
+sdb -s <TV_IP>:26101 shell 0 getduid
+```
+
+Sihirbaz sırası: `+` ile yeni profil, sertifika tipi **Samsung**, cihaz tipi
+**TV**, Samsung hesabıyla giriş, yazar sertifikası parolası, dağıtıcı adımında
+privilege **Public** ve DUID.
+
+## Gerçek TV'ye kurulum
+
+TV'de Apps ekranında kumandadan `1 2 3 4 5`, Developer mode `On`, host PC IP'si
+girilir, TV yeniden başlatılır. Ardından:
+
+```
+sdb connect <TV_IP>:26101
+sdb devices
+npm run tizen:build
+TIZEN_PROFILE=samsung npm run tizen:package
+node tizen/deploy.mjs
+```
+
+`deploy.mjs` önce `tizen install` dener, o çökerse sdb üzerinden `vd_appinstall`
+yoluna düşer. Başlatma da aynı şekilde `tizen run`, sonra `was_execute` sırasını
+izler. Elle yapmak gerekirse:
+
+```
+sdb -s <serial> push <wgt> /home/owner/share/tmp/sdk_tools/tmp/
+sdb -s <serial> shell 0 vd_appinstall BabusTVApp /home/owner/share/tmp/sdk_tools/tmp/<wgt>
+sdb -s <serial> shell 0 was_execute BabusTVApp.BabusTV
+```
+
+Git Bash bu yolları Windows yoluna çevirip push'u bozar. `MSYS_NO_PATHCONV=1`
+verilmeli veya PowerShell kullanılmalı. sdb bağlantısı kendiliğinden düşebiliyor,
+kurulumdan önce `sdb devices` ile doğrula.
 
 ## Bilinen sınırlar
 
@@ -194,6 +261,27 @@ hem okurken `NullPointerException` atıyor. Sebep, parola şifreleyici
 Parola alanı ya bir `.pwd` dosyasının yolu ya da satır içi şifreli metin olabilir.
 Satır içi biçim seçildi. Boş bir `distributor="2"` öğesi eklenmemeli, okuyucu
 onda çöküyor. Yazar öğesinde `author="true"` olmalı.
+
+**4. `tizen install` çöküyor.** Cihaza hiç ulaşmadan
+`TargetUtil.getTargets(TargetUtil.java:96)` içinde `NullPointerException` atıyor.
+`sdb devices` cihazı düzgün listelerken bile oluyor.
+
+Çözüm: `tizen/deploy.mjs` bu komut başarısız olduğunda sdb üzerinden TV'nin kendi
+`vd_appinstall` komutuna düşüyor. Aynı şekilde `tizen run` yerine `was_execute`.
+
+**5. Certificate Manager'ın yazdığı profil CLI tarafından okunamıyor.** GUI,
+parola alanına `.pwd` dosya yolu yazıyor. `SigningProfile.stored()` yalnız `.pwd`
+ile bitmeyen değerlere `true` diyor, yol biçiminde kod `CryptFactory.getCrypt()`
+yoluna gidiyor, o da bu SDK'da `null` dönüp `readProfileItem` satır 265'te
+çöküyor. GUI ayrıca `author="true"` özniteliğini düşürüyor ve boş
+`distributor="2"` öğeleri ekliyor, yani 3 numaralı hata tekrar tetikleniyor.
+
+Çözüm: profil dosyası elle yazıldı. Parolalar `org.tizen.common.util.CipherUtil`
+sınıfının `getEncryptedString` metoduyla satır içi şifreli biçime çevrildi. Bu
+sınıf `C:\tizen-studio\tools\ide\lib-ncli\` altındaki jar'larda. Parola boş
+kalırsa CLI interaktif soruyor ve npm altında konsol olmadığı için
+`ConsolePrompter.password` yine `NullPointerException` atıyor, bu yüzden yazmadan
+önce parolanın `.p12` dosyasını gerçekten açtığı doğrulanmalı.
 
 ## Güvenlik notları
 

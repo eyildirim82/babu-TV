@@ -66,11 +66,23 @@ export function pickTarget() {
 
 // Reads the <tizen:application package="..."> value that config.xml declares.
 export function packageId() {
+  return configAttribute('package');
+}
+
+// Reads the <tizen:application id="..."> value that config.xml declares.
+export function applicationId() {
+  return configAttribute('id');
+}
+
+function configAttribute(name) {
   const config = readFileSync(join(TIZEN_DIR, 'config.xml'), 'utf-8');
-  const m = config.match(/<tizen:application\b[^>]*\bpackage="([^"]+)"/);
+  const m = config.match(new RegExp(`<tizen:application\\b[^>]*\\b${name}="([^"]+)"`));
   if (!m) {
-    console.error('[tizen] could not read package id from config.xml');
+    console.error(`[tizen] could not read ${name} from config.xml`);
     process.exit(1);
   }
   return m[1];
 }
+
+// Staging directory the TV's developer mode exposes to sdb push.
+export const TV_TMP_DIR = '/home/owner/share/tmp/sdk_tools/tmp';
