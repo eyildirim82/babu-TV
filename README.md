@@ -135,6 +135,7 @@ Paket `tizen/build/` altında aynı canonical adlandırmayla bırakılır. Ayrı
 ## Belgeler
 
 - [V1 ürün ve mimari tasarımı](docs/superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md)
+- [Devir belgesi](HANDOVER.md)
 - [V1 RC hazırlık panosu](docs/verification/v1-rc-readiness.md)
 - Kararlar: [ADR 0001 upstream](docs/decisions/0001-controlled-upstream-divergence.md), [ADR 0002 kimlik bilgisi deposu](docs/decisions/0002-tizen-credential-storage.md), [ADR 0003 relay barındırma](docs/decisions/0003-pairing-relay-hosting.md)
 - [Güvenlik](docs/SECURITY.md) · [Telemetri](docs/TELEMETRY.md)
