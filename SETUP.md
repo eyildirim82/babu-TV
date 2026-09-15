@@ -51,8 +51,10 @@ başlatmadan sonra tekrar denenmeli.
 
 ## Uygulama yapısı
 
-Proje Next.js değil. Vite 6 tabanlı vanilla JS SPA, `shaka-player` kullanıyor,
-npm workspaces ile iki paket: `player/` ve `tizen/`.
+Proje Next.js değil. Vite 6 tabanlı, TypeScript ve JavaScript modüllerinden oluşan bir SPA;
+`shaka-player` kullanıyor. npm workspaces üç paket içeriyor: `player/`, `tizen/` ve
+`relay/` (telefonla eşleştirme relay'i). `relay-cloudflare/` bilerek workspace dışında
+tutulan ayrı bir pakettir; kendi `npm ci` komutuyla kurulur (bkz. `relay-cloudflare/README.md`).
 
 Statik çıktı `player/dist` altında üretiliyor. Tizen paketi için build
 `--base=./` ile çalıştırılıyor, böylece asset yolları göreli oluyor ve `.wgt`
@@ -96,6 +98,13 @@ em-cli detail -n tv-emu
 sdb devices
 ```
 
+Telefonla eşleştirme relay'i:
+
+```
+npm run relay:build          # relay/ Node sunucusunu derler
+npm run relay:start          # yerel relay (HTTPS için ters proxy gerekir)
+```
+
 Tarayıcıda hızlı test (Tizen API'leri çalışmaz, arayüz ve oynatıcı çalışır):
 
 ```
@@ -106,8 +115,14 @@ Adres: `http://localhost:5173/babustv/`
 
 ## Sertifika
 
-`dev` adlı güvenlik profili aktif. Yazar sertifikası Tizen Developers CA ile
-imzalı, dağıtıcı sertifikası SDK'nın kendi public signer'ı.
+**Güncel durum (2026-09-15):** bu makinede `samsung` (aktif) ve `tizen` güvenlik
+profilleri var; `dev` profili artık yok. `tizen/wgt.mjs` varsayılan olarak `dev`
+profilini ister ve profil yoksa imzalamadan önce durup mevcut profilleri listeler.
+`TIZEN_PROFILE=samsung` sahibin kişisel Samsung yazar ve dağıtıcı sertifikalarını
+kullanır; her kullanımda sahibin onayı gerekir.
+
+İlk kurulumda (aşağıdaki kayıt) `dev` adlı güvenlik profili oluşturulmuştu. Yazar
+sertifikası Tizen Developers CA ile imzalı, dağıtıcı sertifikası SDK'nın kendi public signer'ı.
 
 - Yazar sertifikası: `C:\tizen-studio-data\keystore\author\dev.p12`
 - Profil: `C:\tizen-studio-data\profile\profiles.xml`

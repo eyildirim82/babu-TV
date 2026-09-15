@@ -1,5 +1,7 @@
 # BUGS — EN TV Player (Bug Tracker)
 
+> **Inherited EN TV Player document (2026-08), kept for history.** It predates BabuşTV's V1 architecture and its statuses, file names and plans are not current. BabuşTV defects are root-caused and fixed through pull requests and recorded in [CHANGELOG.md](../CHANGELOG.md) and the verification records under `docs/verification/`.
+
 > Log bugs immediately. Never delete entries. Resolved bugs move to bottom.
 
 ---

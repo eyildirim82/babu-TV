@@ -1,6 +1,29 @@
 # Changelog
 
-All notable changes to EN TV Player will be documented in this file.
+All notable changes to BabuşTV are documented in this file. Entries before `1.0.0-rc.1` are the inherited EN TV Player history.
+
+## [Unreleased]
+
+Changes merged to `main` after `1.0.0-rc.2`. They are not in any package yet; the next candidate (`1.0.0-rc.3`) will include them.
+
+### Added
+- Phone pairing works in normal builds. `player/public/pairing-config.js` points the TV at the default public relay and phone page, so the provider choice screen (First Run, and adding a provider from Provider Management) offers **Telefonla Ekle** (#146).
+- Pairing relay server: a dependency-free, self-hostable Node relay that carries only ciphertext, with single delivery, a 5-minute server-side lifetime, per-client limits and no request logging (#144).
+- Cloudflare deployment of the relay: a Worker with one Durable Object keeps all pairing state in memory and serves the phone page. It is deployed at `https://babustv-pairing-relay.babustv.workers.dev`, configured with Worker logs and traces disabled (#145).
+
+### Fixed
+- Live TV keeps the highlighted channel, category and Search result scrolled into view in long lists (#142).
+- Home explains an empty "Sık İzlenenler" row (#142).
+- Editing an Xtream provider's server updates its displayed name (#142).
+- A provider whose first sync was interrupted (for example by closing the app) is discarded at the next start instead of lingering unusable (#143).
+- What's New lists BabuşTV releases instead of the inherited EN TV Player history (#143).
+- `npm run tizen:package` stops before signing and lists the available profiles when the requested signing profile does not exist (#143).
+- The relay rate limiter no longer contains raw NUL bytes, which made Git treat the file as binary (#145).
+
+### Known limitations
+- Physical Samsung/Tizen acceptance, including pairing with a real phone camera, is still pending.
+
+---
 
 ## [1.0.0-rc.2] - 2026-09-14
 

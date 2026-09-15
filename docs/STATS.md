@@ -1,5 +1,7 @@
 # Download Stats
 
+> **Inherited EN TV Player document (2026-08), kept for history.** It predates BabuşTV's V1 architecture and its statuses, file names and plans are not current. The numbers below are for the upstream EN TV Player releases. As of 2026-09-15 BabuşTV has release-candidate tags (`v1.0.0-rc.1`, `v1.0.0-rc.2`) but no published GitHub release assets, so it has no download statistics yet.
+
 GitHub counts every `.wgt` download per release asset — direct installs and
 Apps2Samsung bundle installs share one counter, so per-source numbers are not
 available. Second-hand WGT sharing is invisible.

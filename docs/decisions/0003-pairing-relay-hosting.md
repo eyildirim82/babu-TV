@@ -1,6 +1,6 @@
 # ADR 0003 — Public Pairing Relay Hosting
 
-**Status:** Accepted by the owner on 2026-09-14; adapter implementation and deployment pending
+**Status:** Accepted by the owner on 2026-09-14; implemented in #145 and deployed on 2026-09-14 at `https://babustv-pairing-relay.babustv.workers.dev`; enabled in builds by #146
 
 ## Context
 
