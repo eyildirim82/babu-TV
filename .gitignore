@@ -17,9 +17,11 @@ tizen/unsigned.zip
 tizen/author-cert.pem
 tizen/author-key.pem
 
-# WGT files (use releases/ folder for distribution)
+# WGT packages are build output; signed packages are never committed
 *.wgt
-!releases/*.wgt
+
+# Editor/backup leftovers
+*.bak
 
 # Stable folder (build output)
 stable/
