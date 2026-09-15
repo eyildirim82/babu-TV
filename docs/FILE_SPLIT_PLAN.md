@@ -1,5 +1,7 @@
 # FILE_SPLIT_PLAN.md — BUG-002 File Splitting Plan
 
+> **Inherited EN TV Player document (2026-08), kept for history.** It predates BabuşTV's V1 architecture and its statuses, file names and plans are not current. The large inherited files were not split this way; new code lives in bounded TypeScript modules under `player/src/`. Current sources: [V1 product and architecture design](superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md) and [V1 RC readiness board](verification/v1-rc-readiness.md).
+
 > **Goal:** Split all files exceeding 300 LOC into smaller, focused modules.
 > **Rule:** Only move code, never modify logic. Test after each phase.
 

@@ -1,7 +1,7 @@
 # BabuşTV Pairing Relay on Cloudflare — Design
 
 **Date:** 2026-09-14
-**Status:** Draft
+**Status:** Implemented in #145 (merged 2026-09-14) and deployed by the owner on 2026-09-14; endpoints wired into builds by #146
 **Risk:** CRITICAL (public network service on the provider-credential pairing path)
 **Decision:** `docs/decisions/0003-pairing-relay-hosting.md`
 **Relay design:** `docs/superpowers/specs/2026-09-14-pairing-relay-server-design.md`

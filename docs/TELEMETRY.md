@@ -1,45 +1,33 @@
 # Telemetry (opt-in only)
 
-The app asks once on first launch: "Check for app updates on launch?"
-Default is **off**. The choice lives in Settings → Playback → "Check for
-updates" and can be revoked anytime. Declining disables all network activity
-described here.
+> **Updated:** 2026-09-15 for BabuşTV.
+
+BabuşTV collects no analytics and has no account. The only telemetry-like feature is an opt-in update check.
+
+The app asks once: "Uygulama açılırken güncellemeler denetlensin mi? Yalnızca anonim sürüm kontrolü yapılır; kişisel veri gönderilmez." Default is **off**. The choice lives in Settings → Oynatma → "Güncellemeleri denetle" and can be revoked anytime. Declining disables all network activity described in this section.
 
 ## What is sent (only when opted in)
 
 | Data | Purpose |
 |------|---------|
-| Update check: GET of a static `version.json` via jsDelivr CDN | Learn whether a newer release exists |
-| Usage ping: app version + `tizen`/`browser` device class | Count active installs per version |
+| Update check: GET of the static `version.json` from this repository via jsDelivr (`cdn.jsdelivr.net/gh/eyildirim82/babu-TV@main/version.json`) | Learn whether a newer release exists |
+| Usage ping: app version + `tizen`/`browser` device class | Count active installs per version — **not active**, see below |
 
-No IP addresses are stored by us, no identifiers, no viewing data, no playlist
-URLs. The CDN (jsDelivr) sees the requesting IP as with any download — same as
-fetching a playlist.
+No identifiers, viewing data, provider details or playlist URLs are sent. The CDN (jsDelivr) sees the requesting IP address as with any download.
 
 ## Status: ping endpoint not deployed
 
-`player/src/update.js` ships with `PING_URL = ''`. With it empty, the ping is
-a no-op and only the update check runs. To enable install counting, deploy
-this Cloudflare Worker (free tier) with a KV namespace named `COUNTS`:
+`player/src/update.js` ships with `PING_URL = ''`. While it is empty the ping is a no-op and only the update check runs. Enabling install counting would need a separately reviewed endpoint, a privacy note here and an entry in the deploy log.
 
-```js
-export default {
-  async fetch(req, env) {
-    const url = new URL(req.url);
-    const v = url.searchParams.get('v') || 'unknown';
-    const tv = url.searchParams.get('tv') || 'unknown';
-    const key = `installs:${v}:${tv}`;
-    const count = (await env.COUNTS.get(key)) || '0';
-    await env.COUNTS.put(key, String(Number(count) + 1));
-    return new Response('ok');
-  },
-};
-```
+## Phone pairing is not telemetry
 
-Then set `PING_URL` to the worker URL and note the deploy date below.
+The pairing relay (`docs/decisions/0003-pairing-relay-hosting.md`) is contacted only while the user is actively pairing a phone. It receives the session ID and an encrypted envelope; it does not log requests, and the Cloudflare deployment disables Worker logs and traces. Cloudflare still processes client IP addresses at its edge.
+
+Developer tooling: CI sets `WRANGLER_SEND_METRICS=false` so Wrangler's own usage telemetry is not sent from BabuşTV builds.
 
 ## Deploy log
 
 | Date | Change |
 |------|--------|
-| — | Ping endpoint not yet deployed |
+| — | Ping endpoint not deployed |
+| 2026-09-14 | Pairing relay deployed to Cloudflare (not a telemetry endpoint) |

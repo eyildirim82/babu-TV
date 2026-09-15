@@ -1,55 +1,92 @@
 # 📺 BabuşTV
 
-**Samsung Tizen TV için uzaktan kumanda odaklı IPTV oynatıcı** — HLS/DASH akışlarını, ClearKey ve PlayReady korumalı kanalları destekleyen Vite tabanlı TV uygulaması.
+**Samsung Tizen TV için kumanda odaklı, gizlilik öncelikli canlı TV uygulaması.** Xtream ve M3U sağlayıcılarını destekler; kanal rehberi, favoriler, arama ve telefonla şifreli sağlayıcı ekleme sunar.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tizen](https://img.shields.io/badge/Tizen-5.0+-red?logo=samsung)]()
 
-> **Current version: v1.0.0-rc.2** — [CHANGELOG](CHANGELOG.md)
+> **Son sürüm adayı: v1.0.0-rc.2** — [CHANGELOG](CHANGELOG.md). `main` dalında rc.2'den sonra gelen, henüz paketlenmemiş değişiklikler var (telefonla eşleştirme dahil). Gerçek Samsung TV kabul testleri henüz tamamlanmadı; durum için [V1 RC hazırlık panosu](docs/verification/v1-rc-readiness.md).
 
 ---
 
-## BabuşTV neden var?
+## Neler var
 
-Samsung Tizen TV'lerde bazı canlı yayınlar, özellikle DRM korumalı akışlar, genel amaçlı oynatıcılarda güvenilir çalışmayabilir. BabuşTV; TV kumandası, kanal listeleri ve Tizen playback yetenekleri etrafında tasarlanır.
+| | |
+|---|---|
+| 📡 Sağlayıcılar | Xtream (sunucu, kullanıcı adı, şifre) ve M3U/M3U8 playlist; birden fazla sağlayıcı, aynı anda biri aktif |
+| 🏠 Ana Sayfa | Sağlayıcı seçimi, Son İzlenen, Canlı TV, Favoriler, Sık İzlenenler, Ayarlar |
+| 📺 Canlı TV | Tam ekran yayın, OK ile açılan kategori/kanal/program paneli; gezinmek yayını değiştirmez, OK ile açılır |
+| 🗓️ Program rehberi | Şimdiki ve sonraki program, detay; Xtream EPG ve XMLTV |
+| ⭐ Favoriler ve arama | Sağlayıcıya özel favoriler; Türkçe karakter uyumlu yerel kanal araması |
+| 📱 Telefonla ekle | TV'deki QR kodu telefonla okutulur, sağlayıcı bilgisi telefonda şifrelenip TV'ye gönderilir |
+| 🔓 Oynatma | HLS/DASH/TS, ClearKey ve PlayReady; Shaka Player ve Samsung AVPlay yedeği, sınırlı ve sınıflandırılmış yeniden deneme |
+| 🎮 Kumanda | Temel çekirdek Yukarı/Aşağı/Sol/Sağ/OK/Geri ile çalışır; CH+/CH- ve numara tuşları destekleniyorsa |
+| 🔒 Gizlilik | Hesap yok, bulut senkronizasyonu yok; sağlayıcı şifreleri Samsung WidgetData güvenli deposunda tutulur ve loglanmaz |
 
-- 🔓 **DRM desteği** — ClearKey ve PlayReady akışları
-- 📡 **Sunucusuz kullanım** — M3U/M3U8 playlist URL'si doğrudan eklenebilir
-- 📺 **TV odaklı arayüz** — kumanda navigasyonu, kanal grupları ve sayı ile kanal seçimi
-- 🎚️ **Kanal bazlı proxy seçeneği** — gerektiğinde belirli akışlar için
-- 🔒 **Yerel veri** — ayarlar ve kanal verileri cihazda tutulur
-- 🆓 **MIT lisanslı açık kaynak**
+Kapsam dışı (V1): film/dizi (VOD), geçmiş yayın (catch-up), hesap sistemi, bulut senkronizasyonu. Ayrıntılar: [V1 ürün ve mimari tasarımı](docs/superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md).
+
+---
+
+## İlk çalıştırma
+
+1. Uygulamayı kurup açın; kısa tanıtım ekranında bir sağlayıcı türü seçin.
+2. **Xtream** veya **M3U** kartıyla bilgileri TV klavyesinden girin, ya da
+3. **Telefonla Ekle** kartını seçin, ekrandaki QR kodunu telefonunuzla okutun ve bilgileri telefonda girin.
+4. Kanallar yüklenince Ana Sayfa açılır.
+
+## Telefonla eşleştirme nasıl korunur
+
+- TV her eşleştirme için tek kullanımlık bir anahtar üretir; QR kodunda yalnızca oturum bilgisi ve TV'nin açık anahtarı bulunur, sağlayıcı bilgisi bulunmaz.
+- Telefon, sağlayıcı bilgisini tarayıcıda TV'nin anahtarıyla şifreler (ECDH P-256 + AES-GCM).
+- Arada çalışan **relay** yalnızca şifreli veriyi taşır; çözemez, sağlayıcıya bağlanmaz, istek içeriğini loglamaz. Oturum 5 dakika geçerlidir ve tek kez teslim edilir.
+- Varsayılan relay BabuşTV'nin Cloudflare üzerindeki servisidir (`babustv-pairing-relay.babustv.workers.dev`). Cloudflare, her web servisinde olduğu gibi bağlanan IP adreslerini kendi altyapısında işler.
+- Kendi relay'inizi çalıştırabilirsiniz: [relay/README.md](relay/README.md) (Node, kendi sunucunuz) veya [relay-cloudflare/README.md](relay-cloudflare/README.md) (kendi Cloudflare hesabınız). Adresler [`player/public/pairing-config.js`](player/public/pairing-config.js) dosyasındadır.
 
 ---
 
 ## Geliştirme
 
-Gereksinimler: güncel Node.js ve npm.
+Gereksinimler: Node.js 22 veya üzeri, npm.
 
 ```bash
 npm ci
 npm run dev
 ```
 
-Tarayıcı geliştirme adresi:
-
-```text
-http://localhost:5173/babustv/
-```
-
-Üretim build'i:
-
-```bash
-npm run build
-```
+Tarayıcı geliştirme adresi: `http://localhost:5173/babustv/`
 
 Doğrulama:
 
 ```bash
-npm test
+npm test              # player, relay testleri
 npm run typecheck
+npm run build
+npm run relay:build
 npm run brand:check
 ```
+
+Cloudflare relay paketi ayrı kurulur (kök çalışma alanına dahil değildir):
+
+```bash
+cd relay-cloudflare
+npm ci
+npm run typecheck
+npm test              # yerel Workers çalışma ortamında, hesap gerekmez
+npm run build         # yayına almadan deneme paketi
+```
+
+Depo yapısı:
+
+| Klasör | İçerik |
+|---|---|
+| `player/` | TV uygulaması (Vite, TypeScript + JS) |
+| `relay/` | Eşleştirme relay çekirdeği ve Node sunucusu |
+| `relay-cloudflare/` | Relay'in Cloudflare Workers + Durable Object dağıtımı |
+| `tizen/` | Tizen paketleme araçları |
+| `tools/rc-browser/` | Tarayıcı sürüm adayı test paketleri |
+| `docs/` | Tasarımlar, kararlar (ADR), planlar ve doğrulama kayıtları |
+
+Katkıda bulunurken önce [AGENTS.md](AGENTS.md) ve [docs/REPO_RULES.md](docs/REPO_RULES.md) dosyalarını okuyun.
 
 ---
 
@@ -86,7 +123,7 @@ stable/babustv_stable_v<version>_<commit>.wgt
 
 ```bash
 npm run tizen:build
-npm run tizen:package
+TIZEN_PROFILE=<profil-adı> npm run tizen:package
 ```
 
 Paket `tizen/build/` altında aynı canonical adlandırmayla bırakılır. Ayrıntılar için [tizen/README.md](tizen/README.md) ve Windows geliştirme ortamı notları için [SETUP.md](SETUP.md) dosyasına bakın.
@@ -95,31 +132,17 @@ Paket `tizen/build/` altında aynı canonical adlandırmayla bırakılır. Ayrı
 
 ---
 
-## Özellikler
+## Belgeler
 
-| | |
-|---|---|
-| 🔓 DRM playback | ClearKey + PlayReady |
-| 📃 Playlists | M3U/M3U8, birden fazla kayıtlı playlist |
-| 🗂️ Organizasyon | Kanal grupları, sıralama, hızlı sayı ile seçim |
-| 🎚️ Proxy | Kanal bazlı proxy seçimi |
-| 📶 Playback | Akış formatı algılama ve recovery mekanizmaları |
-| 🎮 Remote-first | Samsung kumanda tuşları ve kanal geçişleri |
-
----
-
-## İlk çalıştırma
-
-1. Uygulamayı kurup açın.
-2. Ayarlardan M3U/M3U8 playlist URL'sini ekleyin.
-3. Playlist'i yükleyip kanal seçin.
-
----
+- [V1 ürün ve mimari tasarımı](docs/superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md)
+- [V1 RC hazırlık panosu](docs/verification/v1-rc-readiness.md)
+- Kararlar: [ADR 0001 upstream](docs/decisions/0001-controlled-upstream-divergence.md), [ADR 0002 kimlik bilgisi deposu](docs/decisions/0002-tizen-credential-storage.md), [ADR 0003 relay barındırma](docs/decisions/0003-pairing-relay-hosting.md)
+- [Güvenlik](docs/SECURITY.md) · [Telemetri](docs/TELEMETRY.md)
 
 ## Hata raporu ve katkı
 
-Issue açarken TV modeli, Tizen sürümü, uygulama sürümü ve tekrar üretme adımlarını ekleyin. Mevcut issue'ları önce kontrol edin ve her issue'da tek problemi ele alın.
+Issue açarken TV modeli, Tizen sürümü, uygulama sürümü ve tekrar üretme adımlarını ekleyin. Sağlayıcı adresi, kullanıcı adı, şifre veya playlist bağlantısı paylaşmayın. Mevcut issue'ları önce kontrol edin ve her issue'da tek problemi ele alın.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Mevcut lisans ve repository geçmişi proje provenance'ını korur.
+MIT — see [LICENSE](LICENSE). BabuşTV, [EN TV Player](docs/UPSTREAM_BASELINE.md) tabanından kontrollü olarak ayrılmış bağımsız bir üründür; lisans ve repository geçmişi proje kökenini korur.

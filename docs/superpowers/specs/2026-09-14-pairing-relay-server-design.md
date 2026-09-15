@@ -1,7 +1,7 @@
 # BabuşTV Pairing Relay Server Design
 
 **Date:** 2026-09-14
-**Status:** Draft — awaiting owner review (independent review findings applied)
+**Status:** Implemented in #144 (merged 2026-09-14); memory budget and shared helpers added in #145
 **Risk:** CRITICAL (public network service on the provider-credential pairing path)
 **Parent spec:** `docs/superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md` §11
 **Client contract (merged):** `player/src/pairing/relay-contracts.ts`, `player/src/pairing/relay-client.ts`

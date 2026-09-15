@@ -262,6 +262,8 @@ Validate staged package identity, app/package IDs, title, icon, privileges, rela
 
 ### M6 — Encrypted QR / Phone Pairing
 
+> **Status (2026-09-15):** M6 stays in V1. TV/phone pairing merged in Waves 3–5. The public and self-host relay were completed by #144 (Node relay), #145 (Cloudflare deployment, ADR 0003) and #146 (default public relay config); the public relay is live. Physical-TV pairing acceptance is pending with the next release candidate.
+
 The approved V1 product spec includes optional encrypted QR/phone provider entry. It is not required for the TV keyboard path to work.
 
 If M6 stays in `1.0.0`, implement and verify before RC:

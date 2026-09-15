@@ -1,5 +1,7 @@
 # TAD — EN TV Player (Technical Architecture Document)
 
+> **Inherited EN TV Player document (2026-08), kept for history.** It predates BabuşTV's V1 architecture and its statuses, file names and plans are not current. Current sources: [V1 product and architecture design](superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md) and [V1 RC readiness board](verification/v1-rc-readiness.md). Repository layout: [AGENTS.md](../AGENTS.md).
+
 > **Version:** 1.0 · **Date:** 2026-08-28
 > **Hard rule:** Every code file ≤ 300 LOC.
 

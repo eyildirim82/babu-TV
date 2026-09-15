@@ -8,6 +8,8 @@
 - `fix/*` — bug fixes
 - `refactor/*` — behavior-preserving structural work
 - `spike/*` — bounded technical investigations
+- `integration/*`, `hardening/*`, `foundation/*` — controller-coordinated waves that reach `main` through pull requests
+- `verification/*`, `verify/*`, `evidence/*` — CI evidence for an exact head; never merged into `main`
 
 ## Pull Requests
 
@@ -15,7 +17,7 @@
 - Keep each PR bounded to one behavior or one architectural step.
 - The exact PR head must pass required verification before completion or merge claims.
 - Merge only after explicit user approval.
-- Prefer squash merge for BabuşTV-owned development unless preserving imported history is the explicit task.
+- Use a merge commit when the exact commits that CI or release qualification verified must stay reachable from `main`, as for all V1 RC work. Squash merge is acceptable for small self-contained changes.
 
 ## Commits
 

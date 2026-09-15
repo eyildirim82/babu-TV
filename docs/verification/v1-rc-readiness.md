@@ -1,11 +1,11 @@
 # BabuşTV V1 RC Readiness Board
 
-**Date:** 2026-09-14\
+**Date:** 2026-09-15\
 **Owner:** REVIEW / Integration Controller\
-**Status:** RC CANDIDATE `1.0.0-rc.2` PRODUCED AND TAGGED (SUPERSEDES rc.1) — WAVES 0–5 CLOSED GREEN; RC-BROWSER CLOSED GREEN; RC-PACKAGE rc.1 AND rc.2 CLOSED GREEN; PHYSICAL-TIZEN DEBT PENDING/DEFERRED\
+**Status:** RC CANDIDATE `1.0.0-rc.2` PRODUCED AND TAGGED (SUPERSEDES rc.1) — WAVES 0–5 CLOSED GREEN; RC-BROWSER CLOSED GREEN; RC-PACKAGE rc.1 AND rc.2 CLOSED GREEN; PHONE-PAIRING RELAY LIVE (#144–#146); rc.3 NOT YET PRODUCED; PHYSICAL-TIZEN DEBT PENDING/DEFERRED\
 **Starting baseline:** `main@f3061cbad574b507b1f80cf23e19b8af179e90b0`\
 **Baseline verify:** `34414698392` SUCCESS\
-**Latest evidence head:** `main@3f86fa4` (RC FIX rc.2 follow-ups merge, PR #142); post-merge verify `34866709641` SUCCESS
+**Latest evidence head:** `main@f1ddb8c` (default pairing relay config, PR #146); post-merge verify `34941573975` and relay-cloudflare `34941574025` SUCCESS
 
 ## Purpose
 
@@ -94,7 +94,7 @@ This table remains product-level. Evidence lists the merged PRs that implement e
 | 8 | M5 Home | `CLOSED GREEN` | No | Provider / Last Watched / Live TV / Favorites / Frequently Watched / Settings flow | #64 #71 #78 |
 | 9 | M5 Provider Management | `CLOSED GREEN` | No | switch/add/edit/delete with provider-scoped cleanup | #63 #78 #83 #86; RC fix #105 |
 | 10 | M5 First Run | `CLOSED GREEN` | No | short branded Provider Ekle flow; later boots remain restrained | #65 #78 |
-| 11 | M6 Secure Pairing | `CLOSED GREEN` | No for protocol/browser development | ephemeral encrypted single-use pairing + public/self-host-compatible relay contract | #72 #73 #74 #79 #84 #87; RC fix #131 |
+| 11 | M6 Secure Pairing | `CLOSED GREEN` | No for protocol/browser development | ephemeral encrypted single-use pairing + public/self-host-compatible relay contract | #72 #73 #74 #79 #84 #87; RC fix #131; relay server #144, Cloudflare relay #145, default public relay config #146 (deployed 2026-09-14) |
 | 12 | M7 Hardening | `CLOSED GREEN` | No for deterministic matrix | large/malformed/offline/migration/focus/security cases GREEN | #88 #90 #92 #93 #94 #95 #96 |
 | 13 | Browser Release Matrix | `CLOSED GREEN` | No | deterministic 1920×1080 release smoke GREEN | #132 → `main@450f681`; `docs/verification/rc-browser-execution.md` |
 | 14 | Tizen build/package RC gate | `CLOSED GREEN` | No for build; environment-dependent for package signing | available package/staging gates GREEN, unavailable paths honestly classified | #135 → #137 `main@4afeef4` (rc.1); #139 → #140 `main@e4a6bca` (rc.2); `docs/verification/rc-package-execution.md`, `docs/verification/rc-package-rc2-execution.md` |
@@ -199,6 +199,7 @@ These rows are not repository implementation blockers while TV access is unavail
 | Persisted settings/provider after relaunch | `DEFERRED` | real Tizen persistence check |
 | Supported Tizen floor/model acceptance | `DEFERRED` | applicable hardware/RTL/emulator matrix |
 | Final release install/package smoke | `DEFERRED` | candidate WGT installed and exercised on release-truth environment |
+| Phone pairing on a physical TV | `PENDING` | real phone camera scans the TV QR, provider arrives through the public relay, TV registers it; needs a package containing #146 |
 
 No row in this table may be converted to PASS solely because unit tests, browser smoke, package construction, install, or launch succeeded.
 
@@ -239,7 +240,7 @@ Synthetic/fake provider data only in public CI and screenshots.
 
 ## Controller state
 
-Current controller state (2026-09-14):
+Current controller state (2026-09-15):
 
 - Waves 0–5 are integrated on `main`; every role PR merged with a SUCCESS post-merge `verify` run (per-role evidence in `v1-parallel-execution.md`);
 - RC-BROWSER was accepted under Task 13 on 2026-09-14 against production `eaa928c`, qualification head `aca5f44`, integrated suite 76/76 PASS in `rc-browser` run `34838069268` attempts 1 and 2 with no retried scenario;
@@ -256,8 +257,16 @@ Current controller state (2026-09-14):
 - rc.1 and rc.2 both carry Tizen widget version `1.0.0`; same-version install behaviour is a physical-device check;
 - #139 follow-ups closed by #142: Live TV channel, category and Search rows now scroll into view (the channel list had the same defect, found with a 60-channel playlist; the RC matrix uses 11 channels); Home "Sık İzlenenler" empty-state message; Xtream server edit relabels the provider; IndexedDB `getAll` audit found no other order-dependent read, and `MemoryStructuredStore` now lists rows in primary-key order;
 - legacy root-absolute routes (`/log`, `/api/fetch`, `/proxy/`) investigated 2026-09-14, no change: in the staged `file://` build all three resolve to package-local URLs and are rejected without any network request; `/log` failures are swallowed and rc-browser uses `/log` levels as its playback-error signal; `/proxy/` rewriting only applies to `https:` pages; the legacy-shell proxy toggle cannot work on a TV with no proxy server (unchanged);
-- RC-PACKAGE observations fixed on `fix/rc3-onboarding-cleanups` (merge pending): legacy What's New listed inherited EN TV Player 1.x history under the BabuşTV version; `tizen/wgt.mjs` ran a missing `dev` signing profile without naming it;
-- open non-blocking RC-BROWSER observations: interrupted onboarding fixed on `fix/rc3-onboarding-cleanups` (merge pending; boot discards providers that never completed a first sync), phone relay HTTP 500 shown with the network copy (product wording decision), B06 Search passed without retry in the RC-PACKAGE local run;
+- RC-PACKAGE observations fixed by #143 (`main@5eb8e18`, post-merge verify `34886040249`): What's New now lists BabuşTV releases instead of inherited EN TV Player 1.x history; `tizen/wgt.mjs` stops before signing and lists profiles when the requested profile is missing;
+- RC-BROWSER interrupted-onboarding observation fixed by #143: boot discards providers that never completed a first sync;
+- open non-blocking RC-BROWSER observations: phone relay HTTP 500 shown with the network copy (product wording decision), B06 Search passed without retry in the RC-PACKAGE local run;
+- M6 public relay gap closed. The merged pairing code had no relay server and no build supplied `BABUSTV_PAIRING_CONFIG`, so packaged builds could not pair:
+  - #144 (`main@9c28e85`, verify `34887479016`) added the self-hostable ciphertext-only Node relay after three independent review rounds;
+  - #145 (`main@36264ec`, verify `34894744390`, relay-cloudflare `34894744526`) added the Cloudflare Worker + single in-memory Durable Object deployment chosen in ADR 0003, and removed literal NUL bytes that #144 had left in `relay/src/memory-rate-limiter.ts`;
+  - #146 (`main@f1ddb8c`, verify `34941573975`, relay-cloudflare `34941574025`) enabled pairing in normal builds via `player/public/pairing-config.js`;
+- the owner deployed the relay on 2026-09-14 (version `1c2adf63-23bf-4a47-8a89-fdc8d96cd262`) and renamed the e-mail-derived `workers.dev` subdomain to `babustv`. Live checks and a live end-to-end desktop pairing (local TV build → live relay → deployed phone page → provider registered) passed with synthetic data (`docs/verification/pairing-relay-cloudflare.md`). Wrangler was logged out afterwards. The dashboard Observability setting has not been checked on screen;
+- `1.0.0-rc.3` is not produced: the owner asked on 2026-09-14 and again on 2026-09-15 to package last, so the rc.1/rc.2 WGTs do not contain #142–#146;
+- 31 historical Wave 3B, Wave 3C, M7 and RC-BROWSER plans, specs and boards that existed only on unmerged docs branches were imported with historical banners on 2026-09-15. The remaining unmerged branches are CI verification/evidence branches or PRs superseded by merged work, and are not merge candidates;
 - physical-Tizen debt rows are unchanged and remain `PENDING`/`DEFERRED`;
 - old B0/M3G/Xtream worker branches and the Wave 1 base are historical evidence, not implementation bases;
 - merge authority remains Controller / explicit user instruction.
