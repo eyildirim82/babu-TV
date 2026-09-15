@@ -101,7 +101,8 @@ void test('UI_COPY exposes the exact approved Turkish runtime contract', async (
 void test('copy.d.ts matches the exact UI_COPY declaration shape', async () => {
   await assertFileExists(declarationUrl, 'player/src/ui/copy.d.ts');
   const source = await readFile(declarationUrl, 'utf8');
-  assert.equal(source.trim(), EXPECTED_DECLARATION);
+  // Windows checkouts carry CRLF; the contract is the declaration, not the newline.
+  assert.equal(source.replace(/\r\n/g, '\n').trim(), EXPECTED_DECLARATION);
 });
 
 void test('settings runtime-generated labels are Turkish-first and use shared copy', async () => {
