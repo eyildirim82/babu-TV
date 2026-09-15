@@ -60,3 +60,27 @@ Also confirmed sound by the reviewer: nothing stored or logged, `CF-Connecting-I
 - Nothing is deployed; no Cloudflare account, `workers.dev` hostname or live endpoint exists.
 - Free-plan limits and logging behaviour are taken from Cloudflare documentation (ADR 0003), not observed on a live account.
 - Durable Object eviction timing and real-world restart frequency are not measured.
+
+## Deployment record (owner, 2026-09-14/15)
+
+- The owner created a Cloudflare account and ran `npx wrangler login` and `npm run deploy` from a clean `main@36264ec` worktree. Wrangler 4.131.2 reported bindings `RELAY` (Durable Object) and `ASSETS`, version `1c2adf63-23bf-4a47-8a89-fdc8d96cd262`.
+- Cloudflare had auto-assigned an e-mail-derived `workers.dev` subdomain. The owner renamed it to `babustv`, and the old hostname stopped resolving (curl DNS failure, exit 6).
+- Live checks against `https://babustv-pairing-relay.babustv.workers.dev` with synthetic data only:
+  - preflight `204` with `GET, POST, OPTIONS`;
+  - phone page `/babustv/` `200 text/html`, with its bundle served;
+  - unknown session `404`;
+  - create `204` → put `204` → poll `ready` → poll `consumed`, with `no-store`, `nosniff`, `no-referrer` and CORS headers.
+- Not observed: the dashboard Observability setting. The deployed configuration disables logs, but no one has looked at the dashboard yet.
+
+## Default pairing config (`feature/pairing-default-relay-config`)
+
+| Gate | Result | Notes |
+| --- | --- | --- |
+| RED | FAIL as expected | 4 new `PAIR-CFG` tests failed before `player/public/pairing-config.js` and the script tag existed |
+| `PAIR-CFG` tests | 4/4 PASS | classic script before the app entry; whitelist-only keys; HTTPS same-origin relay and `/babustv/` phone page; 2 s poll; never overrides an earlier value; ES5-only syntax |
+| Web build | PASS | `dist/index.html` loads `/babustv/pairing-config.js` before `/babustv/assets/index.*.js` |
+| `npm run tizen:build` | PASS | staged `index.html` loads `./pairing-config.js`; the stage absolute-path guard passed |
+| rc-browser suite (all packs, local cached Chromium) | 76/76 PASS | fixtures that inject their own pairing config keep it |
+| Live end-to-end pairing | PASS | local TV build with the default config → live relay → **deployed** phone page on Cloudflare (M3U) → TV decrypted and registered the provider and reached Home 2.5 s after the phone submitted. The TV made 4 relay requests (3 polls). Relay bodies held only the envelope keys `algorithm, ciphertext, iv, senderPublicKey, version`. The playlist URL and synthetic canaries never appeared in relay traffic. The M3U playlist itself was a harness mock in the TV browser context. |
+
+Not claimed: pairing on a physical Samsung TV or a real phone camera scanning the QR.
