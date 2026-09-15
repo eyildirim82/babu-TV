@@ -18,6 +18,8 @@ Sessions live 5 minutes (server clock), accept one ciphertext, and deliver it on
 
 Requirements: Node.js 22 or newer, and a reverse proxy that provides HTTPS. The TV and phone clients refuse plain-HTTP relay URLs.
 
+TV and web builds read the relay and phone-page addresses from [`player/public/pairing-config.js`](../player/public/pairing-config.js). To use your own relay, edit both URLs there before building, and serve the player build (`player/dist`) over HTTPS at the `phoneBaseUrl` you configure. The Node relay itself does not serve the phone page.
+
 ```bash
 npm ci
 npm run relay:build

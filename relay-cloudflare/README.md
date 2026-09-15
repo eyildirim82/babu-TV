@@ -41,7 +41,9 @@ Deploying creates public infrastructure under your Cloudflare account. Do it onl
    - `curl -i -X OPTIONS https://babustv-pairing-relay.<your-subdomain>.workers.dev/v1/pairing/sessions` returns `204` with `access-control-allow-methods: GET, POST, OPTIONS`;
    - opening `https://babustv-pairing-relay.<your-subdomain>.workers.dev/babustv/` in a browser loads the BabuşTV page;
    - in the dashboard, the Worker's **Observability** settings show logs disabled.
-6. Record the URL. TV and web builds receive it through `BABUSTV_PAIRING_CONFIG` in a separate change.
+6. Put the URL into [`player/public/pairing-config.js`](../player/public/pairing-config.js): `relayBaseUrl` is the bare origin and `phoneBaseUrl` is the same origin followed by `/babustv/`. TV and web builds load that file before the app starts.
+
+The default BabuşTV deployment is `https://babustv-pairing-relay.babustv.workers.dev`. If Cloudflare assigned a subdomain derived from your e-mail address, change it under **Workers & Pages → Your subdomain** before publishing the URL.
 
 Undo: `npx wrangler rollback` returns to the previous version; `npx wrangler delete` removes the Worker entirely.
 
