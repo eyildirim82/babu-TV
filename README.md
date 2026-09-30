@@ -1,149 +1,214 @@
-# 📺 BabuşTV
+<p align="center">
+  <img src="player/public/brand/babustv-wordmark.svg" alt="BabuşTV" width="420" />
+</p>
 
-**Samsung Tizen TV için kumanda odaklı, gizlilik öncelikli canlı TV uygulaması.** Xtream ve M3U sağlayıcılarını destekler; kanal rehberi, favoriler, arama ve telefonla şifreli sağlayıcı ekleme sunar.
+<p align="center">
+  <strong>A remote-first, privacy-focused live TV client for Samsung Tizen TVs.</strong>
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tizen](https://img.shields.io/badge/Tizen-5.0+-red?logo=samsung)]()
+<p align="center">
+  <a href="https://github.com/eyildirim82/babu-TV/actions/workflows/verify.yml"><img src="https://github.com/eyildirim82/babu-TV/actions/workflows/verify.yml/badge.svg" alt="Verification" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License" /></a>
+  <img src="https://img.shields.io/badge/Tizen-5.0%2B-red?logo=samsung" alt="Tizen 5.0+" />
+  <img src="https://img.shields.io/badge/TypeScript-project-blue?logo=typescript" alt="TypeScript" />
+</p>
 
-> **Son sürüm adayı: v1.0.0-rc.2** — [CHANGELOG](CHANGELOG.md). `main` dalında rc.2'den sonra gelen, henüz paketlenmemiş değişiklikler var (telefonla eşleştirme dahil). Gerçek Samsung TV kabul testleri henüz tamamlanmadı; durum için [V1 RC hazırlık panosu](docs/verification/v1-rc-readiness.md).
+BabuşTV is a Samsung Tizen live-TV application built around TV-remote navigation, privacy-conscious credential handling and resilient playback. It supports **Xtream** and **M3U/M3U8** providers, EPG data, favorites, search, viewing history and encrypted phone-to-TV provider onboarding.
 
----
+The project started from the open-source **EN TV Player** codebase and has since been substantially extended with a new product identity, modular application architecture, provider abstractions, secure pairing, automated verification and Tizen packaging workflows. The upstream origin and license history are intentionally preserved.
 
-## Neler var
+> **Current release candidate:** `v1.0.0-rc.2`. `main` also contains post-RC changes, including phone pairing. Browser-level qualification is automated; final acceptance testing on physical Samsung TV hardware is still pending.
 
-| | |
-|---|---|
-| 📡 Sağlayıcılar | Xtream (sunucu, kullanıcı adı, şifre) ve M3U/M3U8 playlist; birden fazla sağlayıcı, aynı anda biri aktif |
-| 🏠 Ana Sayfa | Sağlayıcı seçimi, Son İzlenen, Canlı TV, Favoriler, Sık İzlenenler, Ayarlar |
-| 📺 Canlı TV | Tam ekran yayın, OK ile açılan kategori/kanal/program paneli; gezinmek yayını değiştirmez, OK ile açılır |
-| 🗓️ Program rehberi | Şimdiki ve sonraki program, detay; Xtream EPG ve XMLTV |
-| ⭐ Favoriler ve arama | Sağlayıcıya özel favoriler; Türkçe karakter uyumlu yerel kanal araması |
-| 📱 Telefonla ekle | TV'deki QR kodu telefonla okutulur, sağlayıcı bilgisi telefonda şifrelenip TV'ye gönderilir |
-| 🔓 Oynatma | HLS/DASH/TS, ClearKey ve PlayReady; Shaka Player ve Samsung AVPlay yedeği, sınırlı ve sınıflandırılmış yeniden deneme |
-| 🎮 Kumanda | Temel çekirdek Yukarı/Aşağı/Sol/Sağ/OK/Geri ile çalışır; CH+/CH- ve numara tuşları destekleniyorsa |
-| 🔒 Gizlilik | Hesap yok, bulut senkronizasyonu yok; sağlayıcı şifreleri Samsung WidgetData güvenli deposunda tutulur ve loglanmaz |
+## Engineering highlights
 
-Kapsam dışı (V1): film/dizi (VOD), geçmiş yayın (catch-up), hesap sistemi, bulut senkronizasyonu. Ayrıntılar: [V1 ürün ve mimari tasarımı](docs/superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md).
+| Area | What the project demonstrates |
+| --- | --- |
+| **Smart TV UX** | Remote-first navigation, explicit focus management, numeric channel entry and TV-oriented interaction flows |
+| **Application architecture** | Provider adapters, domain services, repositories, platform boundaries and feature-level composition |
+| **Streaming** | HLS / DASH / TS playback through Shaka Player with Samsung AVPlay fallback and classified recovery paths |
+| **EPG & provider integration** | Xtream and M3U providers, XMLTV parsing, EPG normalization, channel mapping and provider-scoped state |
+| **Security & privacy** | ECDH P-256 + AES-GCM pairing, protected credential storage, log sanitization and no account/cloud-sync requirement |
+| **Edge/backend work** | A Node.js pairing relay plus a Cloudflare Workers + Durable Object deployment option |
+| **Quality engineering** | Unit/integration tests, browser qualification with Playwright, type checking, build checks, brand checks and GitHub Actions |
+| **Delivery** | Reproducible Samsung Tizen staging, packaging and deployment tooling |
 
----
+## Product capabilities
 
-## İlk çalıştırma
+- **Multiple provider types** — Xtream and M3U/M3U8, with multiple saved providers and one active provider at a time
+- **Remote-first home screen** — provider selection, recently watched, live TV, favorites, frequently watched channels and settings
+- **Live TV experience** — full-screen playback with category/channel/program overlays designed around directional remote input
+- **Program guide** — current/next program data from Xtream EPG and XMLTV sources
+- **Favorites and search** — provider-scoped favorites and local channel search with Turkish-character-aware matching
+- **Secure phone onboarding** — scan a TV QR code and enter provider credentials on a phone instead of the TV keyboard
+- **Playback resilience** — Shaka Player plus Samsung AVPlay fallback with bounded, classified retry behavior
+- **Local-first privacy** — no BabuşTV account and no cloud synchronization of viewing state or provider credentials
 
-1. Uygulamayı kurup açın; kısa tanıtım ekranında bir sağlayıcı türü seçin.
-2. **Xtream** veya **M3U** kartıyla bilgileri TV klavyesinden girin, ya da
-3. **Telefonla Ekle** kartını seçin, ekrandaki QR kodunu telefonunuzla okutun ve bilgileri telefonda girin.
-4. Kanallar yüklenince Ana Sayfa açılır.
+V1 intentionally does **not** include VOD, catch-up TV, a user-account system or cloud sync. See the [V1 product and architecture design](docs/superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md) for the detailed scope.
 
-## Telefonla eşleştirme nasıl korunur
+## Architecture
 
-- TV her eşleştirme için tek kullanımlık bir anahtar üretir; QR kodunda yalnızca oturum bilgisi ve TV'nin açık anahtarı bulunur, sağlayıcı bilgisi bulunmaz.
-- Telefon, sağlayıcı bilgisini tarayıcıda TV'nin anahtarıyla şifreler (ECDH P-256 + AES-GCM).
-- Arada çalışan **relay** yalnızca şifreli veriyi taşır; çözemez, sağlayıcıya bağlanmaz, istek içeriğini loglamaz. Oturum 5 dakika geçerlidir ve tek kez teslim edilir.
-- Varsayılan relay BabuşTV'nin Cloudflare üzerindeki servisidir (`babustv-pairing-relay.babustv.workers.dev`). Cloudflare, her web servisinde olduğu gibi bağlanan IP adreslerini kendi altyapısında işler.
-- Kendi relay'inizi çalıştırabilirsiniz: [relay/README.md](relay/README.md) (Node, kendi sunucunuz) veya [relay-cloudflare/README.md](relay-cloudflare/README.md) (kendi Cloudflare hesabınız). Adresler [`player/public/pairing-config.js`](player/public/pairing-config.js) dosyasındadır.
+```text
+                    ┌───────────────────────────┐
+                    │      Samsung Tizen TV      │
+                    │                           │
+Xtream / M3U ──────▶│ Provider adapters         │
+                    │        │                  │
+                    │        ▼                  │
+                    │ Domain + repositories     │
+                    │ EPG · search · favorites  │
+                    │        │                  │
+                    │        ▼                  │
+                    │ Playback coordinator      │
+                    │ Shaka ───────▶ AVPlay     │
+                    └───────────────────────────┘
 
----
-
-## Geliştirme
-
-Gereksinimler: Node.js 22 veya üzeri, npm.
-
-```bash
-npm ci
-npm run dev
+Phone browser
+    │
+    │ ECDH P-256 + AES-GCM encrypted payload
+    ▼
+Pairing relay (opaque ciphertext only)
+    │
+    ▼
+Samsung TV → secure credential store
 ```
 
-Tarayıcı geliştirme adresi: `http://localhost:5173/babustv/`
+The browser and Tizen implementations share application/domain code behind platform boundaries. Provider-specific behavior is isolated behind adapters, while structured repositories persist catalog, provider, EPG, favorite and watch-state data.
 
-Doğrulama:
+## Secure phone-to-TV pairing
+
+Typing long provider credentials with a TV remote is awkward, so BabuşTV includes a phone-assisted onboarding flow designed to avoid exposing credentials to the relay:
+
+1. The TV creates a short-lived pairing session and a one-time key pair.
+2. The QR code contains session information and the TV public key — **not provider credentials**.
+3. The phone encrypts provider data in the browser using **ECDH P-256 + AES-GCM**.
+4. The relay transports only the encrypted payload and does not connect to the provider on the user's behalf.
+5. The TV retrieves and decrypts the payload, then persists credentials through the Samsung WidgetData credential store.
+
+Pairing sessions expire after five minutes and are single-delivery. The default public relay runs on **Cloudflare Workers + a Durable Object**; a self-hosted Node.js relay is also included. See [relay/README.md](relay/README.md), [relay-cloudflare/README.md](relay-cloudflare/README.md) and the [security documentation](docs/SECURITY.md).
+
+## Tech stack
+
+**Client & platform**
+
+- TypeScript / JavaScript
+- Vite
+- Samsung Tizen Web APIs
+- Shaka Player
+- Samsung AVPlay
+- IndexedDB / Samsung WidgetData-backed storage boundaries
+
+**Relay & edge**
+
+- Node.js
+- Cloudflare Workers
+- Cloudflare Durable Objects
+- Web Crypto (`ECDH P-256`, `AES-GCM`)
+
+**Testing & delivery**
+
+- Node test runner
+- Playwright
+- TypeScript type checking
+- GitHub Actions
+- Custom Tizen packaging scripts + Tizen Studio CLI support
+
+## Verification
+
+The repository treats verification as part of the product rather than a final manual step.
 
 ```bash
-npm test              # player, relay testleri
-npm run typecheck
-npm run build
-npm run relay:build
-npm run brand:check
+npm test              # player + TypeScript + relay tests
+npm run typecheck     # player + relay type checks
+npm run build         # production player build
+npm run rc:browser    # Playwright release-candidate browser qualification
+npm run relay:build   # relay build
+npm run brand:check   # product identity / legacy-brand guard
 ```
 
-Cloudflare relay paketi ayrı kurulur (kök çalışma alanına dahil değildir):
+The Cloudflare package is intentionally isolated from the root npm workspace. It can be verified independently without a Cloudflare account:
 
 ```bash
 cd relay-cloudflare
 npm ci
 npm run typecheck
-npm test              # yerel Workers çalışma ortamında, hesap gerekmez
-npm run build         # yayına almadan deneme paketi
+npm test
+npm run build
 ```
 
-Depo yapısı:
+## Repository structure
 
-| Klasör | İçerik |
-|---|---|
-| `player/` | TV uygulaması (Vite, TypeScript + JS) |
-| `relay/` | Eşleştirme relay çekirdeği ve Node sunucusu |
-| `relay-cloudflare/` | Relay'in Cloudflare Workers + Durable Object dağıtımı |
-| `tizen/` | Tizen paketleme araçları |
-| `tools/rc-browser/` | Tarayıcı sürüm adayı test paketleri |
-| `docs/` | Tasarımlar, kararlar (ADR), planlar ve doğrulama kayıtları |
+```text
+├── player/              # TV/web application, domain modules and tests
+├── relay/               # Pairing relay core and Node.js server
+├── relay-cloudflare/    # Cloudflare Worker + Durable Object deployment
+├── tizen/               # Samsung Tizen staging, packaging and deployment tools
+├── tools/rc-browser/    # Playwright release-candidate qualification harness
+├── docs/                # Architecture, ADRs, plans, security and verification evidence
+└── .github/workflows/   # Automated verification workflows
+```
 
-Katkıda bulunurken önce [AGENTS.md](AGENTS.md) ve [docs/REPO_RULES.md](docs/REPO_RULES.md) dosyalarını okuyun.
+## Run locally
 
----
+Requirements: **Node.js 22+** and npm.
 
-## Tizen build ve packaging
+```bash
+git clone https://github.com/eyildirim82/babu-TV.git
+cd babu-TV
+npm ci
+npm run dev
+```
 
-BabuşTV'nin canonical Tizen kimliği:
+Development server:
 
-- package: `BabusTVApp`
-- application: `BabusTVApp.BabusTV`
-- display name: `BABUŞ TV`
+```text
+http://localhost:5173/babustv/
+```
 
-İki paketleme hattı da aynı kimliği ve artifact adlandırmasını kullanır.
+## Samsung Tizen build
 
-### Custom packaging
+BabuşTV uses one canonical product identity across its packaging paths:
+
+```text
+package:      BabusTVApp
+application:  BabusTVApp.BabusTV
+display name: BABUŞ TV
+```
+
+Custom packaging:
 
 ```bash
 npm run build
 npm run tizen
 ```
 
-Feature branch çıktısı:
-
-```text
-beta/babustv_beta_v<version>_<commit>.wgt
-```
-
-`main` çıktısı:
-
-```text
-stable/babustv_stable_v<version>_<commit>.wgt
-```
-
-### Tizen Studio CLI
+Tizen Studio CLI flow:
 
 ```bash
 npm run tizen:build
-TIZEN_PROFILE=<profil-adı> npm run tizen:package
+TIZEN_PROFILE=<profile-name> npm run tizen:package
 ```
 
-Paket `tizen/build/` altında aynı canonical adlandırmayla bırakılır. Ayrıntılar için [tizen/README.md](tizen/README.md) ve Windows geliştirme ortamı notları için [SETUP.md](SETUP.md) dosyasına bakın.
+See [tizen/README.md](tizen/README.md) and [SETUP.md](SETUP.md) for environment and device setup details.
 
-> Paket/uygulama kimliği değişiklikleri cihaz storage origin'ini etkileyebilir. Desteklenen kurulu bir ürün kimliğinden başka kimliğe otomatik veri taşıma bu repoda yapılmaz; böyle bir upgrade hedefi ayrı, açıkça onaylanmış migration tasarımı gerektirir.
+## Engineering documentation
 
----
+This repository keeps implementation decisions and verification evidence alongside the code. Useful entry points:
 
-## Belgeler
+- [V1 product & architecture design](docs/superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md)
+- [Security model](docs/SECURITY.md)
+- [Telemetry & privacy](docs/TELEMETRY.md)
+- [ADR 0001 — controlled upstream divergence](docs/decisions/0001-controlled-upstream-divergence.md)
+- [ADR 0002 — Tizen credential storage](docs/decisions/0002-tizen-credential-storage.md)
+- [ADR 0003 — pairing relay hosting](docs/decisions/0003-pairing-relay-hosting.md)
+- [V1 RC readiness / verification](docs/verification/v1-rc-readiness.md)
+- [Changelog](CHANGELOG.md)
 
-- [V1 ürün ve mimari tasarımı](docs/superpowers/specs/2026-09-07-babustv-v1-product-and-architecture-design.md)
-- [Devir belgesi](HANDOVER.md)
-- [V1 RC hazırlık panosu](docs/verification/v1-rc-readiness.md)
-- Kararlar: [ADR 0001 upstream](docs/decisions/0001-controlled-upstream-divergence.md), [ADR 0002 kimlik bilgisi deposu](docs/decisions/0002-tizen-credential-storage.md), [ADR 0003 relay barındırma](docs/decisions/0003-pairing-relay-hosting.md)
-- [Güvenlik](docs/SECURITY.md) · [Telemetri](docs/TELEMETRY.md)
+## Contributing and security reports
 
-## Hata raporu ve katkı
+Before contributing, read [AGENTS.md](AGENTS.md) and [docs/REPO_RULES.md](docs/REPO_RULES.md). When opening an issue, include the TV model, Tizen version, app version and reproduction steps when relevant.
 
-Issue açarken TV modeli, Tizen sürümü, uygulama sürümü ve tekrar üretme adımlarını ekleyin. Sağlayıcı adresi, kullanıcı adı, şifre veya playlist bağlantısı paylaşmayın. Mevcut issue'ları önce kontrol edin ve her issue'da tek problemi ele alın.
+Do **not** post provider URLs, usernames, passwords or private playlist links in issues or logs.
 
-## License
+## Origin and license
 
-MIT — see [LICENSE](LICENSE). BabuşTV, [EN TV Player](docs/UPSTREAM_BASELINE.md) tabanından kontrollü olarak ayrılmış bağımsız bir üründür; lisans ve repository geçmişi proje kökenini korur.
+BabuşTV is distributed under the **MIT License**. It is a controlled derivative of [EN TV Player](docs/UPSTREAM_BASELINE.md); the repository preserves the relevant upstream history and attribution while documenting the architectural and product divergence introduced by BabuşTV.
