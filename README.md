@@ -19,6 +19,28 @@ The project started from the open-source **EN TV Player** codebase and has since
 
 > **Current release candidate:** `v1.0.0-rc.2`. `main` also contains post-RC changes, including phone pairing. Browser-level qualification is automated; final acceptance testing on physical Samsung TV hardware is still pending.
 
+## Product screenshots
+
+These screenshots are generated from the real production build at a deterministic **1920×1080** viewport using the repository's Playwright browser harness and synthetic provider data. No production credentials or private playlist data are used.
+
+### Home
+
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="BabuşTV home screen" width="100%" />
+</p>
+
+### Live TV
+
+<p align="center">
+  <img src="docs/screenshots/live-tv.png" alt="BabuşTV Live TV screen" width="100%" />
+</p>
+
+### Search
+
+<p align="center">
+  <img src="docs/screenshots/search.png" alt="BabuşTV channel search overlay" width="100%" />
+</p>
+
 ## Engineering highlights
 
 | Area | What the project demonstrates |
